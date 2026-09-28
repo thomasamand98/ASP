@@ -160,7 +160,7 @@ export function EntiteForm({ formId, form, smtpPasswordSet, smtpPlanningPassword
           <input value={form.Nom_societe} onChange={(e) => onChange({ ...form, Nom_societe: e.target.value })} />
         </label>
         <label className="field">
-          Téléphone
+          Téléphones
           <input value={form.Num_Telephone} onChange={(e) => onChange({ ...form, Num_Telephone: e.target.value })} />
         </label>
         <label className="field">
