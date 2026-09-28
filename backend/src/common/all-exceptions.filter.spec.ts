@@ -37,8 +37,25 @@ describe('AllExceptionsFilter', () => {
     expect(body.message).not.toContain('détail interne');
   });
 
+  it.each(['P1000', 'P1001', 'P1003', 'P2037'])('renvoie 503 quand la base est indisponible (%s)', (code) => {
+    expect(run(prismaError(code))).toEqual({
+      status: 503,
+      body: { statusCode: 503, message: 'Base de données indisponible, réessayez dans quelques instants.' },
+    });
+  });
+
+  it('renvoie 503 quand le pool ne parvient pas à ouvrir de connexion', () => {
+    const poolTimeout = new Prisma.PrismaClientKnownRequestError(
+      'Database error. Code: `45028`. Message: `pool failed to retrieve a connection from pool`',
+      { code: 'P2039', clientVersion: 'test' },
+    );
+    expect(run(poolTimeout).status).toBe(503);
+    expect(run(new Prisma.PrismaClientInitializationError('connexion impossible', 'test')).status).toBe(503);
+  });
+
   it('renvoie 500 générique pour une erreur Prisma non répertoriée ou un bug', () => {
-    expect(run(prismaError('P1001')).status).toBe(500);
+    expect(run(prismaError('P2021')).status).toBe(500);
+    expect(run(prismaError('P2039')).status).toBe(500);
     expect(run(new TypeError('boom'))).toEqual({ status: 500, body: { statusCode: 500, message: 'Erreur interne du serveur' } });
   });
 });

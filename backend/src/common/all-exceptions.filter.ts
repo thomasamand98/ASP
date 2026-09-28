@@ -20,6 +20,22 @@ const prismaErrors: Record<string, { status: HttpStatus; message: string }> = {
   P2025: { status: HttpStatus.NOT_FOUND, message: 'Enregistrement introuvable.' },
 };
 
+// Base injoignable ou qui refuse la connexion (identifiants, base absente,
+// serveur arrêté, trop de connexions...) : ce n'est pas un bug de l'API mais
+// une indisponibilité, d'où un 503 plutôt qu'un 500.
+const databaseUnavailableCodes = new Set(['P1000', 'P1001', 'P1003', 'P1008', 'P1010', 'P1011', 'P1017', 'P2037']);
+// L'adaptateur MariaDB remonte l'échec d'obtention d'une connexion du pool
+// (erreur 45028 du pilote, ex. socket Cloud SQL absent ou mot de passe refusé)
+// sous le code générique P2039 : seul le message permet de le reconnaître.
+const POOL_TIMEOUT = /Code: `45028`/;
+const DATABASE_UNAVAILABLE_MESSAGE = 'Base de données indisponible, réessayez dans quelques instants.';
+
+function isDatabaseUnavailable(exception: unknown): exception is Error {
+  if (exception instanceof Prisma.PrismaClientInitializationError) return true;
+  if (!(exception instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  return databaseUnavailableCodes.has(exception.code) || (exception.code === 'P2039' && POOL_TIMEOUT.test(exception.message));
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('Exceptions');
@@ -33,6 +49,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const raw = typeof body === 'string' ? body : (body as { message?: string | string[] }).message;
       const message = Array.isArray(raw) ? raw.join(', ') : (raw ?? exception.message);
       response.status(status).json({ statusCode: status, message });
+      return;
+    }
+
+    if (isDatabaseUnavailable(exception)) {
+      // Journalisé en erreur avec le détail : c'est la seule trace de la
+      // cause réelle (mot de passe, socket, base...).
+      this.logger.error(`Base de données indisponible : ${exception.message}`);
+      const status = HttpStatus.SERVICE_UNAVAILABLE;
+      response.status(status).json({ statusCode: status, message: DATABASE_UNAVAILABLE_MESSAGE });
       return;
     }
 
