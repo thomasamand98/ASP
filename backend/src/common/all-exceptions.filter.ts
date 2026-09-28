@@ -55,7 +55,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (isDatabaseUnavailable(exception)) {
       // Journalisé en erreur avec le détail : c'est la seule trace de la
       // cause réelle (mot de passe, socket, base...).
-      this.logger.error(`Base de données indisponible : ${exception.message}`);
+      this.logger.error(`Base de données indisponible : ${exception.message.replace(/\s*\n\s*/g, ' | ')}`);
       const status = HttpStatus.SERVICE_UNAVAILABLE;
       response.status(status).json({ statusCode: status, message: DATABASE_UNAVAILABLE_MESSAGE });
       return;
@@ -72,7 +72,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     }
 
-    this.logger.error(exception instanceof Error ? (exception.stack ?? exception.message) : String(exception));
+    // Sur une seule ligne : Cloud Logging crée une entrée par ligne, et le
+    // détail utile (table ou colonne absente...) serait séparé de l'en-tête.
+    const detail = exception instanceof Error ? (exception.stack ?? exception.message) : String(exception);
+    this.logger.error(detail.replace(/\s*\n\s*/g, ' | '));
     response.status(500).json({ statusCode: 500, message: 'Erreur interne du serveur' });
   }
 }
