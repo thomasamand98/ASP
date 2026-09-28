@@ -63,6 +63,8 @@
      mobile (layout/AppLayout.css) : les en-têtes collants se placent dessous. */
   --tabbar-h: 2.8rem;
   --burger-h: 3.25rem;
+  /* Barre repliée du bandeau « Tâches à faire » (layout/TasksPanel.css). */
+  --tasks-rail-w: 2.75rem;
 }
 
 /* Thème sombre : choisi par l'utilisateur dans la sidebar, ou par le

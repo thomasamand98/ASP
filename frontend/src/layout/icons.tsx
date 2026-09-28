@@ -112,3 +112,17 @@ export function CloseIcon(props: SVGProps<SVGSVGElement>) {
     </IconBase>
   )
 }
+
+// Bandeau « Tâches à faire » (voir TasksPanel.tsx).
+export function TasksIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="M9 5h10" />
+      <path d="M9 12h10" />
+      <path d="M9 19h10" />
+      <path d="m3.5 5 1.2 1.2L7 4" />
+      <path d="m3.5 12 1.2 1.2L7 11" />
+      <path d="m3.5 19 1.2 1.2L7 18" />
+    </IconBase>
+  )
+}

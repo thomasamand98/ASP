@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { Sidebar, type MenuNode } from './Sidebar.js'
 import { TabBar } from './TabBar.js'
+import { TasksPanel } from './TasksPanel.js'
 import { TabsContext, type OpenTabRequest } from './TabsContext.js'
 import { ProjectionProvider } from '../components/projection/ProjectionProvider.js'
 import { GuardBoundary } from '../components/unsaved-changes/UnsavedChangesProvider.js'
@@ -296,6 +297,7 @@ export function AppLayout() {
               ))}
             </div>
           </div>
+          <TasksPanel />
         </div>
       </ProjectionProvider>
     </TabsContext.Provider>
