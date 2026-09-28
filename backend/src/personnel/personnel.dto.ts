@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { date, id, num, text } from '../common/validation.js';
+import { date, num, text } from '../common/validation.js';
 
 // Champs qu'un client peut envoyer pour créer/modifier un personnel —
 // le sous-ensemble scripturable de personnelDetailSelect
-// (personnel.service.ts). IDADRESSES est une string côté JSON (BigInt non
-// sérialisable) et les Date_* des strings ISO — converties dans
-// personnel.service.ts. Routier/Manutention/Atelier sont des codes 0/1 côté
+// (personnel.service.ts). Les Date_* sont des strings ISO — converties dans
+// personnel.service.ts ; IDADRESSES est géré par le serveur (voir
+// common/adresse.ts). Routier/Manutention/Atelier sont des codes 0/1 côté
 // vrai modèle Prisma (pas des booléens).
 export const CreatePersonnelDto = z.object({
   Civilite_Personnel: text.optional(),
@@ -33,7 +33,6 @@ export const CreatePersonnelDto = z.object({
   Manutention: num,
   Atelier: num,
   Commentaire_Personnel: text.optional(),
-  IDADRESSES: id.optional(),
   Date_validite_selection_medicale: date.optional(),
   Date_validite_carte_chauffeur: date.optional(),
   Date_validite_CAP: date.optional(),

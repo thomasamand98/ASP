@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { serializeBigInt } from '../prisma/serialize-bigint.js';
+import { adresseFieldNames, adresseSelect, pickAdresse, saveAdresse } from '../common/adresse.js';
 import { UpdateEntiteDto } from './entite.dto.js';
 
 export const entiteSelect = {
@@ -36,18 +37,6 @@ export const entiteSelect = {
 // une nouvelle valeur non vide est envoyée.
 const secretFieldNames = ['MDP_SMTP', 'MDP_SMTP_Planning'] as const;
 
-const addressSelect = {
-  Adresse1: true,
-  Adresse2: true,
-  Adresse3: true,
-  CP: true,
-  Localite: true,
-  Pays: true,
-  Pays_full_name: true,
-} satisfies Prisma.AdresseSelect;
-
-const addressFieldNames = ['Adresse1', 'Adresse2', 'Adresse3', 'CP', 'Localite', 'Pays', 'Pays_full_name'] as const;
-
 @Injectable()
 export class EntiteService {
   constructor(private readonly prisma: PrismaService) {}
@@ -66,7 +55,7 @@ export class EntiteService {
       select: { ...entiteSelect, MDP_SMTP: true, MDP_SMTP_Planning: true, Logo: true },
     });
     const adresse = entite.IDADRESSES
-      ? await this.prisma.adresse.findUnique({ where: { IDADRESSES: entite.IDADRESSES }, select: addressSelect })
+      ? await this.prisma.adresse.findUnique({ where: { IDADRESSES: entite.IDADRESSES }, select: adresseSelect })
       : null;
     return serializeBigInt({
       ...entite,
@@ -80,14 +69,11 @@ export class EntiteService {
   // Sépare les champs d'adresse (aplatis côté DTO) du reste, et les
   // persiste dans la table `adresses` liée via IDADRESSES — créée si
   // l'entité n'en a pas encore (cas normalement jamais rencontré en
-  // pratique, la ligne existante en a toujours une).
+  // pratique, la ligne existante en a toujours une). Voir common/adresse.ts.
   async updateEntite(dto: UpdateEntiteDto) {
     const current = await this.prisma.entite.findFirstOrThrow();
 
-    const addressData: Partial<Record<(typeof addressFieldNames)[number], string>> = {};
-    for (const field of addressFieldNames) {
-      if (dto[field] !== undefined) addressData[field] = dto[field];
-    }
+    const addressData = pickAdresse(dto);
     // Logo traité séparément (converti en Buffer, voir plus bas) : exclu ici
     // par déstructuration plutôt que `delete`, pour que son absence soit
     // aussi reflétée dans le type de `entiteFields` (sinon TS le voit encore
@@ -95,7 +81,7 @@ export class EntiteService {
     // Prisma pour ce champ).
     const { Logo: logoDataUri, ...dtoWithoutLogo } = dto;
     const entiteFields = { ...dtoWithoutLogo };
-    for (const field of addressFieldNames) delete entiteFields[field];
+    for (const field of adresseFieldNames) delete entiteFields[field];
     // Champ mot de passe vide = « inchangé » (le formulaire ne connaît pas
     // la valeur actuelle et l'envoie vide s'il n'est pas modifié).
     for (const field of secretFieldNames) {
@@ -106,19 +92,12 @@ export class EntiteService {
     // vide signifie ici une vraie suppression voulue, pas "inchangé".
     const logoData = logoDataUri !== undefined ? { Logo: logoDataUri ? Buffer.from(logoDataUri, 'utf-8') : null } : {};
 
-    let idAdresses = current.IDADRESSES;
-    if (Object.keys(addressData).length > 0) {
-      if (idAdresses) {
-        await this.prisma.adresse.update({ where: { IDADRESSES: idAdresses }, data: addressData });
-      } else {
-        const created = await this.prisma.adresse.create({ data: addressData });
-        idAdresses = created.IDADRESSES;
-      }
-    }
-
-    await this.prisma.entite.update({
-      where: { IDSignaletique: current.IDSignaletique },
-      data: { ...entiteFields, ...logoData, IDADRESSES: idAdresses !== current.IDADRESSES ? idAdresses : undefined },
+    await this.prisma.$transaction(async (tx) => {
+      const idAdresses = await saveAdresse(tx, current.IDADRESSES, addressData);
+      await tx.entite.update({
+        where: { IDSignaletique: current.IDSignaletique },
+        data: { ...entiteFields, ...logoData, IDADRESSES: idAdresses !== current.IDADRESSES ? idAdresses : undefined },
+      });
     });
 
     return this.getEntite();

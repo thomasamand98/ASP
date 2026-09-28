@@ -1,19 +1,20 @@
 import { z } from 'zod';
 import { decimal, id, num, text } from '../common/validation.js';
+import { AdresseDto } from '../common/adresse.js';
 
 // Champs qu'un client peut envoyer pour créer/modifier une société —
 // le sous-ensemble scripturable de societeDetailSelect (societe.service.ts).
-// IDADRESSES est une string côté JSON (BigInt non sérialisable) — convertie
-// dans societe.service.ts. Prospect/Archive sont des codes 0/1 côté vrai
-// modèle Prisma (pas des booléens).
-export const CreateSocieteDto = z.object({
+// Les adresses (société, facturation client/fournisseur) sont saisies champ
+// par champ ; leurs IDADRESSES sont gérés par le serveur (voir
+// common/adresse.ts). Prospect/Archive sont des codes 0/1 côté vrai modèle
+// Prisma (pas des booléens).
+export const CreateSocieteDto = AdresseDto.extend({
   Nom_societe: text.optional(),
   Denomination: text.optional(),
   TVA: text.optional(),
   Activite: text.optional(),
   Site_web: text.optional(),
   Note: text.optional(),
-  IDADRESSES: id.optional(),
   Prospect: num,
   Archive: num,
 
@@ -29,7 +30,7 @@ export const CreateSocieteDto = z.object({
   Client_E_mail_comptabilite: text.optional(),
   Client_Facture_mail: num,
   Client_Adresse_facturation_societe: num,
-  Client_IDADRESSES_facturation: id.optional(),
+  Client_Adresse_facturation: AdresseDto.optional(),
   Client_IDCONTACTS_Comptabilite: id.optional(),
 
   // Idem pour le Fournisseur lié (sous-onglet « Fournisseur »).
@@ -39,7 +40,7 @@ export const CreateSocieteDto = z.object({
   Fournisseur_E_mail_comptabilite: text.optional(),
   Fournisseur_Facture_mail: num,
   Fournisseur_Adresse_facturation_societe: num,
-  Fournisseur_IDADRESSES_facturation: id.optional(),
+  Fournisseur_Adresse_facturation: AdresseDto.optional(),
   Fournisseur_IDCONTACTS_Comptabilite: id.optional(),
   Fournisseur_Iban: text.optional(),
   Fournisseur_Bic: text.optional(),

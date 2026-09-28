@@ -8,19 +8,22 @@ import { SocieteMessagesTab } from './SocieteMessagesTab.js'
 import { FichePanel, FicheTabs } from '../../components/FicheTabs.js'
 import './SocieteForm.css'
 import { useUnsavedForm } from '../../components/unsaved-changes/UnsavedChangesContext.js'
+import { AdresseFields } from '../../components/AdresseFields.js'
+import { adresseValues, type AdresseValues } from '../../lib/adresse'
 
 // Champs scripturables d'une société, mêmes clés que le CreateSocieteDto
 // côté backend (backend/src/societe/societe.dto.ts). Prospect/Archive/
 // Client_Facture_mail/Client_Adresse_facturation_societe/Fournisseur_* (les
 // mêmes) sont des codes 0/1 côté vrai modèle Prisma (pas des booléens).
-export type SocieteDto = {
+// Les adresses sont saisies champ par champ (adresse de la société aplatie,
+// adresses de facturation en objets) ; leurs IDADRESSES restent côté serveur.
+export type SocieteDto = AdresseValues & {
   Nom_societe: string
   Denomination: string
   TVA: string
   Activite: string
   Site_web: string
   Note: string
-  IDADRESSES: string
   Prospect: number
   Archive: number
 
@@ -30,7 +33,7 @@ export type SocieteDto = {
   Client_E_mail_comptabilite: string
   Client_Facture_mail: number
   Client_Adresse_facturation_societe: number
-  Client_IDADRESSES_facturation: string
+  Client_Adresse_facturation: AdresseValues
   Client_IDCONTACTS_Comptabilite: string
 
   Fournisseur_Numero_fournisseur: string
@@ -39,7 +42,7 @@ export type SocieteDto = {
   Fournisseur_E_mail_comptabilite: string
   Fournisseur_Facture_mail: number
   Fournisseur_Adresse_facturation_societe: number
-  Fournisseur_IDADRESSES_facturation: string
+  Fournisseur_Adresse_facturation: AdresseValues
   Fournisseur_IDCONTACTS_Comptabilite: string
   Fournisseur_Iban: string
   Fournisseur_Bic: string
@@ -85,9 +88,9 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
     Activite: initial?.Activite ?? '',
     Site_web: initial?.Site_web ?? '',
     Note: initial?.Note ?? '',
-    IDADRESSES: initial?.IDADRESSES ?? '',
     Prospect: initial?.Prospect ?? 0,
     Archive: initial?.Archive ?? 0,
+    ...adresseValues(initial?.Adresse),
 
     Client_Numero_client: initial?.Client?.Numero_client ?? '',
     Client_Delai_paiement: initial?.Client?.Delai_paiement ?? '',
@@ -95,7 +98,7 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
     Client_E_mail_comptabilite: initial?.Client?.E_mail_comptabilite ?? '',
     Client_Facture_mail: initial?.Client?.Facture_mail ?? 0,
     Client_Adresse_facturation_societe: initial?.Client?.Adresse_facturation_societe ?? 1,
-    Client_IDADRESSES_facturation: initial?.Client?.IDADRESSES_facturation ?? '',
+    Client_Adresse_facturation: adresseValues(initial?.Client?.Adresse_facturation),
     Client_IDCONTACTS_Comptabilite: initial?.Client?.IDCONTACTS_Comptabilite ?? '',
 
     Fournisseur_Numero_fournisseur: initial?.Fournisseur?.Numero_fournisseur ?? '',
@@ -104,7 +107,7 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
     Fournisseur_E_mail_comptabilite: initial?.Fournisseur?.E_mail_comptabilite ?? '',
     Fournisseur_Facture_mail: initial?.Fournisseur?.Facture_mail ?? 0,
     Fournisseur_Adresse_facturation_societe: initial?.Fournisseur?.Adresse_facturation_societe ?? 1,
-    Fournisseur_IDADRESSES_facturation: initial?.Fournisseur?.IDADRESSES_facturation ?? '',
+    Fournisseur_Adresse_facturation: adresseValues(initial?.Fournisseur?.Adresse_facturation),
     Fournisseur_IDCONTACTS_Comptabilite: initial?.Fournisseur?.IDCONTACTS_Comptabilite ?? '',
     Fournisseur_Iban: initial?.Fournisseur?.Iban ?? '',
     Fournisseur_Bic: initial?.Fournisseur?.Bic ?? '',
@@ -189,15 +192,7 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
                   </select>
                 </label>
               </div>
-              <label className="field">
-                ID adresse
-                <input value={form.IDADRESSES} onChange={(e) => setForm({ ...form, IDADRESSES: e.target.value })} />
-              </label>
-              {initial?.Adresse && (
-                <p className="societe-form-hint">
-                  Adresse actuelle : {[initial.Adresse.Adresse1, initial.Adresse.CP, initial.Adresse.Localite].filter(Boolean).join(', ') || '—'}
-                </p>
-              )}
+              <AdresseFields value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />
               <label className="field">
                 Note
                 <textarea rows={4} value={form.Note} onChange={(e) => setForm({ ...form, Note: e.target.value })} />
@@ -267,13 +262,10 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
                     Adresse de facturation = adresse de la société
                   </label>
                   {form.Client_Adresse_facturation_societe !== 1 && (
-                    <label className="field">
-                      ID adresse de facturation
-                      <input
-                        value={form.Client_IDADRESSES_facturation}
-                        onChange={(e) => setForm({ ...form, Client_IDADRESSES_facturation: e.target.value })}
-                      />
-                    </label>
+                    <AdresseFields
+                      value={form.Client_Adresse_facturation}
+                      onChange={(patch) => setForm((prev) => ({ ...prev, Client_Adresse_facturation: { ...prev.Client_Adresse_facturation, ...patch } }))}
+                    />
                   )}
                 </div>
               ) : (
@@ -348,13 +340,10 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
                     Adresse de facturation = adresse de la société
                   </label>
                   {form.Fournisseur_Adresse_facturation_societe !== 1 && (
-                    <label className="field">
-                      ID adresse de facturation
-                      <input
-                        value={form.Fournisseur_IDADRESSES_facturation}
-                        onChange={(e) => setForm({ ...form, Fournisseur_IDADRESSES_facturation: e.target.value })}
-                      />
-                    </label>
+                    <AdresseFields
+                      value={form.Fournisseur_Adresse_facturation}
+                      onChange={(patch) => setForm((prev) => ({ ...prev, Fournisseur_Adresse_facturation: { ...prev.Fournisseur_Adresse_facturation, ...patch } }))}
+                    />
                   )}
                 </div>
               )}

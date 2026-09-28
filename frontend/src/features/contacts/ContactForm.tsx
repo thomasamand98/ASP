@@ -25,7 +25,6 @@ export type ContactDto = AdresseValues & {
   Personne_physique: number
   Adresse_entreprise: number
   description_telephone: string
-  IDADRESSES: string
   // Société principale (liste « Entreprise ») et fonction/service dans cette
   // société — lien SocieteContacts géré par le backend (createContact/
   // updateContact). Vide : aucune société principale.
@@ -77,7 +76,6 @@ export function ContactForm({ initial, societes, defaultSocieteId, onSubmit, onC
     Personne_physique: initial?.Personne_physique ?? 1,
     Adresse_entreprise: initial?.Adresse_entreprise ?? 0,
     description_telephone: initial?.description_telephone ?? '',
-    IDADRESSES: initial?.IDADRESSES ?? '',
     IDSOCIETES: initial ? (principal?.IDSOCIETES ?? '') : (defaultSocieteId ?? ''),
     Fonction_contact: principal?.Fonction_contact ?? '',
     Service_bureau: principal?.Service_bureau ?? '',

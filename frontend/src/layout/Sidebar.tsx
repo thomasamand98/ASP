@@ -1,7 +1,15 @@
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext.js'
 import { useConfirmLeave } from '../components/unsaved-changes/UnsavedChangesContext.js'
+import { HorizonLogo } from '../components/HorizonLogo.js'
+import { useTheme, type ThemePreference } from '../lib/theme'
 import './Sidebar.css'
+
+const THEMES: { id: ThemePreference; label: string; title: string }[] = [
+  { id: 'light', label: 'Clair', title: 'Thème clair' },
+  { id: 'dark', label: 'Sombre', title: 'Thème sombre' },
+  { id: 'system', label: 'Auto', title: 'Suivre le réglage du système' },
+]
 
 export type MenuItem = {
   id: string
@@ -47,6 +55,7 @@ export function Sidebar({ nodes, activeId, onSelect, open, onClose }: SidebarPro
   // Se déconnecter quitte toutes les saisies ouvertes : la sidebar est hors
   // des onglets, sa zone est celle de toute l'application.
   const confirmLeave = useConfirmLeave()
+  const { preference, setPreference } = useTheme()
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     () =>
       new Set(
@@ -72,6 +81,7 @@ export function Sidebar({ nodes, activeId, onSelect, open, onClose }: SidebarPro
     <>
       {open && <div className="sidebar-backdrop" onClick={onClose} />}
       <nav className={`sidebar${open ? ' open' : ''}`}>
+        <HorizonLogo className="sidebar-logo" />
         {nodes.map((node) => {
           if (!isGroup(node)) {
             return (
@@ -120,6 +130,24 @@ export function Sidebar({ nodes, activeId, onSelect, open, onClose }: SidebarPro
             </div>
           )
         })}
+
+        <div className="sidebar-theme" role="group" aria-label="Thème">
+          <span className="sidebar-theme-label">Thème</span>
+          <div className="sidebar-theme-options">
+            {THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                title={theme.title}
+                aria-pressed={preference === theme.id}
+                className={preference === theme.id ? 'active' : undefined}
+                onClick={() => setPreference(theme.id)}
+              >
+                {theme.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Utilisateur connecté et déconnexion — uniquement quand l'écran de
             connexion est activé (voir auth/AuthProvider.tsx). */}

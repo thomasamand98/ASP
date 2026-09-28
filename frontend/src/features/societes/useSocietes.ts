@@ -1,4 +1,8 @@
 import { useApiList, type ApiListPagination } from '../../lib/useApiList.js'
+import type { AdresseValues } from '../../lib/adresse'
+
+// Adresse résolue telle que renvoyée par l'API (champs NULL possibles).
+type Adresse = { [K in keyof AdresseValues]: string | null }
 
 // Forme d'une société telle que renvoyée par le Controller backend
 // (backend/src/societe/societe.controller.ts → GET /societes), qui reflète
@@ -16,7 +20,8 @@ export type Societe = {
 
 // Données de facturation d'un Client/Fournisseur, telles que résolues dans
 // la fiche Société (au lieu des seuls IDCLIENTS/IDFOURNISSEURS) — voir
-// clientBillingSelect/fournisseurBillingSelect dans societe.service.ts.
+// clientBillingSelect/fournisseurBillingSelect et getSociete dans
+// societe.service.ts (adresse de facturation résolue, sans son id).
 export type ClientBilling = {
   IDCLIENTS: string
   Numero_client: string | null
@@ -25,7 +30,7 @@ export type ClientBilling = {
   E_mail_comptabilite: string | null
   Facture_mail: number | null
   Adresse_facturation_societe: number | null
-  IDADRESSES_facturation: string | null
+  Adresse_facturation: Adresse | null
   IDCONTACTS_Comptabilite: string | null
 }
 
@@ -37,7 +42,7 @@ export type FournisseurBilling = {
   E_mail_comptabilite: string | null
   Facture_mail: number | null
   Adresse_facturation_societe: number | null
-  IDADRESSES_facturation: string | null
+  Adresse_facturation: Adresse | null
   IDCONTACTS_Comptabilite: string | null
   Iban: string | null
   Bic: string | null
@@ -56,10 +61,9 @@ export type SocieteDetail = {
   Activite: string | null
   Site_web: string | null
   Note: string | null
-  IDADRESSES: string | null
   Prospect: number | null
   Archive: number | null
-  Adresse: { Adresse1: string | null; CP: string | null; Localite: string | null } | null
+  Adresse: Adresse | null
   Client: ClientBilling | null
   Fournisseur: FournisseurBilling | null
   SocieteContacts: {

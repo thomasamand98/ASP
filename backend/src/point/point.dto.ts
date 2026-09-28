@@ -15,14 +15,14 @@ export const HorairePointDto = z
 export type HorairePointDto = z.infer<typeof HorairePointDto>;
 
 // Champs qu'un client peut envoyer pour créer/modifier un point.
-// IDADRESSES/IDSOCIETES/IDCONTACTS_DEFAUTS sont des strings côté JSON
-// (BigInt non sérialisable) — converties dans point.service.ts. Archive est
-// un code 0/1 côté vrai modèle Prisma (pas un booléen).
+// IDSOCIETES/IDCONTACTS_DEFAUTS sont des strings côté JSON (BigInt non
+// sérialisable) — converties dans point.service.ts. IDADRESSES est géré par
+// le serveur (voir common/adresse.ts). Archive est un code 0/1 côté vrai
+// modèle Prisma (pas un booléen).
 export const CreatePointDto = z.object({
   Libelle: text.optional(),
   Nom_societe: text.optional(),
   Telephone: text.optional(),
-  IDADRESSES: id.optional(),
   IDSOCIETES: id.optional(),
   Archive: num,
   Lien_googleMap: text.optional(),

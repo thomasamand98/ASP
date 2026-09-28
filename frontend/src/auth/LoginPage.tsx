@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { HorizonLogo } from '../components/HorizonLogo.js'
 import './LoginPage.css'
 
 type Props = {
@@ -29,6 +30,7 @@ export function LoginPage({ onLogin }: Props) {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
+        <HorizonLogo className="login-logo" />
         <h1 className="login-title">Connexion</h1>
         <p className="login-subtitle">Identifiez-vous pour accéder à l’application.</p>
 

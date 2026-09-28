@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { buildSearchWhere } from '../common/search.js';
 import { andWhere, projectionWhere, type Projection, type ProjectionMap } from '../common/projection.js';
 import { serializeBigInt } from '../prisma/serialize-bigint.js';
+import { adresseSelect, pickAdresse, saveAdresse } from '../common/adresse.js';
 import { CreatePersonnelDto, UpdatePersonnelDto } from './personnel.dto.js';
 
 export const personnelSelect = {
@@ -53,21 +54,6 @@ export const personnelDetailSelect = {
   Date_validite_A1: true,
   Date_validite_SIPSI: true,
 } satisfies Prisma.PersonnelSelect;
-
-// Adresse du personnel : pas de relation Prisma entre Personnel et Adresse
-// (colonne IDADRESSES sans clé déclarée), elle est lue et écrite à part.
-const addressSelect = {
-  Adresse1: true,
-  Adresse2: true,
-  Adresse3: true,
-  CP: true,
-  Localite: true,
-  Pays: true,
-  Pays_full_name: true,
-} satisfies Prisma.AdresseSelect;
-
-const addressFieldNames = ['Adresse1', 'Adresse2', 'Adresse3', 'CP', 'Localite', 'Pays', 'Pays_full_name'] as const;
-type AddressFields = Partial<Record<(typeof addressFieldNames)[number], string>>;
 
 const dateFieldNames = [
   'Date_naissance',
@@ -124,22 +110,25 @@ export class PersonnelService {
       where: { IDPERSONNELS: id },
       select: personnelDetailSelect,
     });
+    // Pas de relation Prisma entre Personnel et Adresse (colonne IDADRESSES
+    // sans clé déclarée) : l'adresse est lue à part.
     const adresse = personnel.IDADRESSES
-      ? await this.prisma.adresse.findUnique({ where: { IDADRESSES: personnel.IDADRESSES }, select: addressSelect })
+      ? await this.prisma.adresse.findUnique({ where: { IDADRESSES: personnel.IDADRESSES }, select: adresseSelect })
       : null;
     return serializeBigInt({ ...personnel, Adresse: adresse });
   }
 
-  // L'adresse éventuellement saisie est créée dans `adresses` puis liée.
+  // L'adresse éventuellement saisie est créée dans `adresses` puis liée
+  // (voir common/adresse.ts).
   async createPersonnel(dto: CreatePersonnelDto) {
     const { address, data } = toPersonnelData(dto);
     const personnel = await this.prisma.$transaction(async (tx) => {
-      const idAdresses = hasContent(address) ? (await tx.adresse.create({ data: { ...address, Date_heure_creation: new Date() } })).IDADRESSES : null;
+      const idAdresses = await saveAdresse(tx, null, address);
       return tx.personnel.create({
         // IDADRESSES/IDUTILISATEURS_* ont un défaut DB de 0, qui viole leur
         // contrainte de clé étrangère (aucune ligne d'id 0) quand ils sont
         // omis — mis explicitement à NULL.
-        data: { ...data, IDADRESSES: idAdresses ?? data.IDADRESSES ?? null, IDUTILISATEURS_createur: null, IDUTILISATEURS_modificateur: null },
+        data: { ...data, IDADRESSES: idAdresses, IDUTILISATEURS_createur: null, IDUTILISATEURS_modificateur: null },
         select: personnelSelect,
       });
     });
@@ -150,18 +139,11 @@ export class PersonnelService {
   async updatePersonnel(id: bigint, dto: UpdatePersonnelDto) {
     const { address, data } = toPersonnelData(dto);
     const personnel = await this.prisma.$transaction(async (tx) => {
-      if (Object.keys(address).length > 0) {
-        const current = await tx.personnel.findUniqueOrThrow({ where: { IDPERSONNELS: id }, select: { IDADRESSES: true } });
-        if (current.IDADRESSES) {
-          await tx.adresse.update({ where: { IDADRESSES: current.IDADRESSES }, data: { ...address, Date_heure_modification: new Date() } });
-        } else if (hasContent(address)) {
-          const created = await tx.adresse.create({ data: { ...address, Date_heure_creation: new Date() } });
-          data.IDADRESSES = created.IDADRESSES;
-        }
-      }
+      const current = await tx.personnel.findUniqueOrThrow({ where: { IDPERSONNELS: id }, select: { IDADRESSES: true } });
+      const idAdresses = await saveAdresse(tx, current.IDADRESSES, address);
       return tx.personnel.update({
         where: { IDPERSONNELS: id },
-        data: { ...data, Date_heure_modification: new Date() },
+        data: { ...data, IDADRESSES: idAdresses, Date_heure_modification: new Date() },
         select: personnelSelect,
       });
     });
@@ -174,24 +156,18 @@ export class PersonnelService {
 }
 
 // Le DTO a les mêmes noms de champs que Prisma. Sont convertis ici :
-//   - IDADRESSES (BigInt côté Prisma, string côté JSON) ;
 //   - les Date_* : le formulaire envoie un jour « AAAA-MM-JJ », que Prisma
 //     refuse tel quel (colonne DATE → minuit UTC) ; vide = effacé (NULL) ;
 //   - les champs d'adresse, séparés du reste pour la table `adresses` ;
 //   - les textes vides : le formulaire envoie "" pour un champ non rempli,
 //     enregistré NULL comme le faisait WinDev (pas de "" parasites).
 function toPersonnelData(dto: CreatePersonnelDto | UpdatePersonnelDto) {
-  const { Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name, IDADRESSES, ...rawFields } = dto;
+  const { Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name, ...rawFields } = dto;
   const fields = emptyToNull(rawFields);
-  const address = emptyToNull(
-    Object.fromEntries(
-      Object.entries({ Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name }).filter(([, value]) => value !== undefined),
-    ) as AddressFields,
-  );
   const dates: Partial<Record<(typeof dateFieldNames)[number], Date | null>> = Object.fromEntries(
     dateFieldNames.filter((field) => fields[field] !== undefined).map((field) => [field, toDay(fields[field], field)]),
   );
-  return { address, data: { ...fields, ...dates, IDADRESSES: IDADRESSES ? BigInt(IDADRESSES) : undefined } };
+  return { address: pickAdresse({ Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name }), data: { ...fields, ...dates } };
 }
 
 function toDay(raw: string | null | undefined, field: string): Date | null {
@@ -208,9 +184,4 @@ function emptyToNull<T extends object>(values: T): { [K in keyof T]: T[K] | null
   return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, typeof value === 'string' && !value.trim() ? null : value])) as {
     [K in keyof T]: T[K] | null;
   };
-}
-
-// Une adresse entièrement vide n'est pas créée.
-function hasContent(address: Partial<Record<string, string | null>>): boolean {
-  return Object.values(address).some((value) => value?.trim());
 }

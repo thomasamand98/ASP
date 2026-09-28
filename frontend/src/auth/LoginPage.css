@@ -45,3 +45,11 @@
   padding: 0.65rem 1rem;
   font-size: 0.95rem;
 }
+
+.login-logo {
+  display: block;
+  width: 160px;
+  height: auto;
+  margin: 0 auto 0.5rem;
+  color: var(--text-h);
+}

@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { buildSearchWhere } from '../common/search.js';
 import { andWhere, projectionWhere, type Projection, type ProjectionMap } from '../common/projection.js';
 import { serializeBigInt } from '../prisma/serialize-bigint.js';
+import { adresseSelect, pickAdresse, saveAdresse } from '../common/adresse.js';
 import { CreateContactDto, UpdateContactDto } from './contact.dto.js';
 
 export const contactSelect = {
@@ -43,7 +44,7 @@ export const contactDetailSelect = {
   Adresse_entreprise: true,
   description_telephone: true,
   IDADRESSES: true,
-  Adresse: { select: { Adresse1: true, Adresse2: true, Adresse3: true, CP: true, Localite: true, Pays: true, Pays_full_name: true } },
+  Adresse: { select: adresseSelect },
   // Le premier lien est la « société principale » modifiable dans la fiche
   // (voir updateContact) — IDSOCIETES sert à présélectionner la liste.
   SocieteContacts: {
@@ -137,18 +138,19 @@ export class ContactService {
   // dto.IDSOCIETES (création depuis la fiche Société) : le contact est
   // créé directement lié à cette société, dans la même requête ; de même
   // pour dto.IDPOINTS (création depuis la fiche Point).
-  // L'adresse éventuellement saisie est créée dans `adresses` puis liée.
+  // L'adresse éventuellement saisie est créée dans `adresses` puis liée
+  // (voir common/adresse.ts).
   async createContact(dto: CreateContactDto) {
     const { address, data } = toContactData(dto);
     const contact = await this.prisma.$transaction(async (tx) => {
-      const idAdresses = hasContent(address) ? (await tx.adresse.create({ data: { ...address, Date_heure_creation: new Date() } })).IDADRESSES : null;
+      const idAdresses = await saveAdresse(tx, null, address);
       return tx.contact.create({
         // IDADRESSES/IDUTILISATEURS_* ont un défaut DB de 0, qui viole leur
         // contrainte de clé étrangère (aucune ligne d'id 0) quand ils sont
         // omis — mis explicitement à NULL.
         data: {
           ...data,
-          IDADRESSES: idAdresses ?? data.IDADRESSES ?? null,
+          IDADRESSES: idAdresses,
           IDUTILISATEURS_createur: null,
           IDUTILISATEURS_modificateur: null,
           ...(dto.IDSOCIETES
@@ -186,15 +188,8 @@ export class ContactService {
   async updateContact(id: bigint, dto: UpdateContactDto) {
     const { address, data } = toContactData(dto);
     return this.prisma.$transaction(async (tx) => {
-      if (Object.keys(address).length > 0) {
-        const current = await tx.contact.findUniqueOrThrow({ where: { IDCONTACTS: id }, select: { IDADRESSES: true } });
-        if (current.IDADRESSES) {
-          await tx.adresse.update({ where: { IDADRESSES: current.IDADRESSES }, data: { ...address, Date_heure_modification: new Date() } });
-        } else if (hasContent(address)) {
-          const created = await tx.adresse.create({ data: { ...address, Date_heure_creation: new Date() } });
-          data.IDADRESSES = created.IDADRESSES;
-        }
-      }
+      const current = await tx.contact.findUniqueOrThrow({ where: { IDCONTACTS: id }, select: { IDADRESSES: true } });
+      const idAdresses = await saveAdresse(tx, current.IDADRESSES, address);
       if (dto.IDSOCIETES !== undefined) {
         const principal = await tx.societeContact.findFirst({
           where: { IDCONTACTS: id },
@@ -218,7 +213,7 @@ export class ContactService {
       }
       const contact = await tx.contact.update({
         where: { IDCONTACTS: id },
-        data,
+        data: { ...data, IDADRESSES: idAdresses },
         select: contactSelect,
       });
       return serializeBigInt(contact);
@@ -230,9 +225,8 @@ export class ContactService {
   }
 }
 
-// Le DTO a les mêmes noms de champs que Prisma — seul IDADRESSES (BigInt
-// côté Prisma, string côté JSON) a besoin d'être converti, le reste passe
-// tel quel via le spread.
+// Le DTO a les mêmes noms de champs que Prisma, le reste passe tel quel via
+// le spread.
 // IDSOCIETES/Fonction_contact/Service_bureau appartiennent au lien
 // SocieteContact (voir createContact), IDPOINTS au lien PointContact, pas
 // au contact lui-même ; les champs
@@ -246,21 +240,5 @@ function toContactData(dto: CreateContactDto | UpdateContactDto) {
     Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name,
     ...contact
   } = dto;
-  const address: Partial<Record<string, string | null>> = Object.fromEntries(
-    Object.entries({ Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name })
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => [key, value?.trim() ? value : null]),
-  );
-  return {
-    address,
-    data: {
-      ...contact,
-      IDADRESSES: dto.IDADRESSES ? BigInt(dto.IDADRESSES) : undefined,
-    },
-  };
-}
-
-// Une adresse entièrement vide n'est pas créée.
-function hasContent(address: Partial<Record<string, string | null>>): boolean {
-  return Object.values(address).some((value) => value?.trim());
+  return { address: pickAdresse({ Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name }), data: contact };
 }

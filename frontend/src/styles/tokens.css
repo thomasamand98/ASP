@@ -65,23 +65,24 @@
   --burger-h: 3.25rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --overlay: rgba(0, 0, 0, 0.6);
-    --accent: #60a5fa;
-    --accent-bg: rgba(96, 165, 250, 0.15);
-    --accent-border: rgba(96, 165, 250, 0.5);
-    --danger: #f87171;
-    --danger-bg: rgba(248, 113, 113, 0.15);
-    --danger-border: rgba(248, 113, 113, 0.5);
-    --success: #4ade80;
-    --warning: #fbbf24;
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* Thème sombre : choisi par l'utilisateur dans la sidebar, ou par le
+   système en mode « Auto » (voir lib/theme.ts, qui pose data-theme). */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --accent: #60a5fa;
+  --accent-bg: rgba(96, 165, 250, 0.15);
+  --accent-border: rgba(96, 165, 250, 0.5);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.15);
+  --danger-border: rgba(248, 113, 113, 0.5);
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 }

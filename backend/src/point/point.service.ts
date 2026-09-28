@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { buildSearchWhere } from '../common/search.js';
 import { andWhere, projectionWhere, type Projection, type ProjectionMap } from '../common/projection.js';
 import { serializeBigInt } from '../prisma/serialize-bigint.js';
+import { adresseSelect, pickAdresse, saveAdresse } from '../common/adresse.js';
 import { CreatePointDto, UpdatePointContactDto, UpdatePointDto, HorairePointDto } from './point.dto.js';
 
 export const pointSelect = {
@@ -28,7 +29,7 @@ export const pointDetailSelect = {
   Lien_googleMap: true,
   Instruction: true,
   IDCONTACTS_DEFAUTS: true,
-  Adresse: { select: { Adresse1: true, Adresse2: true, Adresse3: true, CP: true, Localite: true, Pays: true, Pays_full_name: true } },
+  Adresse: { select: adresseSelect },
   ContactDefauts: { select: { Nom_contact: true, Prenom_contact: true } },
   // IDCONTACTS et coordonnées : onglet Contacts de la fiche (liste, et
   // choix du contact par défaut parmi les contacts liés).
@@ -97,18 +98,19 @@ export class PointService {
     });
   }
 
-  // L'adresse éventuellement saisie est créée dans `adresses` puis liée.
+  // L'adresse éventuellement saisie est créée dans `adresses` puis liée
+  // (voir common/adresse.ts).
   async createPoint(dto: CreatePointDto) {
     const { address, horaires, data } = toPointData(dto);
     const point = await this.prisma.$transaction(async (tx) => {
-      const idAdresses = hasContent(address) ? (await tx.adresse.create({ data: { ...address, Date_heure_creation: new Date() } })).IDADRESSES : null;
+      const idAdresses = await saveAdresse(tx, null, address);
       const created = await tx.point.create({
         // IDADRESSES/IDSOCIETES/IDCONTACTS_DEFAUTS ont un défaut DB de 0, qui
         // viole leur contrainte de clé étrangère (aucune ligne d'id 0) quand
         // ils sont omis — mis explicitement à NULL.
         data: {
           ...data,
-          IDADRESSES: idAdresses ?? data.IDADRESSES ?? null,
+          IDADRESSES: idAdresses,
           IDSOCIETES: data.IDSOCIETES ?? null,
           IDCONTACTS_DEFAUTS: data.IDCONTACTS_DEFAUTS ?? null,
           Date_heure_creation: new Date(),
@@ -125,19 +127,12 @@ export class PointService {
   async updatePoint(id: bigint, dto: UpdatePointDto) {
     const { address, horaires, data } = toPointData(dto);
     const point = await this.prisma.$transaction(async (tx) => {
-      if (Object.keys(address).length > 0) {
-        const current = await tx.point.findUniqueOrThrow({ where: { IDPOINTS: id }, select: { IDADRESSES: true } });
-        if (current.IDADRESSES) {
-          await tx.adresse.update({ where: { IDADRESSES: current.IDADRESSES }, data: { ...address, Date_heure_modification: new Date() } });
-        } else if (hasContent(address)) {
-          const created = await tx.adresse.create({ data: { ...address, Date_heure_creation: new Date() } });
-          data.IDADRESSES = created.IDADRESSES;
-        }
-      }
+      const current = await tx.point.findUniqueOrThrow({ where: { IDPOINTS: id }, select: { IDADRESSES: true } });
+      const idAdresses = await saveAdresse(tx, current.IDADRESSES, address);
       if (horaires) await replaceHoraires(tx, id, horaires);
       return tx.point.update({
         where: { IDPOINTS: id },
-        data: { ...data, Date_heure_modification: new Date() },
+        data: { ...data, IDADRESSES: idAdresses, Date_heure_modification: new Date() },
         select: pointSelect,
       });
     });
@@ -170,26 +165,15 @@ export class PointService {
 // NULL), les plages horaires dans `grilles_horaires`.
 function toPointData(dto: CreatePointDto | UpdatePointDto) {
   const { Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name, Horaires, ...point } = dto;
-  const address: Partial<Record<string, string | null>> = Object.fromEntries(
-    Object.entries({ Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name })
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => [key, value?.trim() ? value : null]),
-  );
   return {
-    address,
+    address: pickAdresse({ Adresse1, Adresse2, Adresse3, CP, Localite, Pays, Pays_full_name }),
     horaires: Horaires,
     data: {
       ...point,
-      IDADRESSES: dto.IDADRESSES ? BigInt(dto.IDADRESSES) : undefined,
       IDSOCIETES: dto.IDSOCIETES ? BigInt(dto.IDSOCIETES) : undefined,
       IDCONTACTS_DEFAUTS: dto.IDCONTACTS_DEFAUTS ? BigInt(dto.IDCONTACTS_DEFAUTS) : undefined,
     },
   };
-}
-
-// Une adresse entièrement vide n'est pas créée.
-function hasContent(address: Partial<Record<string, string | null>>): boolean {
-  return Object.values(address).some((value) => value?.trim());
 }
 
 // Remplace toutes les plages horaires du point. Colonnes TIME : Prisma les

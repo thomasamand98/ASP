@@ -3,9 +3,9 @@ import { id, num, text } from '../common/validation.js';
 
 // Champs qu'un client peut envoyer pour créer/modifier un contact —
 // le sous-ensemble scripturable de contactDetailSelect (contact.service.ts).
-// IDADRESSES est une string côté JSON (BigInt non sérialisable) — convertie
-// dans contact.service.ts. Personne_physique/Adresse_entreprise sont des
-// codes 0/1 côté vrai modèle Prisma (pas des booléens).
+// IDADRESSES n'en fait pas partie : il est géré par le serveur (voir
+// common/adresse.ts). Personne_physique/Adresse_entreprise sont des codes
+// 0/1 côté vrai modèle Prisma (pas des booléens).
 export const CreateContactDto = z.object({
   Civilite: text.optional(),
   Nom_contact: text.optional(),
@@ -18,7 +18,6 @@ export const CreateContactDto = z.object({
   Personne_physique: num,
   Adresse_entreprise: num,
   description_telephone: text.optional(),
-  IDADRESSES: id.optional(),
   // Société principale du contact (liste « Société » de la fiche) : lien
   // SocieteContacts avec sa fonction/service, géré à part du contact
   // lui-même (voir createContact/updateContact dans contact.service.ts).

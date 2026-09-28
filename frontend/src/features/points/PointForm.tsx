@@ -11,16 +11,15 @@ import { PointContactsTab } from './PointContactsTab.js'
 import './PointForm.css'
 
 // Champs scripturables d'un point, mêmes clés que le CreatePointDto côté
-// backend (backend/src/point/point.dto.ts) : IDADRESSES/IDSOCIETES/
-// IDCONTACTS_DEFAUTS en string (BigInt non sérialisable côté JSON). Archive
-// est un code 0/1 côté vrai modèle Prisma (pas un booléen). L'adresse est
-// aplatie (AdresseValues) et les plages horaires envoyées en entier : le
-// backend enregistre les deux à part.
+// backend (backend/src/point/point.dto.ts) : IDSOCIETES/IDCONTACTS_DEFAUTS
+// en string (BigInt non sérialisable côté JSON). Archive est un code 0/1
+// côté vrai modèle Prisma (pas un booléen). L'adresse est aplatie
+// (AdresseValues) et les plages horaires envoyées en entier : le backend
+// enregistre les deux à part (l'IDADRESSES est géré par le serveur).
 export type PointDto = AdresseValues & {
   Libelle: string
   Nom_societe: string
   Telephone: string
-  IDADRESSES: string
   IDSOCIETES: string
   Archive: number
   Lien_googleMap: string
@@ -66,7 +65,6 @@ export function PointForm({ initial, defaults, societes, onSubmit, onCancel }: P
     Libelle: initial?.Libelle ?? '',
     Nom_societe: initial?.Nom_societe ?? '',
     Telephone: initial?.Telephone ?? '',
-    IDADRESSES: initial?.IDADRESSES ?? '',
     IDSOCIETES: initial?.IDSOCIETES ?? '',
     Archive: initial?.Archive ?? 0,
     Lien_googleMap: initial?.Lien_googleMap ?? '',

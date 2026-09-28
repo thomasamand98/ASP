@@ -3,7 +3,9 @@
 :root {
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  /* Contrôles natifs (barres de défilement, sélecteurs de date...) du
+     thème clair ; tokens.css passe à `dark` avec le thème sombre. */
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
