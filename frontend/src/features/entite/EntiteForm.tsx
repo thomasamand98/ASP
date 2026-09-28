@@ -258,65 +258,68 @@ export function EntiteForm({ formId, form, smtpPasswordSet, smtpPlanningPassword
 
       <h3 className="entite-section-title">Configuration des paramètres e-mail</h3>
 
+      {/* Une colonne par bloc : serveur, puis compte compta et compte
+          planning (e-mail suivi de son mot de passe). */}
       <div className="entite-form-grid entite-form-grid-email">
-        <span />
-        <span className="entite-column-title">E-mail compta</span>
-        <span className="entite-column-title">E-mail planning</span>
-
-        <div className="entite-field-group">
+        <div className="entite-email-column">
           <label className="field">
             Serveur :
             <input value={form.Seveur_SMTP} onChange={(e) => onChange({ ...form, Seveur_SMTP: e.target.value })} />
           </label>
+          <div className="entite-field-group">
+            <label className="field">
+              Connexion SMTP :
+              <select
+                value={form.TypeConnexion_SMTP}
+                onChange={(e) => onChange({ ...form, TypeConnexion_SMTP: Number(e.target.value) })}
+              >
+                {CONNEXION_SMTP_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field entite-field-narrow">
+              Port SMTP :
+              <input type="number" value={form.Port_SMTP} onChange={(e) => onChange({ ...form, Port_SMTP: Number(e.target.value) })} />
+            </label>
+          </div>
         </div>
-        <label className="field">
-          E-mail compta :
-          <input value={form.Utilisateur_SMTP} onChange={(e) => onChange({ ...form, Utilisateur_SMTP: e.target.value })} />
-        </label>
-        <label className="field">
-          E-mail planning :
-          <input value={form.Utilisateur_smtp_planning} onChange={(e) => onChange({ ...form, Utilisateur_smtp_planning: e.target.value })} />
-        </label>
 
-        <div className="entite-field-group">
+        <div className="entite-email-column">
           <label className="field">
-            Connexion SMTP :
-            <select
-              value={form.TypeConnexion_SMTP}
-              onChange={(e) => onChange({ ...form, TypeConnexion_SMTP: Number(e.target.value) })}
-            >
-              {CONNEXION_SMTP_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            E-mail compta :
+            <input value={form.Utilisateur_SMTP} onChange={(e) => onChange({ ...form, Utilisateur_SMTP: e.target.value })} />
           </label>
-          <label className="field entite-field-narrow">
-            Port SMTP :
-            <input type="number" value={form.Port_SMTP} onChange={(e) => onChange({ ...form, Port_SMTP: Number(e.target.value) })} />
+          <label className="field">
+            Mot de passe compta :
+            <input
+              type="password"
+              value={form.MDP_SMTP}
+              placeholder={smtpPasswordSet ? UNCHANGED_PLACEHOLDER : undefined}
+              autoComplete="new-password"
+              onChange={(e) => onChange({ ...form, MDP_SMTP: e.target.value })}
+            />
           </label>
         </div>
-        <label className="field">
-          Mot de passe compta :
-          <input
-            type="password"
-            value={form.MDP_SMTP}
-            placeholder={smtpPasswordSet ? UNCHANGED_PLACEHOLDER : undefined}
-            autoComplete="new-password"
-            onChange={(e) => onChange({ ...form, MDP_SMTP: e.target.value })}
-          />
-        </label>
-        <label className="field">
-          Mot de passe planning :
-          <input
-            type="password"
-            value={form.MDP_SMTP_Planning}
-            placeholder={smtpPlanningPasswordSet ? UNCHANGED_PLACEHOLDER : undefined}
-            autoComplete="new-password"
-            onChange={(e) => onChange({ ...form, MDP_SMTP_Planning: e.target.value })}
-          />
-        </label>
+
+        <div className="entite-email-column">
+          <label className="field">
+            E-mail planning :
+            <input value={form.Utilisateur_smtp_planning} onChange={(e) => onChange({ ...form, Utilisateur_smtp_planning: e.target.value })} />
+          </label>
+          <label className="field">
+            Mot de passe planning :
+            <input
+              type="password"
+              value={form.MDP_SMTP_Planning}
+              placeholder={smtpPlanningPasswordSet ? UNCHANGED_PLACEHOLDER : undefined}
+              autoComplete="new-password"
+              onChange={(e) => onChange({ ...form, MDP_SMTP_Planning: e.target.value })}
+            />
+          </label>
+        </div>
       </div>
     </form>
   )
