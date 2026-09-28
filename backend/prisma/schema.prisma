@@ -1,6 +1,11 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // Explicites pour ne pas dépendre de la détection via tsconfig.json
+  // (absent lors du `npm ci` du Dockerfile) : imports en `.js`, requis par
+  // le code compilé exécuté avec `node dist/main`.
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
 datasource db {
