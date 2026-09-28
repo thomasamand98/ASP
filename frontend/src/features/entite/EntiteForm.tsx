@@ -270,11 +270,11 @@ export function EntiteForm({ formId, form, smtpPasswordSet, smtpPlanningPassword
           </label>
         </div>
         <label className="field">
-          Utilisateur :
+          E-mail compta :
           <input value={form.Utilisateur_SMTP} onChange={(e) => onChange({ ...form, Utilisateur_SMTP: e.target.value })} />
         </label>
         <label className="field">
-          Utilisateur :
+          E-mail planning :
           <input value={form.Utilisateur_smtp_planning} onChange={(e) => onChange({ ...form, Utilisateur_smtp_planning: e.target.value })} />
         </label>
 
@@ -298,7 +298,7 @@ export function EntiteForm({ formId, form, smtpPasswordSet, smtpPlanningPassword
           </label>
         </div>
         <label className="field">
-          Mot de passe :
+          Mot de passe compta :
           <input
             type="password"
             value={form.MDP_SMTP}
@@ -308,7 +308,7 @@ export function EntiteForm({ formId, form, smtpPasswordSet, smtpPlanningPassword
           />
         </label>
         <label className="field">
-          Mot de passe :
+          Mot de passe planning :
           <input
             type="password"
             value={form.MDP_SMTP_Planning}
