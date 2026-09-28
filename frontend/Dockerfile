@@ -12,11 +12,7 @@ COPY . .
 # Les variables VITE_* sont figées dans le code au moment de la compilation :
 # l'URL de l'API est fournie par cloudbuild.yaml (--build-arg).
 ARG VITE_API_URL
-# En ligne, l'écran de connexion est obligatoire : sans lui, le front ouvre
-# une session automatique pour n'importe quel visiteur.
-ARG VITE_LOGIN_SCREEN=true
-ENV VITE_API_URL=$VITE_API_URL \
-    VITE_LOGIN_SCREEN=$VITE_LOGIN_SCREEN
+ENV VITE_API_URL=$VITE_API_URL
 RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL manquant : renseigner _API_URL dans le déclencheur Cloud Build" && exit 1)
 RUN npm run build
 
