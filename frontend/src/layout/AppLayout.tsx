@@ -42,6 +42,7 @@ const DocumentTemplatesPage = lazy(() =>
   import('../features/documents/DocumentTemplatesPage.js').then((m) => ({ default: m.DocumentTemplatesPage }))
 )
 const OcrPage = lazy(() => import('../features/ocr/OcrPage.js').then((m) => ({ default: m.OcrPage })))
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage.js').then((m) => ({ default: m.DashboardPage })))
 
 type MenuLeafConfig = { id: string; label: string; icon?: ReactNode; render: () => ReactElement }
 type MenuGroupConfig = { id: string; label: string; icon?: ReactNode; items: MenuLeafConfig[] }
@@ -53,7 +54,7 @@ type MenuGroupConfig = { id: string; label: string; icon?: ReactNode; items: Men
 // L'icône n'est affichée que sur les entrées principales, pas sur les
 // items d'un groupe déroulé.
 const MENU: (MenuLeafConfig | MenuGroupConfig)[] = [
-  { id: 'dashboard', label: 'Tableau de bord', icon: <DashboardIcon />, render: () => <Dev /> },
+  { id: 'dashboard', label: 'Tableau de bord', icon: <DashboardIcon />, render: () => <DashboardPage /> },
   {
     id: 'commercial',
     label: 'Commercial',

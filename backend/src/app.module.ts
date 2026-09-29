@@ -36,6 +36,7 @@ import { DocumentMergeModule } from './document-merge/document-merge.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { MistralModule } from './mistral/mistral.module.js';
 import { TacheModule } from './tache/tache.module.js';
+import { StatistiqueModule } from './statistique/statistique.module.js';
 import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
 
 @Module({
@@ -71,6 +72,7 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
     DocumentMergeModule,
     MistralModule,
     TacheModule,
+    StatistiqueModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

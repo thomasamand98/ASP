@@ -38,6 +38,15 @@
   --warning-bg: color-mix(in srgb, var(--warning-solid) 16%, transparent);
   --neutral-solid: #94a3b8;
 
+  /* ---------- Séries de graphiques (identité, ordre fixe) ----------
+     Ordre validé daltonisme (paires voisines) en clair comme en sombre :
+     ne pas réordonner. Les séries 3 et 4 sont sous 3:1 sur fond clair, d'où
+     la vue Tableau à côté de chaque graphique. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+
   /* ---------- Formes ---------- */
   --radius-sm: 6px;
   --radius: 8px;
@@ -85,6 +94,10 @@
   --danger-border: rgba(248, 113, 113, 0.5);
   --success: #4ade80;
   --warning: #fbbf24;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
   --shadow:
     rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 }
