@@ -7,7 +7,7 @@
 // réutilisée entre les requêtes (son démarrage prend ~1s, trop lent pour le
 // refaire à chaque génération de PDF), et fermée proprement à l'arrêt de
 // l'application.
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
 import puppeteer, { type Browser } from 'puppeteer';
 
 // Habillage du corps principal : reprend les classes posées par l'éditeur
@@ -81,25 +81,71 @@ export type RenderInput = {
   footerHtml: string;
 };
 
+// Message renvoyé au client quand Chromium ne peut pas produire le PDF : la
+// cause réelle (lancement impossible, navigateur arrêté, délai dépassé...)
+// est journalisée côté serveur, jamais exposée.
+const PDF_UNAVAILABLE_MESSAGE = 'Génération du PDF impossible pour le moment, réessayez dans quelques instants.';
+
+// Sur une seule ligne, comme AllExceptionsFilter (une entrée Cloud Logging
+// par ligne).
+function describeError(error: unknown): string {
+  const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  return detail.replace(/\s*\n\s*/g, ' | ');
+}
+
 @Injectable()
 export class PdfRendererService implements OnModuleDestroy {
+  private readonly logger = new Logger('PdfRenderer');
   private browserPromise: Promise<Browser> | null = null;
 
+  // L'instance est oubliée si son lancement échoue ou si Chromium s'arrête
+  // (plantage, mise en veille du poste, processus tué...) : sans cela, la
+  // promesse gardée en cache ferait échouer toutes les générations suivantes
+  // jusqu'au redémarrage de l'API. La demande suivante relance Chromium.
   private getBrowser(): Promise<Browser> {
     if (!this.browserPromise) {
-      this.browserPromise = puppeteer.launch({
+      const launching = puppeteer.launch({
         headless: true,
         // --no-sandbox : requis dans la plupart des environnements
         // conteneurisés (CI, Railway...) où l'utilisateur exécutant Node n'a
         // pas les privilèges du sandbox Chromium par défaut.
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
+      const forget = () => {
+        if (this.browserPromise === launching) this.browserPromise = null;
+      };
+      launching.then((browser) => browser.once('disconnected', forget), forget);
+      this.browserPromise = launching;
     }
     return this.browserPromise;
   }
 
-  async renderPdf({ headerHtml, bodyHtml, footerHtml }: RenderInput): Promise<Buffer> {
-    const browser = await this.getBrowser();
+  // Chromium est un processus externe : son indisponibilité n'est pas un bug
+  // de l'API, d'où un 503 avec un message clair plutôt qu'un 500. Si
+  // l'instance s'est arrêtée entre deux demandes, la génération est retentée
+  // une fois sur une instance neuve avant d'abandonner.
+  async renderPdf(input: RenderInput): Promise<Buffer> {
+    for (let attempt = 1; ; attempt++) {
+      const launched = this.getBrowser();
+      let browser: Browser | undefined;
+      try {
+        browser = await launched;
+        return await this.renderWith(browser, input);
+      } catch (error) {
+        const browserLost = browser !== undefined && !browser.connected;
+        // Sans attendre l'événement 'disconnected', qui peut arriver après.
+        if (browserLost && this.browserPromise === launched) this.browserPromise = null;
+        if (browserLost && attempt === 1) {
+          this.logger.warn(`Chromium arrêté, nouvelle tentative : ${describeError(error)}`);
+          continue;
+        }
+        this.logger.error(`Génération du PDF impossible : ${describeError(error)}`);
+        throw new ServiceUnavailableException(PDF_UNAVAILABLE_MESSAGE);
+      }
+    }
+  }
+
+  private async renderWith(browser: Browser, { headerHtml, bodyHtml, footerHtml }: RenderInput): Promise<Buffer> {
     const page = await browser.newPage();
     try {
       // Le HTML d'un modèle est saisi par les utilisateurs : il ne doit ni
@@ -128,13 +174,14 @@ export class PdfRendererService implements OnModuleDestroy {
       });
       return Buffer.from(pdf);
     } finally {
-      await page.close();
+      // Sans effet si Chromium s'est arrêté entre-temps (page déjà perdue).
+      await page.close().catch(() => undefined);
     }
   }
 
   async onModuleDestroy() {
     if (!this.browserPromise) return;
-    const browser = await this.browserPromise;
-    await browser.close();
+    const browser = await this.browserPromise.catch(() => null);
+    await browser?.close().catch(() => undefined);
   }
 }

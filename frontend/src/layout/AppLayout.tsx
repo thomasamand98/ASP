@@ -42,6 +42,7 @@ const DocumentTemplatesPage = lazy(() =>
   import('../features/documents/DocumentTemplatesPage.js').then((m) => ({ default: m.DocumentTemplatesPage }))
 )
 const OcrPage = lazy(() => import('../features/ocr/OcrPage.js').then((m) => ({ default: m.OcrPage })))
+const PerformancePage = lazy(() => import('../features/performance/PerformancePage.js').then((m) => ({ default: m.PerformancePage })))
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage.js').then((m) => ({ default: m.DashboardPage })))
 
 type MenuLeafConfig = { id: string; label: string; icon?: ReactNode; render: () => ReactElement }
@@ -110,6 +111,7 @@ const MENU: (MenuLeafConfig | MenuGroupConfig)[] = [
       { id: 'enumerations', label: 'Enumérations', render: () => <EnumerationsPage /> },
       { id: 'outils', label: 'Outils', render: () => <Dev /> },
       { id: 'ocr', label: 'Test OCR', render: () => <OcrPage /> },
+      { id: 'performance', label: 'Performance', render: () => <PerformancePage /> },
       { id: 'donnees', label: 'Données brutes', render: () => <Dev /> },
       { id: 'import-export', label: 'Import/Export', render: () => <Dev /> },
     ]

@@ -9,5 +9,7 @@ import { DocumentMergeModule } from '../document-merge/document-merge.module.js'
   imports: [EnumerationModule, EntiteModule, DocumentMergeModule],
   controllers: [ContratController],
   providers: [ContratService],
+  // Consommé par PerformanceModule (impression de tous les contrats).
+  exports: [ContratService],
 })
 export class ContratModule {}

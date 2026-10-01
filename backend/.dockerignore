@@ -3,3 +3,4 @@ dist
 .env
 *.tsbuildinfo
 src/generated/prisma
+storage
