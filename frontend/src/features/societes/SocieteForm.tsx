@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { SocieteDetail } from './useSocietes.js'
 import type { Contact } from '../contacts/useContacts.js'
-import { Dev } from '../enDeveloppement/Dev.js'
+import { DocumentsTab } from '../liens-documents/DocumentsTab.js'
+import { DOCUMENT_CATEGORIE } from '../liens-documents/documentCategories.js'
 import { SocieteContactsTab } from './SocieteContactsTab.js'
 import { SocieteContratsTab } from './SocieteContratsTab.js'
 import { SocieteMessagesTab } from './SocieteMessagesTab.js'
@@ -365,7 +366,7 @@ export function SocieteForm({ initial, contacts, onSubmit, onCancel }: Props) {
           <SocieteContratsTab societeId={initial.IDSOCIETES} />
         </FichePanel>
       )}
-      {topTab === 'documents' && <Dev />}
+      {topTab === 'documents' && initial && <DocumentsTab type={DOCUMENT_CATEGORIE.SOCIETE} referentId={initial.IDSOCIETES} />}
       {topTab === 'messages' && initial && <SocieteMessagesTab societeId={initial.IDSOCIETES} />}
     </div>
   )

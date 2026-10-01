@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { apiJson } from '../../lib/api'
 import { Dev } from '../enDeveloppement/Dev.js'
+import { DocumentsTab } from '../liens-documents/DocumentsTab.js'
+import { DOCUMENT_CATEGORIE } from '../liens-documents/documentCategories.js'
 import { FichePanel, FicheTabs } from '../../components/FicheTabs.js'
 import { PersonnelContratsTab } from './PersonnelContratsTab.js'
 import type { PersonnelDetail } from './usePersonnel.js'
@@ -246,7 +248,8 @@ export function PersonnelForm({ initial, onSubmit, onCancel }: Props) {
         </FichePanel>
       )}
 
-      {(tab === 'contact' || tab === 'documents') && <Dev />}
+      {tab === 'contact' && <Dev />}
+      {tab === 'documents' && initial && <DocumentsTab type={DOCUMENT_CATEGORIE.PERSONNEL} referentId={initial.IDPERSONNELS} />}
 
       {tab === 'principal' && (
         <form ref={formRef} onSubmit={handleSubmit} className="pf-form">

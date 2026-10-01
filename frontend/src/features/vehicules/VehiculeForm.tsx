@@ -6,7 +6,8 @@ import { FicheField, FicheSection } from '../../components/FicheLayout.js'
 import { FichePanel, FicheTabs } from '../../components/FicheTabs.js'
 import { useEnumerationLabels } from '../../lib/useEnumerationLabels.js'
 import './VehiculeForm.css'
-import { Dev } from '../enDeveloppement/Dev.js'
+import { DocumentsTab } from '../liens-documents/DocumentsTab.js'
+import { DOCUMENT_CATEGORIE } from '../liens-documents/documentCategories.js'
 
 // Champs scripturables d'un véhicule, mêmes clés que le CreateVehiculeDto
 // côté backend (backend/src/vehicule/vehicule.dto.ts) : IDSOCIETES en string
@@ -203,7 +204,11 @@ export function VehiculeForm({ initial, defaults, societes, onSubmit, onCancel }
       </FichePanel>
 
       <FichePanel active={tab === 'documents'}>
-        <Dev/>
+        {initial ? (
+          <DocumentsTab type={DOCUMENT_CATEGORIE.VEHICULE} referentId={initial.IDVEHICULES} />
+        ) : (
+          <p className="fiche-empty">Enregistrez d’abord le véhicule pour y joindre des documents.</p>
+        )}
       </FichePanel>
     </form>
   )

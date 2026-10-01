@@ -37,6 +37,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { MistralModule } from './mistral/mistral.module.js';
 import { TacheModule } from './tache/tache.module.js';
 import { StatistiqueModule } from './statistique/statistique.module.js';
+import { PerformanceModule } from './performance/performance.module.js';
+import { LienDocumentModule } from './lien-document/lien-document.module.js';
 import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
 
 @Module({
@@ -73,6 +75,8 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
     MistralModule,
     TacheModule,
     StatistiqueModule,
+    PerformanceModule,
+    LienDocumentModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
