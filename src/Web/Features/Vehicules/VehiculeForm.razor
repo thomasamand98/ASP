@@ -1,0 +1,190 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject EnumerationLabels Enumerations
+
+@* Fiche d'un véhicule, en création (Initial null) ou en modification (fiche
+   complète chargée par CrudPage). Mise en page reprise de l'écran WinDev :
+   Entreprise, puis cartes Identification et Documents.
+   Date_validite_assurance n'est pas affichée (absente de l'écran WinDev,
+   vide en base) mais reste conservée telle quelle. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+
+    <FicheTabs AriaLabel="Sections de la fiche véhicule" @bind-Value="_tab" Tabs="Tabs" />
+
+    <FichePanel Active="@(_tab == "general")">
+        <div class="veh-general">
+            <section class="fiche-section">
+                <FicheField Label="Entreprise">
+                    <select class="veh-societe" value="@_form.IDSOCIETES" @onchange="e => _form.IDSOCIETES = (string)e.Value!">
+                        <option value=""></option>
+                        @* Société liée pas encore dans la liste chargée. *@
+                        @if (_form.IDSOCIETES.Length > 0 && !SortedSocietes.Any(s => s.IDSOCIETES == _form.IDSOCIETES))
+                        {
+                            <option value="@_form.IDSOCIETES">@(Initial?.Societe?.Nom_societe ?? _form.IDSOCIETES)</option>
+                        }
+                        @foreach (var s in SortedSocietes)
+                        {
+                            <SelectOption @key="s.IDSOCIETES" Value="@s.IDSOCIETES" Current="@_form.IDSOCIETES">@s.Nom_societe</SelectOption>
+                        }
+                    </select>
+                </FicheField>
+            </section>
+
+            <FicheSection Title="Identification" Class="fiche-section--center">
+                <div class="veh-grid">
+                    <FicheField Label="Type">
+                        <select value="@JsNumber.ToString(_form.Type)" @onchange="e => _form.Type = JsNumber.Parse((string)e.Value!)">
+                            @if (!_types.ContainsKey(JsNumber.ToString(_form.Type)))
+                            {
+                                <option value="@JsNumber.ToString(_form.Type)">@(_form.Type != 0 ? JsNumber.ToString(_form.Type) : "")</option>
+                            }
+                            @foreach (var (valeur, libelle) in _types)
+                            {
+                                <SelectOption @key="valeur" Value="@valeur" Current="@JsNumber.ToString(_form.Type)">@libelle</SelectOption>
+                            }
+                        </select>
+                    </FicheField>
+                    <FicheField Label="Marque"><input value="@_form.Marque" maxlength="50" @oninput="e => _form.Marque = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Modèle"><input value="@_form.Modele" maxlength="50" @oninput="e => _form.Modele = (string)e.Value!" /></FicheField>
+                    <FicheField Label="N° de châssis"><input value="@_form.Num_chassis" maxlength="50" @oninput="e => _form.Num_chassis = (string)e.Value!" /></FicheField>
+                    <FicheField Label="N° d'immatriculation"><input value="@_form.Num_immat" maxlength="50" @oninput="e => _form.Num_immat = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Radiation de l'immatriculation"><input type="date" value="@_form.Date_radiation_immatriculation" @oninput="e => _form.Date_radiation_immatriculation = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Vente"><input type="date" value="@_form.Date_vente" @oninput="e => _form.Date_vente = (string)e.Value!" /></FicheField>
+                    <label class="fiche-check veh-check">
+                        <span class="field-label">Avec compresseur</span>
+                        <input type="checkbox" checked="@(_form.Avec_compresseur == 1)" @onchange="e => _form.Avec_compresseur = e.Value is true ? 1 : 0" />
+                    </label>
+                </div>
+            </FicheSection>
+
+            <FicheSection Title="Documents" Class="fiche-section--center">
+                <div class="veh-grid">
+                    <FicheField Label="N° licence transport"><input value="@_form.Num_licence_transport" maxlength="50" @oninput="e => _form.Num_licence_transport = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Validité de la licence"><input type="date" value="@_form.Date_validite_licence" @oninput="e => _form.Date_validite_licence = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Modification de licence"><input type="date" value="@_form.Date_modification_licence" @oninput="e => _form.Date_modification_licence = (string)e.Value!" /></FicheField>
+                    <FicheField Label="N° police d'assurance"><input value="@_form.Num_police_assurance" maxlength="50" @oninput="e => _form.Num_police_assurance = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Première mise en circulation"><input type="date" value="@_form.Date_premiere_mise_en_circulation" @oninput="e => _form.Date_premiere_mise_en_circulation = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Validité tachygraphe"><input type="date" value="@_form.Date_validite_tachygeaphe" @oninput="e => _form.Date_validite_tachygeaphe = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Inspection auto"><input type="date" value="@_form.Date_inspection_auto" @oninput="e => _form.Date_inspection_auto = (string)e.Value!" /></FicheField>
+                </div>
+            </FicheSection>
+        </div>
+    </FichePanel>
+
+    <FichePanel Active="@(_tab == "documents")">
+        @if (Initial is not null)
+        {
+            <DocumentsTab Type="DocumentCategorie.Vehicule" ReferentId="@Initial.IDVEHICULES" />
+        }
+        else
+        {
+            <p class="fiche-empty">Enregistrez d’abord le véhicule pour y joindre des documents.</p>
+        }
+    </FichePanel>
+</form>
+
+@code {
+    private static readonly IReadOnlyList<FicheTab> Tabs = [new("general", "Général"), new("documents", "Documents")];
+
+    // Champs envoyés à l'API (CreateVehiculeDto) : IDSOCIETES en texte ("" =
+    // aucune société), dates « AAAA-MM-JJ ». Type est un code de
+    // l'énumération « type_vehicule » (1 Tracteur, 2 Remorque...) ;
+    // Avec_compresseur un code 0/1.
+    private sealed class Model
+    {
+        public double Type { get; set; }
+        public string Marque { get; set; } = "";
+        public string Modele { get; set; } = "";
+        public string Num_police_assurance { get; set; } = "";
+        public string Num_immat { get; set; } = "";
+        public string Num_chassis { get; set; } = "";
+        public string Date_validite_assurance { get; set; } = "";
+        public string Num_licence_transport { get; set; } = "";
+        public string Date_validite_licence { get; set; } = "";
+        public string Date_modification_licence { get; set; } = "";
+        public string Date_inspection_auto { get; set; } = "";
+        public string Date_radiation_immatriculation { get; set; } = "";
+        public string Date_vente { get; set; } = "";
+        public string IDSOCIETES { get; set; } = "";
+        public string Date_premiere_mise_en_circulation { get; set; } = "";
+        public string Date_validite_tachygeaphe { get; set; } = "";
+        public double Avec_compresseur { get; set; }
+    }
+
+    private Model _form = new();
+    private string _tab = "general";
+    private IReadOnlyDictionary<string, string> _types = new Dictionary<string, string>();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public VehiculeDetail? Initial { get; set; }
+
+    // Valeurs préremplies en création (projection depuis une seule ligne).
+    [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
+
+    // Liste du sélecteur Société, chargée par VehiculesPage.
+    [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
+    [Parameter] public Func<CreateVehiculeDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private IEnumerable<Societe> SortedSocietes => Societes.OrderBy(s => s.Nom_societe ?? "", FormModel.French);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _form = new Model
+        {
+            Type = Initial?.Type ?? 1,
+            Marque = Initial?.Marque ?? "",
+            Modele = Initial?.Modele ?? "",
+            Num_police_assurance = Initial?.Num_police_assurance ?? "",
+            Num_immat = Initial?.Num_immat ?? "",
+            Num_chassis = Initial?.Num_chassis ?? "",
+            Date_validite_assurance = FormModel.DateInput(Initial?.Date_validite_assurance),
+            Num_licence_transport = Initial?.Num_licence_transport ?? "",
+            Date_validite_licence = FormModel.DateInput(Initial?.Date_validite_licence),
+            Date_modification_licence = FormModel.DateInput(Initial?.Date_modification_licence),
+            Date_inspection_auto = FormModel.DateInput(Initial?.Date_inspection_auto),
+            Date_radiation_immatriculation = FormModel.DateInput(Initial?.Date_radiation_immatriculation),
+            Date_vente = FormModel.DateInput(Initial?.Date_vente),
+            IDSOCIETES = FormModel.LinkId(Initial?.IDSOCIETES),
+            Date_premiere_mise_en_circulation = FormModel.DateInput(Initial?.Date_premiere_mise_en_circulation),
+            Date_validite_tachygeaphe = FormModel.DateInput(Initial?.Date_validite_tachygeaphe),
+            Avec_compresseur = Initial?.Avec_compresseur ?? 0,
+        };
+        if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+        _types = await Enumerations.LoadAsync("type_vehicule");
+    }
+
+    protected override void OnParametersSet() => _guard?.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateVehiculeDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

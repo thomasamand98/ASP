@@ -1,2 +1,50 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : AttelagesPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Attelage" TDto="CreateAttelageDto" TDetail="Attelage"
+          Title="Attelages" LoadingLabel="Chargement des attelages..."
+          Source="_list" Columns="Columns" GetRowId="a => a.IDATTELAGE_REFERENCE"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer cet attelage ?" CreateModalTitle="Nouvel attelage" EditModalTitle="Modifier l'attelage"
+          Entity="attelages" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <AttelageForm Initial="form.Initial" Defaults="Projection?.Defaults" Chauffeurs="_chauffeurs.Data" Vehicules="_vehicules.Data"
+                      Societes="_societes.Data" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private static readonly IReadOnlyList<Column<Attelage>> Columns =
+    [
+        Col.Of<Attelage>("chauffeur", "Chauffeur", a => a.Chauffeur?.Nom_chauffeur ?? ""),
+        Col.Of<Attelage>("tracteur", "Tracteur", a => AttelageForm.VehiculeLabel(a.Tracteur)),
+        Col.Of<Attelage>("remorque", "Remorque", a => AttelageForm.VehiculeLabel(a.Remorque)),
+    ];
+
+    private ApiList<Attelage> _list = default!;
+    private CrudApi<CreateAttelageDto, Attelage, Attelage> _api = default!;
+    // Listes des sélecteurs Chauffeur / Tracteur / Remorque / Société,
+    // chargées une fois tant que l'onglet reste ouvert.
+    private ApiList<Chauffeur> _chauffeurs = default!;
+    private ApiList<Vehicule> _vehicules = default!;
+    private ApiList<Societe> _societes = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Attelage>(Api, "attelages") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreateAttelageDto, Attelage, Attelage>(Api, "attelages");
+        _chauffeurs = new ApiList<Chauffeur>(Api, "chauffeurs");
+        _vehicules = new ApiList<Vehicule>(Api, "vehicules");
+        _societes = new ApiList<Societe>(Api, "societes");
+        _chauffeurs.Changed += StateHasChanged;
+        _vehicules.Changed += StateHasChanged;
+        _societes.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _chauffeurs.RefetchAsync(), _vehicules.RefetchAsync(), _societes.RefetchAsync());
+    }
+}

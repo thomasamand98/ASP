@@ -57,9 +57,12 @@ public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = nul
     }
 
     // Comme les dépendances de useApiList : un filtre identique ne relance rien.
-    public Task SetFiltersAsync(IReadOnlyDictionary<string, string> filters)
+    // resetPage : retour à la page 1 (nouveau filtre choisi par l'utilisateur).
+    public Task SetFiltersAsync(IReadOnlyDictionary<string, string> filters, bool resetPage = false)
     {
-        if (filters.Count == Filters.Count && filters.All(f => Filters.TryGetValue(f.Key, out var v) && v == f.Value)) return Task.CompletedTask;
+        var pageChanged = resetPage && Page != 1;
+        if (resetPage) Page = 1;
+        if (filters.Count == Filters.Count && filters.All(f => Filters.TryGetValue(f.Key, out var v) && v == f.Value)) return pageChanged ? RefetchAsync() : Task.CompletedTask;
         Filters = filters;
         return RefetchAsync();
     }

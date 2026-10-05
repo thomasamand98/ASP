@@ -1,0 +1,11 @@
+@* Option d'un <select> dont les options arrivent après le premier rendu
+   (listes chargées depuis l'API) : `selected` est posé explicitement, sinon
+   le navigateur garde la première option — Blazor ne réapplique pas la
+   valeur du <select> quand seules ses options changent (React le fait). *@
+<option value="@Value" selected="@(Value == Current)">@ChildContent</option>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter, EditorRequired] public string Current { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

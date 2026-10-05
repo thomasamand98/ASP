@@ -23,3 +23,11 @@
 #root:has(.tasks-rail) {
   margin-right: calc(1rem + var(--tasks-rail-w));
 }
+
+/* Classe partagée (CrudPage, onglet Documents des fiches) : globale. */
+/* Erreur d'un rechargement (page, recherche) : affichée au-dessus du
+   tableau, qui garde les dernières données reçues. */
+.crud-page-error {
+  color: var(--danger);
+  margin: 0 0 0.5rem;
+}

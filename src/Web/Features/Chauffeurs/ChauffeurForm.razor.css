@@ -1,0 +1,13 @@
+/* Fiche chauffeur : deux colonnes (Entreprise/Catégorie, Nom/Téléphone,
+   Lien salarié/Email planning), une seule sur mobile. */
+.chf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem 1rem;
+}
+
+@media (max-width: 480px) {
+  .chf-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,2 +1,60 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : VehiculesPage</p>
+@inject ApiClient Api
+@inject EnumerationLabels Enumerations
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Vehicule" TDto="CreateVehiculeDto" TDetail="VehiculeDetail"
+          Title="Véhicules" LoadingLabel="Chargement des véhicules..."
+          Source="_list" Columns="_columns" GetRowId="v => v.IDVEHICULES"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce véhicule ?" CreateModalTitle="Nouveau véhicule" EditModalTitle="Modifier le véhicule"
+          Entity="vehicules" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <VehiculeForm Initial="form.Initial" Defaults="Projection?.Defaults" Societes="_societes.Data"
+                      OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private ApiList<Vehicule> _list = default!;
+    private CrudApi<CreateVehiculeDto, Vehicule, VehiculeDetail> _api = default!;
+    // Liste du sélecteur Société, chargée une fois tant que l'onglet reste
+    // ouvert (pas à chaque ouverture de fiche).
+    private ApiList<Societe> _societes = default!;
+    private IReadOnlyList<Column<Vehicule>> _columns = [];
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Vehicule>(Api, "vehicules") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreateVehiculeDto, Vehicule, VehiculeDetail>(Api, "vehicules");
+        _societes = new ApiList<Societe>(Api, "societes");
+        _societes.Changed += StateHasChanged;
+        _columns = MakeColumns(new Dictionary<string, string>());
+        var loading = Task.WhenAll(_list.RefetchAsync(), _societes.RefetchAsync());
+        // Libellés de l'énumération « type_vehicule » indexés par code — le
+        // code brut s'affiche tant qu'ils ne sont pas chargés.
+        _columns = MakeColumns(await Enumerations.LoadAsync("type_vehicule"));
+        await loading;
+    }
+
+    private static IReadOnlyList<Column<Vehicule>> MakeColumns(IReadOnlyDictionary<string, string> types) =>
+    [
+        Col.Key<Vehicule>("Num_immat", "N° d'immatriculation", v => v.Num_immat),
+        Col.Of<Vehicule>("Type", "Type", v => v.Type is { } type ? types.GetValueOrDefault(JsNumber.ToString(type)) ?? JsNumber.ToString(type) : ""),
+        Col.Key<Vehicule>("Marque", "Marque", v => v.Marque),
+        Col.Key<Vehicule>("Modele", "Modèle", v => v.Modele),
+        Col.Of<Vehicule>("societe", "Société", v => v.Societe?.Nom_societe ?? ""),
+        Col.Key<Vehicule>("Num_police_assurance", "N° police d'assurance", v => v.Num_police_assurance),
+        Col.Key<Vehicule>("Num_chassis", "N° châssis", v => v.Num_chassis),
+        Col.Date<Vehicule>("Date_validite_assurance", "Validité assurance", v => v.Date_validite_assurance),
+        Col.Key<Vehicule>("Num_licence_transport", "N° licence transport", v => v.Num_licence_transport),
+        Col.Date<Vehicule>("Date_validite_licence", "Validité licence", v => v.Date_validite_licence),
+        Col.Date<Vehicule>("Date_inspection_auto", "Inspection auto", v => v.Date_inspection_auto),
+        Col.Date<Vehicule>("Date_validite_tachygeaphe", "Validité tachygraphe", v => v.Date_validite_tachygeaphe),
+    ];
+}

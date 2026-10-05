@@ -73,10 +73,3 @@
   cursor: not-allowed;
   opacity: 0.4;
 }
-
-/* Erreur d'un rechargement (page, recherche) : affichée au-dessus du
-   tableau, qui garde les dernières données reçues. */
-.crud-page-error {
-  color: var(--danger);
-  margin: 0 0 0.5rem;
-}

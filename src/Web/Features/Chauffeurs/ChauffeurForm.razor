@@ -1,0 +1,162 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject EnumerationLabels Enumerations
+
+@* Fiche d'un chauffeur, en création (Initial null) ou en modification
+   (pré-remplie avec la ligne du tableau). « Email planning » est l'e-mail
+   professionnel du salarié lié, en lecture seule (il se modifie sur la fiche
+   personnel). *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+
+    <section class="fiche-section">
+        <div class="chf-grid">
+            <FicheField Label="Entreprise">
+                <select value="@_form.IDSOCIETES" @onchange="e => _form.IDSOCIETES = (string)e.Value!">
+                    <option value=""></option>
+                    @* Société liée pas encore dans la liste chargée. *@
+                    @if (_form.IDSOCIETES.Length > 0 && !SortedSocietes.Any(s => s.IDSOCIETES == _form.IDSOCIETES))
+                    {
+                        <option value="@_form.IDSOCIETES">@(Initial?.Societe?.Nom_societe ?? _form.IDSOCIETES)</option>
+                    }
+                    @foreach (var s in SortedSocietes)
+                    {
+                        <SelectOption @key="s.IDSOCIETES" Value="@s.IDSOCIETES" Current="@_form.IDSOCIETES">@s.Nom_societe</SelectOption>
+                    }
+                </select>
+            </FicheField>
+            <FicheField Label="Catégorie">
+                <select value="@_form.Categorie" @onchange="e => _form.Categorie = (string)e.Value!">
+                    <option value=""></option>
+                    @if (_form.Categorie.Length > 0 && !_categories.ContainsKey(_form.Categorie))
+                    {
+                        <option value="@_form.Categorie">@_form.Categorie</option>
+                    }
+                    @foreach (var (valeur, libelle) in _categories)
+                    {
+                        <SelectOption @key="valeur" Value="@valeur" Current="@_form.Categorie">@libelle</SelectOption>
+                    }
+                </select>
+            </FicheField>
+            <FicheField Label="Nom">
+                <input value="@_form.Nom_chauffeur" maxlength="50" @oninput="e => _form.Nom_chauffeur = (string)e.Value!" />
+            </FicheField>
+            <FicheField Label="Téléphone">
+                <input type="tel" value="@_form.Telephone" maxlength="50" @oninput="e => _form.Telephone = (string)e.Value!" />
+            </FicheField>
+            <FicheField Label="Lien salarié">
+                <select value="@_form.IDPERSONNELS" @onchange="e => _form.IDPERSONNELS = (string)e.Value!">
+                    <option value=""></option>
+                    @if (_form.IDPERSONNELS.Length > 0 && Linked is null)
+                    {
+                        <option value="@_form.IDPERSONNELS">@(Initial?.Personnel is { } p ? PersonnelName(p.Nom_Personnel, p.Prenom_Personnel) : _form.IDPERSONNELS)</option>
+                    }
+                    @foreach (var p in SortedPersonnel)
+                    {
+                        var name = PersonnelName(p.Nom_Personnel, p.Prenom_Personnel);
+                        <SelectOption @key="p.IDPERSONNELS" Value="@p.IDPERSONNELS" Current="@_form.IDPERSONNELS">@(name.Length > 0 ? name : p.IDPERSONNELS)</SelectOption>
+                    }
+                </select>
+            </FicheField>
+            <div class="field">
+                <span class="field-label">Email planning</span>
+                <span class="fiche-readonly" title="E-mail professionnel du salarié lié">@(string.IsNullOrEmpty(EmailPlanning) ? " " : EmailPlanning)</span>
+            </div>
+        </div>
+        <FicheSwitch Label="Archivé" Checked="@(_form.Archive == 1)" CheckedChanged="on => _form.Archive = on ? 1 : 0" />
+    </section>
+</form>
+
+@code {
+    // Champs envoyés à l'API (CreateChauffeurDto) : ids en texte, "" = aucun
+    // lien ; Categorie est la `Valeur` d'une entrée de l'énumération
+    // « categorie_chauffeur » ; Archive est un code 0/1.
+    private sealed class Model
+    {
+        public string Nom_chauffeur { get; set; } = "";
+        public string Telephone { get; set; } = "";
+        public string Categorie { get; set; } = "";
+        public double Archive { get; set; }
+        public string IDPERSONNELS { get; set; } = "";
+        public string IDSOCIETES { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private IReadOnlyDictionary<string, string> _categories = new Dictionary<string, string>();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public Chauffeur? Initial { get; set; }
+
+    // Valeurs préremplies en création (projection depuis une seule ligne) —
+    // ignorées en modification.
+    [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
+
+    // Listes des sélecteurs, chargées par ChauffeursPage.
+    [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
+    [Parameter] public IReadOnlyList<Personnel> Personnel { get; set; } = [];
+    [Parameter] public Func<CreateChauffeurDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private static string PersonnelName(string? nom, string? prenom) => FormModel.JoinNonEmpty(" ", nom, prenom);
+
+    private IEnumerable<Personnel> SortedPersonnel =>
+        Personnel.OrderBy(p => PersonnelName(p.Nom_Personnel, p.Prenom_Personnel), FormModel.French);
+
+    private IEnumerable<Societe> SortedSocietes => Societes.OrderBy(s => s.Nom_societe ?? "", FormModel.French);
+
+    private Personnel? Linked => Personnel.FirstOrDefault(p => p.IDPERSONNELS == _form.IDPERSONNELS);
+
+    // E-mail du salarié choisi ; tant que la liste n'est pas chargée, celui
+    // renvoyé avec le chauffeur (même salarié).
+    private string? EmailPlanning => _form.IDPERSONNELS.Length == 0 ? null
+        : Linked is { } linked ? linked.E_mail_professionnel
+        : _form.IDPERSONNELS == FormModel.LinkId(Initial?.IDPERSONNELS) ? Initial?.Personnel?.E_mail_professionnel : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _form = new Model
+        {
+            Nom_chauffeur = Initial?.Nom_chauffeur ?? "",
+            Telephone = Initial?.Telephone ?? "",
+            Categorie = Initial?.Categorie ?? "",
+            Archive = Initial?.Archive ?? 0,
+            IDPERSONNELS = FormModel.LinkId(Initial?.IDPERSONNELS),
+            IDSOCIETES = FormModel.LinkId(Initial?.IDSOCIETES),
+        };
+        if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+        _categories = await Enumerations.LoadAsync("categorie_chauffeur");
+    }
+
+    protected override void OnParametersSet() => _guard?.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateChauffeurDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

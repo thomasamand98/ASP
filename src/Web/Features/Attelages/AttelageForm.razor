@@ -1,0 +1,146 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Fiche d'un attelage de référence, en création (Initial null) ou en
+   modification (pré-remplie avec la ligne du tableau). Tracteur et Remorque
+   ne proposent que les véhicules de ce type ; le véhicule déjà lié reste
+   affiché même s'il est d'un autre type. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+    <label class="field">
+        <span class="field-label">Chauffeur</span>
+        <select value="@_form.IDCHAUFFEUR" @onchange="e => _form.IDCHAUFFEUR = (string)e.Value!">
+            <option value=""></option>
+            @CurrentOption(_form.IDCHAUFFEUR, SortedChauffeurs.Any(c => c.IDCHAUFFEURS == _form.IDCHAUFFEUR), Initial?.Chauffeur?.Nom_chauffeur)
+            @foreach (var c in SortedChauffeurs)
+            {
+                <SelectOption @key="c.IDCHAUFFEURS" Value="@c.IDCHAUFFEURS" Current="@_form.IDCHAUFFEUR">@c.Nom_chauffeur</SelectOption>
+            }
+        </select>
+    </label>
+    <label class="field">
+        <span class="field-label">Tracteur</span>
+        @VehiculeSelect(_form.IDTRACTEUR, v => _form.IDTRACTEUR = v, OfType(TypeTracteur), Initial?.Tracteur)
+    </label>
+    <label class="field">
+        <span class="field-label">Remorque</span>
+        @VehiculeSelect(_form.IDREMORQUE, v => _form.IDREMORQUE = v, OfType(TypeRemorque), Initial?.Remorque)
+    </label>
+    <label class="field">
+        <span class="field-label">Société</span>
+        <select value="@_form.IDSOCIETES" @onchange="e => _form.IDSOCIETES = (string)e.Value!">
+            <option value=""></option>
+            @CurrentOption(_form.IDSOCIETES, SortedSocietes.Any(s => s.IDSOCIETES == _form.IDSOCIETES), Initial?.Societe?.Nom_societe)
+            @foreach (var s in SortedSocietes)
+            {
+                <SelectOption @key="s.IDSOCIETES" Value="@s.IDSOCIETES" Current="@_form.IDSOCIETES">@s.Nom_societe</SelectOption>
+            }
+        </select>
+    </label>
+</form>
+
+@code {
+    // Codes de l'énumération « type_vehicule » proposés dans chaque sélecteur.
+    private const double TypeTracteur = 1;
+    private const double TypeRemorque = 2;
+
+    // Champs envoyés à l'API (CreateAttelageDto) : ids en texte, "" = aucun lien.
+    private sealed class Model
+    {
+        public string IDCHAUFFEUR { get; set; } = "";
+        public string IDTRACTEUR { get; set; } = "";
+        public string IDREMORQUE { get; set; } = "";
+        public string IDSOCIETES { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public Attelage? Initial { get; set; }
+
+    // Valeurs préremplies en création (projection depuis une seule ligne).
+    [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
+
+    // Listes des sélecteurs, chargées par AttelagesPage.
+    [Parameter] public IReadOnlyList<Chauffeur> Chauffeurs { get; set; } = [];
+    [Parameter] public IReadOnlyList<Vehicule> Vehicules { get; set; } = [];
+    [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
+    [Parameter] public Func<CreateAttelageDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    // Un véhicule lié affiché comme « Marque Modèle (immat) ».
+    public static string VehiculeLabel(AttelageVehicule? v) =>
+        v is null ? "" : FormModel.JoinNonEmpty(" ", v.Marque, v.Modele) + (string.IsNullOrEmpty(v.Num_immat) ? "" : $" ({v.Num_immat})");
+
+    private static string VehiculeLabel(Vehicule v) => VehiculeLabel(new AttelageVehicule(v.Marque, v.Modele, v.Num_immat));
+
+    private IEnumerable<Chauffeur> SortedChauffeurs => Chauffeurs.OrderBy(c => c.Nom_chauffeur ?? "", FormModel.French);
+
+    private IEnumerable<Societe> SortedSocietes => Societes.OrderBy(s => s.Nom_societe ?? "", FormModel.French);
+
+    private List<Vehicule> OfType(double type) => [.. Vehicules.Where(v => v.Type == type).OrderBy(VehiculeLabel, FormModel.French)];
+
+    // Option pour la valeur liée absente de la liste proposée (autre type de
+    // véhicule, chauffeur archivé, liste pas encore chargée...).
+    private static RenderFragment? CurrentOption(string value, bool listed, string? label) =>
+        value.Length > 0 && !listed ? @<option value="@value">@(string.IsNullOrEmpty(label) ? value : label)</option> : null;
+
+    private RenderFragment VehiculeSelect(string value, Action<string> set, List<Vehicule> options, AttelageVehicule? linked)
+    {
+        var other = Vehicules.FirstOrDefault(v => v.IDVEHICULES == value);
+        var label = other is not null ? VehiculeLabel(other) : linked is not null ? VehiculeLabel(linked) : null;
+        return @<select value="@value" @onchange="e => set((string)e.Value!)">
+            <option value=""></option>
+            @CurrentOption(value, options.Any(v => v.IDVEHICULES == value), label)
+            @foreach (var v in options)
+            {
+                <SelectOption @key="v.IDVEHICULES" Value="@v.IDVEHICULES" Current="@value">@VehiculeLabel(v)</SelectOption>
+            }
+        </select>;
+    }
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            IDCHAUFFEUR = FormModel.LinkId(Initial?.IDCHAUFFEUR),
+            IDTRACTEUR = FormModel.LinkId(Initial?.IDTRACTEUR),
+            IDREMORQUE = FormModel.LinkId(Initial?.IDREMORQUE),
+            IDSOCIETES = FormModel.LinkId(Initial?.IDSOCIETES),
+        };
+        if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateAttelageDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

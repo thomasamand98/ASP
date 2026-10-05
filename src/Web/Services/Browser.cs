@@ -35,6 +35,8 @@ public sealed class Browser(IJSRuntime js)
 
     // ---------- Éléments ----------
     public ValueTask FocusAsync(ElementReference element) => js.InvokeVoidAsync("horizon.focus", element);
+    public ValueTask ClickAsync(ElementReference element) => js.InvokeVoidAsync("horizon.click", element);
+    public ValueTask ClearValueAsync(ElementReference element) => js.InvokeVoidAsync("horizon.clearValue", element);
     public ValueTask SetIndeterminateAsync(ElementReference element, bool value) => js.InvokeVoidAsync("horizon.setIndeterminate", element, value);
     public bool ReportValidity(ElementReference element) => ((IJSInProcessRuntime)js).Invoke<bool>("horizon.reportValidity", element);
     public ValueTask<ElementRect> GetRectAsync(ElementReference element) => js.InvokeAsync<ElementRect>("horizon.rect", element);

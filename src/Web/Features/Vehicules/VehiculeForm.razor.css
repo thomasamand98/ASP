@@ -1,0 +1,35 @@
+/* Fiche véhicule (onglet Général) : Entreprise, puis cartes Identification
+   et Documents en trois colonnes — deux sur tablette, une sur mobile. */
+.veh-general {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.veh-societe {
+  max-width: 26rem;
+}
+
+.veh-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.6rem 1rem;
+}
+
+/* « Avec compresseur » à côté de « Vente », comme sur l'écran WinDev. */
+.veh-check {
+  padding-left: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .veh-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .veh-grid {
+    grid-template-columns: 1fr;
+  }
+}

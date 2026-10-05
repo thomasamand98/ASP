@@ -28,7 +28,7 @@
                     }
                     @foreach (var (valeur, libelle) in _types)
                     {
-                        <option @key="valeur" value="@valeur">@libelle</option>
+                        <SelectOption @key="valeur" Value="@valeur" Current="@JsNumber.ToString(_form.Type_Prestation)">@libelle</SelectOption>
                     }
                 </select>
             </FicheField>

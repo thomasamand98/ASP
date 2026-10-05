@@ -101,6 +101,12 @@ window.horizon = (() => {
 
   // ---------- Éléments ----------
   const focus = (element) => element?.focus()
+  // Bouton qui ouvre le sélecteur de fichiers d'un <input type="file"> masqué ;
+  // vider sa valeur permet de re-sélectionner le même fichier après une erreur.
+  const click = (element) => element?.click()
+  function clearValue(element) {
+    if (element) element.value = ''
+  }
   function setIndeterminate(element, value) {
     if (element) element.indeterminate = value
   }
@@ -225,6 +231,8 @@ window.horizon = (() => {
     createUrl,
     revokeUrl,
     focus,
+    click,
+    clearValue,
     setIndeterminate,
     reportValidity,
     rect,

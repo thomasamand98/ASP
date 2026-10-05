@@ -1,0 +1,199 @@
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Onglet « Documents » d'une fiche (Société, Personnel, Véhicule) : les
+   documents liés à l'enregistrement par la table lien_documents. Ajout d'un
+   ou plusieurs fichiers, ouverture (double clic ou bouton) et suppression
+   des lignes sélectionnées. Tout est enregistré immédiatement, hors du
+   formulaire de la fiche. *@
+@if (_documents is null)
+{
+    if (_error is not null)
+    {
+        <p class="crud-page-error">Erreur : @_error</p>
+    }
+    else
+    {
+        <p class="fiche-empty">Chargement des documents...</p>
+    }
+}
+else
+{
+    var selectedRows = _documents.Where(d => _selected.Contains(d.IDLIEN_DOCUMENTS)).ToList();
+    <div>
+        <div class="page-header">
+            <h2>Documents (@_documents.Count)</h2>
+            <div class="documents-tab-actions">
+                <button type="button" class="btn" disabled="@(selectedRows.Count != 1)" @onclick="() => OpenAsync(selectedRows[0])">Ouvrir</button>
+                <button type="button" class="btn" disabled="@(selectedRows.Count == 0 || _busy)" @onclick="() => RemoveAsync(selectedRows)">Supprimer</button>
+                <button type="button" class="btn primary" disabled="@_busy" @onclick="() => Browser.ClickAsync(_fileInput!.Element!.Value)">
+                    @(_busy ? "En cours..." : "Ajouter un document")
+                </button>
+                <InputFile @ref="_fileInput" multiple hidden OnChange="AddFilesAsync" />
+            </div>
+        </div>
+        @if (_error is not null)
+        {
+            <p class="crud-page-error">Erreur : @_error</p>
+        }
+        <DataTable T="DocumentRow" Data="_documents" Columns="Columns" GetRowId="d => d.IDLIEN_DOCUMENTS"
+                   SelectedRowIds="_selected" OnSelectionChange="ids => _selected = ids" OnRowDoubleClick="OpenAsync" ExportFileName="Documents" />
+    </div>
+}
+
+@code {
+    // Même limite que Uploads.MaxFileSize côté API : vérifiée ici aussi pour
+    // éviter d'envoyer le fichier pour rien avant d'obtenir un 413.
+    private const long MaxDocumentFileSize = 50 * 1024 * 1024;
+
+    // Formats affichés dans un nouvel onglet ; les autres sont téléchargés.
+    // Liste fermée : un fichier déposé en HTML ou SVG, ouvert depuis un blob,
+    // exécuterait ses scripts avec les droits de l'application.
+    private static readonly Dictionary<string, string> Affichables = new()
+    {
+        ["pdf"] = "application/pdf",
+        ["png"] = "image/png",
+        ["jpg"] = "image/jpeg",
+        ["jpeg"] = "image/jpeg",
+        ["gif"] = "image/gif",
+        ["webp"] = "image/webp",
+    };
+
+    private static readonly IReadOnlyList<Column<DocumentRow>> Columns =
+    [
+        Col.Key<DocumentRow>("Nom", "Nom", d => d.Nom),
+        Col.Of<DocumentRow>("type", "Type", d => d.Extension?.ToUpperInvariant() ?? ""),
+        Col.Of<DocumentRow>("date", "Ajouté le", FormatDateHeure),
+        Col.Key<DocumentRow>("Commentaire", "Commentaire", d => d.Commentaire),
+    ];
+
+    private List<DocumentRow>? _documents;
+    private string? _error;
+    private HashSet<string> _selected = [];
+    private bool _busy;
+    private InputFile? _fileInput;
+
+    // Catégorie des liens affichés (DocumentCategorie) et identifiant de
+    // l'enregistrement auquel ils se rapportent (ex. Societe + IDSOCIETES).
+    [Parameter, EditorRequired] public int Type { get; set; }
+    [Parameter, EditorRequired] public string ReferentId { get; set; } = "";
+
+    // Date locale « AAAA-MM-JJ HH:MM » : triable telle quelle comme du texte.
+    private static string FormatDateHeure(DocumentRow row) =>
+        Format.ParseLocal(row.Date_heure_creation) is { } d ? d.ToString("yyyy'-'MM'-'dd HH':'mm", CultureInfo.InvariantCulture) : "";
+
+    private (int, string)? _loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor == (Type, ReferentId)) return;
+        _loadedFor = (Type, ReferentId);
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var json = await Api.GetAsync<DocumentsResponse>($"lien-documents?type={Type}&referentId={Uri.EscapeDataString(ReferentId)}");
+        _documents = json.documents;
+        _error = null;
+    }
+
+    private async Task AddFilesAsync(InputFileChangeEventArgs e)
+    {
+        var files = e.GetMultipleFiles(int.MaxValue);
+        // Permet de re-sélectionner le même fichier après une erreur.
+        await Browser.ClearValueAsync(_fileInput!.Element!.Value);
+        if (files.Count == 0) return;
+        _busy = true;
+        StateHasChanged();
+        var echecs = new List<string>();
+        foreach (var file in files)
+        {
+            if (file.Size > MaxDocumentFileSize)
+            {
+                echecs.Add($"{file.Name} : fichier trop volumineux (maximum 50 Mo)");
+                continue;
+            }
+            try
+            {
+                var bytes = new byte[file.Size];
+                await using (var stream = file.OpenReadStream(MaxDocumentFileSize))
+                {
+                    await stream.ReadExactlyAsync(bytes);
+                }
+                await Api.SendAsync(() => new HttpRequestMessage(HttpMethod.Post, "lien-documents")
+                {
+                    Content = Uploads.Form(("type", Type.ToString(CultureInfo.InvariantCulture)), ("referentId", ReferentId), file.Name, file.ContentType, bytes),
+                });
+            }
+            catch (Exception ex)
+            {
+                echecs.Add($"{file.Name} : {ex.Message}");
+            }
+        }
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _busy = false;
+        StateHasChanged();
+        if (echecs.Count > 0) await Browser.AlertAsync($"Échec de l'ajout :\n{string.Join('\n', echecs)}");
+    }
+
+    // Le fichier est récupéré par l'API authentifiée puis affiché ou
+    // téléchargé depuis un blob. L'onglet est ouvert avant l'attente réseau,
+    // sinon le navigateur bloquerait le popup.
+    private async Task OpenAsync(DocumentRow row)
+    {
+        var mime = Affichables.GetValueOrDefault(row.Extension?.ToLowerInvariant() ?? "");
+        var preview = mime is null ? 0 : Browser.OpenBlankWindow();
+        try
+        {
+            var response = await Api.SendAsync(HttpMethod.Get, $"lien-documents/{row.IDLIEN_DOCUMENTS}/fichier");
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            if (mime is not null) await Browser.ShowInWindowAsync(preview, bytes, mime);
+            else await Browser.DownloadAsync(row.NomFichier ?? row.Nom ?? "document", bytes, response.Content.Headers.ContentType?.MediaType);
+        }
+        catch (Exception e)
+        {
+            if (preview != 0) await Browser.CloseWindowAsync(preview);
+            await Browser.AlertAsync($"Ouverture impossible : {e.Message}");
+        }
+    }
+
+    private async Task RemoveAsync(List<DocumentRow> rows)
+    {
+        var message = rows.Count == 1 ? $"Supprimer le document « {rows[0].Nom ?? ""} » ?" : $"Supprimer ces {rows.Count} documents ?";
+        if (!await Browser.ConfirmAsync(message)) return;
+        _busy = true;
+        try
+        {
+            foreach (var row in rows) await Api.SendAsync(HttpMethod.Delete, $"lien-documents/{row.IDLIEN_DOCUMENTS}");
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de la suppression : {e.Message}");
+        }
+        _selected = [];
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        _busy = false;
+    }
+}

@@ -23,7 +23,7 @@
             <option value="">—</option>
             @foreach (var p in PaysChoices)
             {
-                <option @key="p.IDPAYS" value="@(p.ISO ?? string.Empty)">@p.Nom</option>
+                <SelectOption @key="p.IDPAYS" Value="@(p.ISO ?? string.Empty)" Current="@Value.Pays">@p.Nom</SelectOption>
             }
         </select>
     </FicheField>

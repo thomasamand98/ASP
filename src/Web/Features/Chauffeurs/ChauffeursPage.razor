@@ -1,2 +1,70 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : ChauffeursPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Chauffeur" TDto="CreateChauffeurDto" TDetail="Chauffeur"
+          Title="Chauffeurs" LoadingLabel="Chargement des chauffeurs..."
+          Source="_list" Columns="Columns" GetRowId="c => c.IDCHAUFFEURS"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce chauffeur ?" CreateModalTitle="Nouveau chauffeur" EditModalTitle="Modifier le chauffeur"
+          Entity="chauffeurs" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <ToolbarExtra>
+        <ArchiveFilter Value="@_archive" ValueChanged="ChangeArchiveAsync" />
+    </ToolbarExtra>
+    <RenderForm Context="form">
+        <ChauffeurForm Initial="form.Initial" Defaults="Projection?.Defaults" Societes="_societes.Data" Personnel="_personnel.Data"
+                       OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private static readonly IReadOnlyList<Column<Chauffeur>> Columns =
+    [
+        Col.Key<Chauffeur>("Nom_chauffeur", "Chauffeur", c => c.Nom_chauffeur),
+        Col.Key<Chauffeur>("Categorie", "Catégorie", c => c.Categorie),
+        Col.Key<Chauffeur>("Telephone", "Téléphone", c => c.Telephone),
+        Col.Of<Chauffeur>("societe", "Société", c => c.Societe?.Nom_societe ?? ""),
+        Col.Of<Chauffeur>("lien_personnel", "Lien personnel", c => FormModel.JoinNonEmpty(" ", c.Personnel?.Nom_Personnel, c.Personnel?.Prenom_Personnel)),
+        Col.Of<Chauffeur>("archive", "Archivé", c => c.Archive is { } a && a != 0 ? "Oui" : "Non"),
+    ];
+
+    private ApiList<Chauffeur> _list = default!;
+    private CrudApi<CreateChauffeurDto, Chauffeur, Chauffeur> _api = default!;
+    // Listes des sélecteurs Entreprise et Lien salarié, chargées une fois
+    // tant que l'onglet reste ouvert (pas à chaque ouverture de fiche).
+    private ApiList<Societe> _societes = default!;
+    private ApiList<Personnel> _personnel = default!;
+    // Non archivés par défaut ; tous en projection, pour ne masquer aucune
+    // ligne liée.
+    private string _archive = "0";
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    private Dictionary<string, string> Filters()
+    {
+        var filters = ProjectionView.Filters(Projection);
+        if (_archive.Length > 0) filters["archive"] = _archive;
+        return filters;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _archive = Projection is null ? "0" : "";
+        _list = new ApiList<Chauffeur>(Api, "chauffeurs") { Paginated = true };
+        _list.Configure(1, 25, "", Filters());
+        _api = new CrudApi<CreateChauffeurDto, Chauffeur, Chauffeur>(Api, "chauffeurs");
+        _societes = new ApiList<Societe>(Api, "societes");
+        _personnel = new ApiList<Personnel>(Api, "personnel");
+        _societes.Changed += StateHasChanged;
+        _personnel.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _societes.RefetchAsync(), _personnel.RefetchAsync());
+    }
+
+    private Task ChangeArchiveAsync(string value)
+    {
+        _archive = value;
+        return _list.SetFiltersAsync(Filters(), resetPage: true);
+    }
+}
