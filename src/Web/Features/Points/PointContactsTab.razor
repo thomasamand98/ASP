@@ -1,0 +1,253 @@
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Onglet « Contacts » de la fiche Point : une carte simplifiée par contact
+   lié au point (fonction, téléphones, email, « Recevoir le planning »),
+   comme dans WinDev. L'œil ouvre la fiche contact complète (ContactForm)
+   dans une modale ; « − » retire le contact du point sans le supprimer.
+   « Recevoir le planning » est enregistré immédiatement (lien
+   point_contacts, hors du formulaire du point). *@
+@if (_contacts.Loading && _contacts.Data.Count == 0)
+{
+    <p class="fiche-empty">Chargement des contacts...</p>
+}
+else if (_contacts.Error is not null)
+{
+    <p class="crud-page-error">Erreur : @_contacts.Error</p>
+}
+else
+{
+    var count = _contacts.Data.Count;
+    var plural = count > 1 ? "s" : "";
+    <div class="pt-contacts">
+        <div class="pt-contacts-head">
+            <span class="pt-contacts-count">@(count == 0 ? "Aucun contact lié à ce point" : $"{count} contact{plural} lié{plural}")</span>
+            <button type="button" class="btn sm" @onclick="() => _opened = new Opened(null)"><Icon Name="fiche.Plus" /> Nouveau contact</button>
+        </div>
+
+        @if (count > 0)
+        {
+            <ul class="pt-contact-cards">
+                @foreach (var c in _contacts.Data)
+                {
+                    @ContactCard(c)
+                }
+            </ul>
+        }
+
+        @* Modale rendue sur place (Blazor n'a pas de portail) : la fiche point
+           s'affiche dans un onglet, où la modale couvre bien toute la fenêtre. *@
+        @if (_opened is { } opened)
+        {
+            <Modal Title="@(opened.Contact is null ? "Nouveau contact" : ContactName(opened.Contact))" OnClose="() => _opened = null">
+                @if (opened.Contact is null)
+                {
+                    <ContactForm Initial="null" Societes="_societes.Data" OnSubmit="SubmitAsync" OnCancel="CloseAsync" />
+                }
+                else if (_detailError is not null)
+                {
+                    <p class="crud-page-error">Erreur : @_detailError</p>
+                }
+                else if (_detail is null)
+                {
+                    <p class="fiche-empty">Chargement de la fiche...</p>
+                }
+                else
+                {
+                    <ContactForm Initial="_detail" Societes="_societes.Data" OnSubmit="SubmitAsync" OnCancel="CloseAsync" />
+                }
+            </Modal>
+        }
+    </div>
+}
+
+@code {
+    // Au-delà, la fiche point n'affiche que les premiers contacts
+    // (MaxPageSize côté API).
+    private const int MaxContacts = 500;
+
+    // Fiche complète ouverte depuis une carte : un contact existant, ou un
+    // nouveau contact (créé lié au point) si Contact est null.
+    private sealed record Opened(Contact? Contact);
+
+    private ApiList<Contact> _contacts = default!;
+    private CrudApi<CreateContactDto, Contact, ContactDetail> _api = default!;
+    // Pour la liste « Société » de la fiche complète.
+    private ApiList<Societe> _societes = default!;
+    private Opened? _openedValue;
+    private ContactDetail? _detail;
+    private string? _detailError;
+
+    [Parameter, EditorRequired] public string PointId { get; set; } = "";
+
+    private Opened? _opened
+    {
+        get => _openedValue;
+        set
+        {
+            _openedValue = value;
+            _detail = null;
+            _detailError = null;
+            if (value?.Contact is { } contact) _ = LoadDetailAsync(contact.IDCONTACTS);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _contacts = new ApiList<Contact>(Api, "contacts") { Paginated = true };
+        _contacts.Configure(1, MaxContacts, "", new Dictionary<string, string> { ["pointId"] = PointId });
+        _contacts.Changed += StateHasChanged;
+        _api = new CrudApi<CreateContactDto, Contact, ContactDetail>(Api, "contacts");
+        _societes = new ApiList<Societe>(Api, "societes");
+        _societes.Changed += StateHasChanged;
+        await Task.WhenAll(_contacts.RefetchAsync(), _societes.RefetchAsync());
+    }
+
+    // Charge la fiche complète (GET /contacts/:id) avant d'afficher le formulaire.
+    private async Task LoadDetailAsync(string contactId)
+    {
+        try
+        {
+            var detail = await _api.GetAsync(contactId);
+            if (_openedValue?.Contact?.IDCONTACTS == contactId) _detail = detail;
+        }
+        catch (Exception e)
+        {
+            if (_openedValue?.Contact?.IDCONTACTS == contactId) _detailError = e.Message;
+        }
+        StateHasChanged();
+    }
+
+    private static string ContactName(Contact c)
+    {
+        var name = FormModel.JoinNonEmpty(" ", c.Civilite, c.Prenom_contact, c.Nom_contact?.ToUpperInvariant());
+        return name.Length > 0 ? name : "Sans nom";
+    }
+
+    private static string PhoneDigits(string phone) => new([.. phone.Where(c => char.IsAsciiDigit(c) || c == '+')]);
+
+    private Task CloseAsync()
+    {
+        _opened = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void PatchPlanning(Contact contact, double value)
+    {
+        _contacts.Data = [.. _contacts.Data.Select(c => c.IDCONTACTS == contact.IDCONTACTS
+            ? c with { PointContacts = [new ContactPointLien(c.PointContacts?.FirstOrDefault()?.Lien, value)] }
+            : c)];
+        StateHasChanged();
+    }
+
+    private async Task TogglePlanningAsync(Contact contact, bool on)
+    {
+        var value = on ? 1 : 0;
+        PatchPlanning(contact, value);
+        try
+        {
+            await Api.SendAsync(HttpMethod.Patch, $"points/{PointId}/contacts/{contact.IDCONTACTS}", new UpdatePointContactDto { Recevoir_Mail_Planning = value });
+        }
+        catch (Exception e)
+        {
+            PatchPlanning(contact, 1 - value);
+            await Browser.AlertAsync($"Échec de l'enregistrement : {e.Message}");
+        }
+    }
+
+    private async Task UnlinkAsync(Contact contact)
+    {
+        if (!await Browser.ConfirmAsync($"Retirer {ContactName(contact)} de ce point ?\nLe contact n’est pas supprimé.")) return;
+        try
+        {
+            await Api.SendAsync(HttpMethod.Delete, $"points/{PointId}/contacts/{contact.IDCONTACTS}");
+            await _contacts.RefetchAsync();
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec du retrait : {e.Message}");
+        }
+    }
+
+    // Enregistrement de la fiche complète : la modale se ferme sur un succès,
+    // reste ouverte (avec la saisie) sur un échec.
+    private async Task SubmitAsync(CreateContactDto dto)
+    {
+        if (_opened is not { } opened) return;
+        try
+        {
+            if (opened.Contact is not null) await _api.UpdateAsync(opened.Contact.IDCONTACTS, dto);
+            else
+            {
+                dto.IDPOINTS = PointId;
+                await _api.CreateAsync(dto);
+            }
+            await _contacts.RefetchAsync();
+            _opened = null;
+            StateHasChanged();
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de l'enregistrement : {e.Message}");
+        }
+    }
+
+    // Carte simplifiée, en lecture seule sauf « Recevoir le planning ».
+    private RenderFragment ContactCard(Contact contact) => __builder =>
+    {
+        var name = ContactName(contact);
+        var lien = contact.PointContacts?.FirstOrDefault();
+        <li @key="contact.IDCONTACTS" class="pt-contact-card">
+            <div class="pt-contact-card-head">
+                <strong title="@name">@name</strong>
+                <button type="button" class="pt-icon-btn pt-icon-btn--view" @onclick="() => _opened = new Opened(contact)" title="Voir la fiche complète" aria-label="@($"Voir la fiche de {name}")">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                </button>
+                <button type="button" class="pt-icon-btn pt-icon-btn--remove" @onclick="() => UnlinkAsync(contact)" title="Retirer du point" aria-label="@($"Retirer {name} de ce point")">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                        <path d="M5 12h14" />
+                    </svg>
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(lien?.Lien))
+            {
+                <span class="pt-contact-card-lien">@lien.Lien</span>
+            }
+            <dl class="pt-contact-card-fields">
+                @CardField("Fonction", contact.SocieteContacts.FirstOrDefault()?.Fonction_contact, null, true)
+                @CardField("Téléphone fixe", contact.Telephone_fixe, string.IsNullOrEmpty(contact.Telephone_fixe) ? null : $"tel:{PhoneDigits(contact.Telephone_fixe)}", false)
+                @CardField("Téléphone portable", contact.Telephone_portable, string.IsNullOrEmpty(contact.Telephone_portable) ? null : $"tel:{PhoneDigits(contact.Telephone_portable)}", false)
+                @CardField("Email", contact.E_mail, string.IsNullOrEmpty(contact.E_mail) ? null : $"mailto:{contact.E_mail}", true)
+            </dl>
+            <label class="pt-contact-card-planning">
+                <span>Recevoir le planning</span>
+                <input type="checkbox" checked="@(lien?.Recevoir_Mail_Planning == 1)" @onchange="e => TogglePlanningAsync(contact, e.Value is true)" />
+            </label>
+        </li>
+    };
+
+    private static RenderFragment CardField(string label, string? value, string? href, bool wide) => __builder =>
+    {
+        <div class="pt-contact-card-field@(wide ? " is-wide" : string.Empty)">
+            <dt>@label</dt>
+            <dd>
+                @if (string.IsNullOrEmpty(value))
+                {
+                    <span class="pt-contact-card-empty">—</span>
+                }
+                else if (href is not null)
+                {
+                    <a href="@href">@value</a>
+                }
+                else
+                {
+                    @value
+                }
+            </dd>
+        </div>
+    };
+}

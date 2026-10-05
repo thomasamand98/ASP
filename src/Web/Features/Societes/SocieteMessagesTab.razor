@@ -1,0 +1,87 @@
+@inject ApiClient Api
+
+@* Onglet « Messages envoyés » de la fiche Société : table standard
+   (recherche, filtres, tri, export) mais en lecture seule — ce sont des
+   journaux d'envoi, l'API n'expose ni création ni modification. *@
+@if (_messages is null)
+{
+    if (_error is not null)
+    {
+        <p>Erreur : @_error</p>
+    }
+    else
+    {
+        <p class="societe-tab-loading">Chargement...</p>
+    }
+}
+else
+{
+    <div>
+        <div class="page-header">
+            <h2>Messages envoyés (@_messages.Count)</h2>
+        </div>
+        @if (_error is not null)
+        {
+            <p class="crud-page-error">Erreur : @_error</p>
+        }
+        <DataTable T="MessageRow" Data="_messages" Columns="Columns" ExportFileName="Messages envoyés">
+            <ToolbarStart>
+                <TableSearch Value="@_search" OnChange="SearchAsync" />
+            </ToolbarStart>
+        </DataTable>
+    </div>
+}
+
+@code {
+    private static readonly IReadOnlyList<Column<MessageRow>> Columns =
+    [
+        Col.Of<MessageRow>("date", "Date", FormatDateHeure),
+        Col.Key<MessageRow>("Sujet", "Sujet", m => m.Sujet),
+        Col.Key<MessageRow>("Destinataire", "Destinataire", m => m.Destinataire),
+        Col.Key<MessageRow>("Type_message", "Type", m => m.Type_message),
+        Col.Key<MessageRow>("NomContact", "Contact", m => m.NomContact),
+    ];
+
+    private List<MessageRow>? _messages;
+    private string _search = "";
+    private string? _error;
+    private int _request;
+
+    [Parameter, EditorRequired] public string SocieteId { get; set; } = "";
+
+    // Date « AAAA-MM-JJ HH:MM » : triable telle quelle comme du texte.
+    private static string FormatDateHeure(MessageRow m)
+    {
+        if (string.IsNullOrEmpty(m.Date_message)) return "";
+        var heure = string.IsNullOrEmpty(m.Heure_message) ? "" : " " + Slice(m.Heure_message, 11, 16);
+        return Slice(m.Date_message, 0, 10) + heure;
+    }
+
+    private static string Slice(string value, int start, int end) => start >= value.Length ? "" : value[start..Math.Min(end, value.Length)];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SearchAsync(string search)
+    {
+        _search = search;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var request = ++_request;
+        var query = $"societeId={Uri.EscapeDataString(SocieteId)}";
+        if (_search.Trim() is { Length: > 0 } search) query += $"&search={Uri.EscapeDataString(search)}";
+        try
+        {
+            var json = await Api.GetAsync<MessagesResponse>($"messages?{query}");
+            if (request != _request) return;
+            _messages = json.messages;
+            _error = null;
+        }
+        catch (Exception e)
+        {
+            if (request == _request) _error = e.Message;
+        }
+    }
+}

@@ -28,8 +28,16 @@ public static class FormModel
         [.. dto.GetProperties()
             .Where(p => p.PropertyType.IsGenericType && p.PropertyType.GetGenericTypeDefinition() == typeof(Opt<>))
             .Select(target => (Source: model.GetProperty(target.Name), Target: target))
-            .Where(pair => pair.Source is not null)
+            // Champs simples seulement : les listes et objets imbriqués
+            // (plages horaires d'un point...) sont convertis par le formulaire.
+            .Where(pair => pair.Source is not null && IsScalar(pair.Source.PropertyType) && IsScalar(pair.Target.PropertyType.GetGenericArguments()[0]))
             .Select(pair => (pair.Source!, pair.Target))];
+
+    private static bool IsScalar(Type type)
+    {
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+        return underlying.IsPrimitive || underlying == typeof(string) || underlying == typeof(decimal) || underlying == typeof(object);
+    }
 
     private static object? Convert(object? value, Type type)
     {

@@ -1,0 +1,325 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Fiche d'une société, en création (Initial null) ou en modification (fiche
+   complète chargée par CrudPage). Les onglets Contacts / Contrats /
+   Documents / Messages ne portent que de la consultation liée à un
+   enregistrement existant — désactivés tant que la société n'est pas créée. *@
+<div class="societe-form">
+    <FicheTabs AriaLabel="Sections de la fiche société" Value="@_topTab" ValueChanged="SetTopTab" Tabs="TopTabs" />
+
+    @if (_topTab == "principale")
+    {
+        <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="societe-form-principale">
+            <div class="form-actions">
+                <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+                <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+            </div>
+
+            <div class="societe-form-columns">
+                <section class="societe-form-section">
+                    <h4 class="societe-form-section-title">Coordonnées</h4>
+                    <label class="field">Nom<input value="@_form.Nom_societe" @oninput="e => _form.Nom_societe = (string)e.Value!" /></label>
+                    <label class="field">Dénomination<input value="@_form.Denomination" @oninput="e => _form.Denomination = (string)e.Value!" /></label>
+                    <label class="field">N° TVA<input value="@_form.TVA" @oninput="e => _form.TVA = (string)e.Value!" /></label>
+                    <label class="field">Activité<input value="@_form.Activite" @oninput="e => _form.Activite = (string)e.Value!" /></label>
+                    <label class="field">Site web<input value="@_form.Site_web" @oninput="e => _form.Site_web = (string)e.Value!" /></label>
+                    <div class="societe-field-row">
+                        <label class="field">
+                            Prospect
+                            <select value="@JsNumber.ToString(_form.Prospect)" @onchange="e => _form.Prospect = JsNumber.Parse((string)e.Value!)">
+                                <option value="0">Non</option>
+                                <option value="1">Oui</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            Archivée
+                            <select value="@JsNumber.ToString(_form.Archive)" @onchange="e => _form.Archive = JsNumber.Parse((string)e.Value!)">
+                                <option value="0">Non</option>
+                                <option value="1">Oui</option>
+                            </select>
+                        </label>
+                    </div>
+                    <AdresseFields Value="Adresse" OnChange="SetAdresse" />
+                    <label class="field">Note<textarea rows="4" value="@_form.Note" @oninput="e => _form.Note = (string)e.Value!"></textarea></label>
+                </section>
+
+                <section class="societe-form-section societe-form-billing">
+                    <FicheTabs AriaLabel="Facturation" @bind-Value="_billingTab" Tabs="BillingTabs" />
+
+                    @if (_billingTab == "client")
+                    {
+                        <div class="societe-billing-panel">
+                            <h4 class="societe-form-section-title">Données pour la facturation client</h4>
+                            <div class="societe-field-row">
+                                <label class="field">Numéro client<input value="@_form.Client_Numero_client" @oninput="e => _form.Client_Numero_client = (string)e.Value!" /></label>
+                                <label class="field">Délai de paiement<input value="@_form.Client_Delai_paiement" @oninput="e => _form.Client_Delai_paiement = (string)e.Value!" /></label>
+                            </div>
+                            <div class="societe-field-row">
+                                <label class="field">Taux de TVA (%)<input value="@_form.Client_Taux_tva" @oninput="e => _form.Client_Taux_tva = (string)e.Value!" /></label>
+                                <label class="field">E-mail comptabilité<input type="email" value="@_form.Client_E_mail_comptabilite" @oninput="e => _form.Client_E_mail_comptabilite = (string)e.Value!" /></label>
+                            </div>
+                            <label class="field">
+                                Contact pour la comptabilité
+                                @ContactSelect(_form.Client_IDCONTACTS_Comptabilite, v => _form.Client_IDCONTACTS_Comptabilite = v)
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" checked="@(_form.Client_Facture_mail == 1)" @onchange="e => _form.Client_Facture_mail = e.Value is true ? 1 : 0" />
+                                Facture e-mail
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" checked="@(_form.Client_Adresse_facturation_societe == 1)"
+                                       @onchange="e => _form.Client_Adresse_facturation_societe = e.Value is true ? 1 : 0" />
+                                Adresse de facturation = adresse de la société
+                            </label>
+                            @if (_form.Client_Adresse_facturation_societe != 1)
+                            {
+                                <AdresseFields Value="_form.Client_Adresse_facturation" OnChange="a => _form.Client_Adresse_facturation = a" />
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="societe-billing-panel">
+                            <h4 class="societe-form-section-title">Données pour la facturation fournisseur</h4>
+                            <div class="societe-field-row">
+                                <label class="field">Numéro fournisseur<input value="@_form.Fournisseur_Numero_fournisseur" @oninput="e => _form.Fournisseur_Numero_fournisseur = (string)e.Value!" /></label>
+                                <label class="field">Délai de paiement<input value="@_form.Fournisseur_Delai_paiement" @oninput="e => _form.Fournisseur_Delai_paiement = (string)e.Value!" /></label>
+                            </div>
+                            <div class="societe-field-row">
+                                <label class="field">Taux de TVA (%)<input value="@_form.Fournisseur_Taux_tva" @oninput="e => _form.Fournisseur_Taux_tva = (string)e.Value!" /></label>
+                                <label class="field">E-mail comptabilité<input type="email" value="@_form.Fournisseur_E_mail_comptabilite" @oninput="e => _form.Fournisseur_E_mail_comptabilite = (string)e.Value!" /></label>
+                            </div>
+                            <div class="societe-field-row">
+                                <label class="field">IBAN<input value="@_form.Fournisseur_Iban" @oninput="e => _form.Fournisseur_Iban = (string)e.Value!" /></label>
+                                <label class="field">BIC<input value="@_form.Fournisseur_Bic" @oninput="e => _form.Fournisseur_Bic = (string)e.Value!" /></label>
+                            </div>
+                            <label class="field">
+                                Contact pour la comptabilité
+                                @ContactSelect(_form.Fournisseur_IDCONTACTS_Comptabilite, v => _form.Fournisseur_IDCONTACTS_Comptabilite = v)
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" checked="@(_form.Fournisseur_Facture_mail == 1)" @onchange="e => _form.Fournisseur_Facture_mail = e.Value is true ? 1 : 0" />
+                                Facture e-mail
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" checked="@(_form.Fournisseur_Adresse_facturation_societe == 1)"
+                                       @onchange="e => _form.Fournisseur_Adresse_facturation_societe = e.Value is true ? 1 : 0" />
+                                Adresse de facturation = adresse de la société
+                            </label>
+                            @if (_form.Fournisseur_Adresse_facturation_societe != 1)
+                            {
+                                <AdresseFields Value="_form.Fournisseur_Adresse_facturation" OnChange="a => _form.Fournisseur_Adresse_facturation = a" />
+                            }
+                        </div>
+                    }
+                </section>
+            </div>
+        </form>
+    }
+
+    @* Onglets tableau gardés montés : une fiche contact ou contrat en cours
+       de saisie survit au changement d'onglet. *@
+    @if (Initial is not null)
+    {
+        <FichePanel Active="@(_topTab == "contacts")">
+            <SocieteContactsTab SocieteId="@Initial.IDSOCIETES" />
+        </FichePanel>
+        <FichePanel Active="@(_topTab == "contrats")">
+            <SocieteContratsTab SocieteId="@Initial.IDSOCIETES" />
+        </FichePanel>
+        @if (_topTab == "documents")
+        {
+            <DocumentsTab Type="DocumentCategorie.Societe" ReferentId="@Initial.IDSOCIETES" />
+        }
+        @if (_topTab == "messages")
+        {
+            <SocieteMessagesTab SocieteId="@Initial.IDSOCIETES" />
+        }
+    }
+</div>
+
+@code {
+    private static readonly IReadOnlyList<FicheTab> BillingTabs = [new("client", "Client"), new("fournisseur", "Fournisseur")];
+
+    // Champs envoyés à l'API (CreateSocieteDto). Codes 0/1 pour Prospect,
+    // Archive et les options de facturation. Les adresses de facturation sont
+    // des objets ; tous les IDADRESSES restent côté serveur.
+    private sealed class Model
+    {
+        public string Nom_societe { get; set; } = "";
+        public string Denomination { get; set; } = "";
+        public string TVA { get; set; } = "";
+        public string Activite { get; set; } = "";
+        public string Site_web { get; set; } = "";
+        public string Note { get; set; } = "";
+        public double Prospect { get; set; }
+        public double Archive { get; set; }
+        public string Adresse1 { get; set; } = "";
+        public string Adresse2 { get; set; } = "";
+        public string Adresse3 { get; set; } = "";
+        public string CP { get; set; } = "";
+        public string Localite { get; set; } = "";
+        public string Pays { get; set; } = "";
+        public string Pays_full_name { get; set; } = "";
+
+        public string Client_Numero_client { get; set; } = "";
+        public string Client_Delai_paiement { get; set; } = "";
+        public string Client_Taux_tva { get; set; } = "";
+        public string Client_E_mail_comptabilite { get; set; } = "";
+        public double Client_Facture_mail { get; set; }
+        public double Client_Adresse_facturation_societe { get; set; }
+        public AdresseValues Client_Adresse_facturation { get; set; } = AdresseValues.Empty;
+        public string Client_IDCONTACTS_Comptabilite { get; set; } = "";
+
+        public string Fournisseur_Numero_fournisseur { get; set; } = "";
+        public string Fournisseur_Delai_paiement { get; set; } = "";
+        public string Fournisseur_Taux_tva { get; set; } = "";
+        public string Fournisseur_E_mail_comptabilite { get; set; } = "";
+        public double Fournisseur_Facture_mail { get; set; }
+        public double Fournisseur_Adresse_facturation_societe { get; set; }
+        public AdresseValues Fournisseur_Adresse_facturation { get; set; } = AdresseValues.Empty;
+        public string Fournisseur_IDCONTACTS_Comptabilite { get; set; } = "";
+        public string Fournisseur_Iban { get; set; } = "";
+        public string Fournisseur_Bic { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private string _topTab = "principale";
+    private string _billingTab = "client";
+    private bool _submitting;
+    private bool _track = true;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public SocieteDetail? Initial { get; set; }
+
+    // Liste des contacts pour les sélecteurs « Contact pour la comptabilité »,
+    // chargée par SocietesPage.
+    [Parameter] public IReadOnlyList<Contact> Contacts { get; set; } = [];
+    [Parameter] public Func<CreateSocieteDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private IReadOnlyList<FicheTab> TopTabs
+    {
+        get
+        {
+            const string locked = "Enregistrez d’abord la société pour accéder à cet onglet";
+            FicheTab Tab(string id, string label) => id != "principale" && Initial is null ? new(id, label, null, true, locked) : new(id, label);
+            return [Tab("principale", "Principale"), Tab("contacts", "Contacts"), Tab("contrats", "Contrats / Offres"), Tab("documents", "Documents"), Tab("messages", "Msg envoyés")];
+        }
+    }
+
+    private static string ContactLabel(Contact c)
+    {
+        var label = FormModel.JoinNonEmpty(" ", c.Nom_contact, c.Prenom_contact);
+        return label.Length > 0 ? label : "—";
+    }
+
+    private RenderFragment ContactSelect(string value, Action<string> set) =>
+        @<select value="@value" @onchange="e => set((string)e.Value!)">
+            <option value="">—</option>
+            @foreach (var c in Contacts)
+            {
+                <SelectOption @key="c.IDCONTACTS" Value="@c.IDCONTACTS" Current="@value">@ContactLabel(c)</SelectOption>
+            }
+        </select>;
+
+    private AdresseValues Adresse => new(_form.Adresse1, _form.Adresse2, _form.Adresse3, _form.CP, _form.Localite, _form.Pays, _form.Pays_full_name);
+
+    private void SetAdresse(AdresseValues a)
+    {
+        (_form.Adresse1, _form.Adresse2, _form.Adresse3, _form.CP, _form.Localite, _form.Pays, _form.Pays_full_name) =
+            (a.Adresse1, a.Adresse2, a.Adresse3, a.CP, a.Localite, a.Pays, a.Pays_full_name);
+    }
+
+    private static AdresseDto ToDto(AdresseValues a) => new()
+    {
+        Adresse1 = a.Adresse1,
+        Adresse2 = a.Adresse2,
+        Adresse3 = a.Adresse3,
+        CP = a.CP,
+        Localite = a.Localite,
+        Pays = a.Pays,
+        Pays_full_name = a.Pays_full_name,
+    };
+
+    protected override void OnInitialized()
+    {
+        var client = Initial?.Client;
+        var fournisseur = Initial?.Fournisseur;
+        _form = new Model
+        {
+            Nom_societe = Initial?.Nom_societe ?? "",
+            Denomination = Initial?.Denomination ?? "",
+            TVA = Initial?.TVA ?? "",
+            Activite = Initial?.Activite ?? "",
+            Site_web = Initial?.Site_web ?? "",
+            Note = Initial?.Note ?? "",
+            Prospect = Initial?.Prospect ?? 0,
+            Archive = Initial?.Archive ?? 0,
+
+            Client_Numero_client = client?.Numero_client ?? "",
+            Client_Delai_paiement = client?.Delai_paiement ?? "",
+            Client_Taux_tva = client?.Taux_tva ?? "",
+            Client_E_mail_comptabilite = client?.E_mail_comptabilite ?? "",
+            Client_Facture_mail = client?.Facture_mail ?? 0,
+            Client_Adresse_facturation_societe = client?.Adresse_facturation_societe ?? 1,
+            Client_Adresse_facturation = AdresseValues.From(client?.Adresse_facturation),
+            Client_IDCONTACTS_Comptabilite = client?.IDCONTACTS_Comptabilite ?? "",
+
+            Fournisseur_Numero_fournisseur = fournisseur?.Numero_fournisseur ?? "",
+            Fournisseur_Delai_paiement = fournisseur?.Delai_paiement ?? "",
+            Fournisseur_Taux_tva = fournisseur?.Taux_tva ?? "",
+            Fournisseur_E_mail_comptabilite = fournisseur?.E_mail_comptabilite ?? "",
+            Fournisseur_Facture_mail = fournisseur?.Facture_mail ?? 0,
+            Fournisseur_Adresse_facturation_societe = fournisseur?.Adresse_facturation_societe ?? 1,
+            Fournisseur_Adresse_facturation = AdresseValues.From(fournisseur?.Adresse_facturation),
+            Fournisseur_IDCONTACTS_Comptabilite = fournisseur?.IDCONTACTS_Comptabilite ?? "",
+            Fournisseur_Iban = fournisseur?.Iban ?? "",
+            Fournisseur_Bic = fournisseur?.Bic ?? "",
+        };
+        SetAdresse(AdresseValues.From(Initial?.Adresse));
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    // Le formulaire est recréé à chaque retour sur l'onglet Principale : il
+    // faut alors le suivre à nouveau.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_track || _topTab != "principale") return;
+        _track = false;
+        await _guard.TrackAsync(_formRef);
+    }
+
+    private void SetTopTab(string tab)
+    {
+        if (tab == "principale" && _topTab != "principale") _track = true;
+        _topTab = tab;
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            var dto = FormModel.ToDto<CreateSocieteDto>(_form);
+            dto.Client_Adresse_facturation = ToDto(_form.Client_Adresse_facturation);
+            dto.Fournisseur_Adresse_facturation = ToDto(_form.Fournisseur_Adresse_facturation);
+            await OnSubmit(dto);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

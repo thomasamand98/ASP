@@ -1,0 +1,313 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject ApiClient Api
+
+@* Fiche complète d'un contrat, sur le modèle de la fiche Société : onglets
+   Détail / Prestations / Factures. Initial vaut null en création, sinon la
+   fiche complète (GET /contrats/:id) chargée par CrudPage. Les onglets
+   Prestations/Factures et les conditions CMR se rattachent à un contrat
+   existant — désactivés tant qu'il n'est pas créé. Le formulaire n'existe
+   que sur l'onglet Détail (retiré, pas masqué, sur les autres onglets). *@
+<div class="contrat-form">
+    <FicheTabs AriaLabel="Sections de la fiche contrat" Value="@_tab" ValueChanged="SetTab" Tabs="Tabs" Actions="PdfButton" />
+
+    @if (_tab == "detail")
+    {
+        <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="contrat-detail">
+            <div class="form-actions">
+                <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+                <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+            </div>
+
+            <div class="contrat-columns">
+                <div class="contrat-column">
+                    <section class="contrat-card">
+                        <h4 class="contrat-card-title">Contrat</h4>
+                        <div class="contrat-row">
+                            <label class="field">
+                                Numéro
+                                @* Attribué à la création, puis figé (affiché avec sa version) :
+                                   les factures et commandes s'y réfèrent. *@
+                                <input value="@(Initial is not null ? ContratFormat.Numero(Initial.Num_contrat, Initial.Version_contrat) : _form.Num_contrat)"
+                                       @oninput="e => _form.Num_contrat = (string)e.Value!" maxlength="50" readonly="@(Initial is not null)" />
+                            </label>
+                            <label class="field">
+                                Date d’ouverture
+                                <input type="date" value="@_form.Date_debut" @oninput="e => _form.Date_debut = (string)e.Value!" />
+                            </label>
+                            <label class="field">
+                                Date de fin
+                                <input type="date" value="@_form.Date_fin" min="@(_form.Date_debut.Length > 0 ? _form.Date_debut : null)" @oninput="e => _form.Date_fin = (string)e.Value!" />
+                            </label>
+                        </div>
+                        <label class="checkbox contrat-checkbox">
+                            <input type="checkbox" checked="@(_form.Offre_de_prix == 1)" @onchange="e => _form.Offre_de_prix = e.Value is true ? 1 : 0" />
+                            Offre de prix
+                        </label>
+                        <label class="field">
+                            Instruction CMR
+                            <input value="@_form.Instruction_CMR" @oninput="e => _form.Instruction_CMR = (string)e.Value!" maxlength="250" />
+                        </label>
+                        <label class="field">
+                            Type facture
+                            <select value="@_form.IDTYPES_FACTURE" @onchange="e => _form.IDTYPES_FACTURE = (string)e.Value!">
+                                <option value="">—</option>
+                                @foreach (var t in TypesFacture)
+                                {
+                                    <SelectOption @key="t.IDTYPES_FACTURE" Value="@t.IDTYPES_FACTURE" Current="@_form.IDTYPES_FACTURE">@t.Nom</SelectOption>
+                                }
+                            </select>
+                        </label>
+                        <label class="field">
+                            Description du projet
+                            <textarea rows="6" value="@_form.Description_projet" @oninput="e => _form.Description_projet = (string)e.Value!" maxlength="1000"></textarea>
+                        </label>
+                        <label class="field">
+                            Note confidentielle
+                            <textarea rows="4" value="@_form.Note_confidentielle" @oninput="e => _form.Note_confidentielle = (string)e.Value!" maxlength="500"></textarea>
+                        </label>
+                    </section>
+                </div>
+
+                <div class="contrat-column">
+                    <section class="contrat-card">
+                        <h4 class="contrat-card-title">Client</h4>
+                        <div class="contrat-row">
+                            <label class="field contrat-grow">
+                                Société
+                                <select value="@_form.IDSOCIETES" @onchange="e => SocieteChangedAsync((string)e.Value!)">
+                                    <option value="">—</option>
+                                    @foreach (var s in Societes)
+                                    {
+                                        <SelectOption @key="s.IDSOCIETES" Value="@s.IDSOCIETES" Current="@_form.IDSOCIETES">@s.Nom_societe</SelectOption>
+                                    }
+                                </select>
+                            </label>
+                            <label class="field">
+                                Numéro client
+                                <input value="@(_client?.Numero_client ?? "")" readonly tabindex="-1" />
+                            </label>
+                        </div>
+                        <div class="contrat-row">
+                            <label class="field">
+                                Référence client
+                                <input value="@_form.Reference_client" @oninput="e => _form.Reference_client = (string)e.Value!" maxlength="100" />
+                            </label>
+                            <label class="field contrat-field-narrow">
+                                Taux TVA (%)
+                                <input type="number" step="0.01" min="0" value="@_form.Taux_tva" @oninput="e => _form.Taux_tva = (string)e.Value!" />
+                            </label>
+                        </div>
+                        <label class="field">
+                            Commissionnaire
+                            <textarea rows="3" value="@_form.Commissionnaire" @oninput="e => _form.Commissionnaire = (string)e.Value!" maxlength="250"></textarea>
+                        </label>
+                    </section>
+
+                    <section class="contrat-card">
+                        <h4 class="contrat-card-title">Archivage</h4>
+                        <div class="contrat-row contrat-row-center">
+                            <label class="checkbox contrat-checkbox">
+                                <input type="checkbox" checked="@(_form.Archive == 1)" @onchange="e => ArchiveChanged(e.Value is true)" />
+                                Archivé
+                            </label>
+                            <label class="field contrat-field-narrow">
+                                Année
+                                <input value="@_form.Annee_archivage" @oninput="e => _form.Annee_archivage = (string)e.Value!" maxlength="50" disabled="@(_form.Archive != 1)" />
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="contrat-card">
+                        <h4 class="contrat-card-title">Conditions CMR</h4>
+                        <ContratConditionsCmr ContratId="@Initial?.IDCONTRATS" @bind-Conditions="_conditions" />
+                    </section>
+
+                    <section class="contrat-card">
+                        <h4 class="contrat-card-title">Chiffres clés</h4>
+                        <div class="contrat-kpi">
+                            <span class="contrat-kpi-label">CA</span>
+                            <span class="contrat-kpi-value">@ContratFormat.Euro(Initial?.Chiffre_affaires ?? "0")</span>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </form>
+    }
+
+    @if (_tab == "prestations" && Initial is not null)
+    {
+        <ContratPrestationsTab Prestations="Initial.Prestations" />
+    }
+    @if (_tab == "factures" && Initial is not null)
+    {
+        <ContratFacturesTab Factures="Initial.Factures" />
+    }
+</div>
+
+@code {
+    // Champs du contrat affichés dans la fiche (CreateContratDto) : dates en
+    // « AAAA-MM-JJ », ids en texte, Taux_tva en texte (Decimal), codes 0/1.
+    // Une valeur vide efface le champ côté serveur. Version_contrat,
+    // Type_contrat, Qt_client_facturation, Suivant et IDMARCHANDISES ne sont
+    // pas dans la fiche : jamais envoyés, donc jamais écrasés.
+    private sealed class Model
+    {
+        public string Num_contrat { get; set; } = "";
+        public string Date_debut { get; set; } = "";
+        public string Date_fin { get; set; } = "";
+        public double Offre_de_prix { get; set; }
+        public string Instruction_CMR { get; set; } = "";
+        public string IDTYPES_FACTURE { get; set; } = "";
+        public string Description_projet { get; set; } = "";
+        public string Note_confidentielle { get; set; } = "";
+        public string IDSOCIETES { get; set; } = "";
+        public string Reference_client { get; set; } = "";
+        public string Taux_tva { get; set; } = "";
+        public string Commissionnaire { get; set; } = "";
+        public double Archive { get; set; }
+        public string Annee_archivage { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private string _tab = "detail";
+    private ContratClient? _client;
+    private List<ConditionCmr> _conditions = [];
+    private bool _submitting;
+    private bool _track;
+    // Numéro de la dernière requête société lancée : une réponse arrivée en
+    // retard après un nouveau changement de société est ignorée.
+    private int _societeRequest;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public ContratDetail? Initial { get; set; }
+
+    // Sociétés, types de facture et modèles « CONTRAT » (bouton « Voir le
+    // PDF »), chargés une fois par la page.
+    [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
+    [Parameter] public IReadOnlyList<TypeFacture> TypesFacture { get; set; } = [];
+    [Parameter] public IReadOnlyList<DocumentTemplateSummary> DocumentTemplates { get; set; } = [];
+
+    // Société présélectionnée en création (onglet Contrats de la fiche
+    // Société, projection) — ignorée en modification.
+    [Parameter] public string? DefaultSocieteId { get; set; }
+    [Parameter] public Func<CreateContratDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private IReadOnlyList<FicheTab> Tabs
+    {
+        get
+        {
+            const string locked = "Enregistrez d’abord le contrat pour accéder à cet onglet";
+            return
+            [
+                new("detail", "Détail"),
+                new("prestations", "Prestations", Initial?.Prestations.Count, Initial is null, Initial is null ? locked : null),
+                new("factures", "Factures", Initial?.Factures.Count, Initial is null, Initial is null ? locked : null),
+            ];
+        }
+    }
+
+    // Bouton « Voir le PDF », seulement pour un contrat enregistré.
+    private RenderFragment? PdfButton => Initial is null ? null : @<ContratPdfButton ContratId="@Initial.IDCONTRATS" Templates="DocumentTemplates" />;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _form = new Model
+        {
+            Num_contrat = Initial?.Num_contrat ?? "",
+            Date_debut = FormModel.DateInput(Initial?.Date_debut),
+            Date_fin = FormModel.DateInput(Initial?.Date_fin),
+            Offre_de_prix = Initial?.Offre_de_prix ?? 0,
+            Instruction_CMR = Initial?.Instruction_CMR ?? "",
+            IDTYPES_FACTURE = Initial?.IDTYPES_FACTURE ?? "",
+            Description_projet = Initial?.Description_projet ?? "",
+            Note_confidentielle = Initial?.Note_confidentielle ?? "",
+            IDSOCIETES = Initial is not null ? Initial.IDSOCIETES ?? "" : DefaultSocieteId ?? "",
+            Reference_client = Initial?.Reference_client ?? "",
+            Taux_tva = Initial?.Taux_tva ?? "",
+            Commissionnaire = Initial?.Commissionnaire ?? "",
+            Archive = Initial?.Archive ?? 0,
+            // "0" est le défaut de la base pour « pas d'année d'archivage ».
+            Annee_archivage = Initial?.Annee_archivage is { Length: > 0 } annee && annee != "0" ? annee : "",
+        };
+        _client = Initial?.Societe?.Client;
+        _conditions = Initial?.ConditionCmrs ?? [];
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+        _track = true;
+        // Société présélectionnée en création : charge son numéro client et
+        // son taux de TVA, exactement comme un choix manuel.
+        if (Initial is null && DefaultSocieteId is { Length: > 0 }) await SocieteChangedAsync(DefaultSocieteId);
+    }
+
+    protected override void OnParametersSet() => _guard?.Register(Scope);
+
+    // Le formulaire est recréé à chaque retour sur l'onglet Détail : il faut
+    // alors le suivre à nouveau.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_track || _tab != "detail") return;
+        _track = false;
+        await _guard.TrackAsync(_formRef);
+    }
+
+    private void SetTab(string tab)
+    {
+        if (tab == "detail" && _tab != "detail") _track = true;
+        _tab = tab;
+    }
+
+    // Changer de société met à jour le numéro client affiché et reprend son
+    // taux de TVA par défaut, comme dans l'ancienne fiche WinDev.
+    private async Task SocieteChangedAsync(string id)
+    {
+        _form.IDSOCIETES = id;
+        var request = ++_societeRequest;
+        if (id.Length == 0)
+        {
+            _client = null;
+            return;
+        }
+        try
+        {
+            var societe = await Api.GetAsync<SocieteClient>($"societes/{Js.EncodeUriComponent(id)}");
+            if (request != _societeRequest) return;
+            _client = societe.Client;
+            if (societe.Client?.Taux_tva is { Length: > 0 } taux) _form.Taux_tva = taux;
+        }
+        catch (Exception)
+        {
+            if (request == _societeRequest) _client = null;
+        }
+    }
+
+    private void ArchiveChanged(bool archived)
+    {
+        _form.Archive = archived ? 1 : 0;
+        // Année en cours proposée à l'archivage, effacée au désarchivage.
+        _form.Annee_archivage = archived
+            ? _form.Annee_archivage.Length > 0 ? _form.Annee_archivage : DateTime.Now.Year.ToString(CultureInfo.InvariantCulture)
+            : "";
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateContratDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

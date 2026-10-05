@@ -192,8 +192,11 @@ window.horizon = (() => {
   })
   //   - onglets de fiche : flèches, Début et Fin changent d'onglet sans
   //     faire défiler la page (data-nav-keys, voir FicheTabs.razor) ;
+  //   - champ de recherche dans une fiche : Entrée choisit un résultat sans
+  //     enregistrer la fiche, Échap referme la recherche (data-enter-select) ;
   document.addEventListener('keydown', (event) => {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) && event.target.closest?.('[data-nav-keys]')) event.preventDefault()
+    if (['Enter', 'Escape'].includes(event.key) && event.target.closest?.('[data-enter-select]')) event.preventDefault()
   })
   document.addEventListener('dragstart', (event) => {
     if (event.target.closest?.('[data-drag-move]')) event.dataTransfer.effectAllowed = 'move'

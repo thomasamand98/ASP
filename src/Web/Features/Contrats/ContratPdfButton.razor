@@ -1,0 +1,71 @@
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Bouton « Voir le PDF » de la fiche contrat : l'API fusionne le modèle choisi
+   avec les données du contrat (GET /contrats/:id/pdf) et le PDF obtenu
+   s'ouvre dans un nouvel onglet. La route exige le jeton d'accès, qu'un lien
+   classique n'enverrait pas : le PDF est récupéré par l'API authentifiée puis
+   affiché depuis un blob. L'onglet est ouvert avant l'attente réseau, sinon
+   le navigateur bloquerait le popup. *@
+@if (Templates.Count == 0)
+{
+    <span class="contrat-pdf" title="Créez d’abord un modèle de contrat dans Gestion documentaire">
+        <button type="button" class="btn" disabled>Voir le PDF</button>
+    </span>
+}
+else
+{
+    <span class="contrat-pdf">
+        @if (Templates.Count > 1)
+        {
+            <select class="control contrat-pdf-select" value="@_templateId" @onchange="e => _templateId = (string)e.Value!" aria-label="Modèle de document">
+                @foreach (var t in Templates)
+                {
+                    <option @key="t.IDDOCUMENT_TEMPLATES" value="@t.IDDOCUMENT_TEMPLATES">@t.Nom</option>
+                }
+            </select>
+        }
+        <button type="button" class="btn" @onclick="ViewAsync" disabled="@_loading">@(_loading ? "Génération..." : "Voir le PDF")</button>
+        @if (_error is not null)
+        {
+            <span class="contrat-pdf-error">@_error</span>
+        }
+    </span>
+}
+
+@code {
+    private string _templateId = "";
+    private bool _loading;
+    private string? _error;
+
+    [Parameter, EditorRequired] public string ContratId { get; set; } = "";
+
+    // Modèles de type « CONTRAT », chargés une fois par la page.
+    [Parameter] public IReadOnlyList<DocumentTemplateSummary> Templates { get; set; } = [];
+
+    protected override void OnInitialized() => _templateId = Templates.FirstOrDefault()?.IDDOCUMENT_TEMPLATES ?? "";
+
+    private async Task ViewAsync()
+    {
+        var selected = _templateId.Length > 0 ? _templateId : Templates.FirstOrDefault()?.IDDOCUMENT_TEMPLATES;
+        if (selected is null) return;
+        var preview = Browser.OpenBlankWindow();
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Api.SendAsync(HttpMethod.Get, $"contrats/{ContratId}/pdf?templateId={Js.EncodeUriComponent(selected)}");
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await Browser.ShowInWindowAsync(preview, bytes, response.Content.Headers.ContentType?.MediaType);
+        }
+        catch (Exception e)
+        {
+            if (preview != 0) await Browser.CloseWindowAsync(preview);
+            _error = e.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

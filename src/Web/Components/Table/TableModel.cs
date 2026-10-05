@@ -54,7 +54,7 @@ public sealed class TableModel<T>
         foreach (var (columnId, value) in _filters)
         {
             var column = Columns.FirstOrDefault(c => c.Id == columnId);
-            if (column?.Accessor is null) continue;
+            if (column?.Accessor is null || !column.Filterable) continue;
             var search = value.ToLowerInvariant();
             rows = rows.Where(row => column.Value(row.Item) is { } cell && JsValue.ToJsString(cell).ToLowerInvariant().Contains(search, StringComparison.Ordinal)).ToList();
         }

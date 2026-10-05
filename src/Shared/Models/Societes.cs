@@ -55,3 +55,9 @@ public sealed record SocieteDetail : Societe
     public FournisseurBilling? Fournisseur { get; init; }
     public List<SocieteContactLien> SocieteContacts { get; init; } = [];
 }
+
+// Messages envoyés à une société (GET /messages?societeId=), journaux
+// d'envoi en lecture seule.
+public sealed record MessageRow(string IDMESSAGES, string? Sujet, string? Destinataire, string? Type_message, string? Date_message, string? Heure_message, string? NomContact);
+
+public sealed record MessagesResponse(List<MessageRow> messages);

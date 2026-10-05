@@ -1,0 +1,144 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Fiche d'une marchandise, en création (Initial null) ou en modification
+   (fiche complète chargée par CrudPage) : cartes « Marchandise » (nom +
+   couleur planning) et « Déchets » (déchet lié, en lecture seule, choisi via
+   la recherche). *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+
+    <FicheSection Title="Marchandise" Class="fiche-section--center mf-section">
+        <Aside>
+            <FicheSwitch Label="Archivée" Checked="@(_form.Archive == 1)" CheckedChanged="on => _form.Archive = on ? 1 : 0" />
+        </Aside>
+        <ChildContent>
+            <div class="mf-row">
+                <FicheField Label="Nom">
+                    <input value="@_form.Nom_marchandise" maxlength="100" @oninput="e => _form.Nom_marchandise = (string)e.Value!" />
+                </FicheField>
+                <div class="field">
+                    <span class="field-label">Couleur</span>
+                    <ColorField Label="Couleur planning" Value="@ColorValue" ValueChanged="color => _form.CouleurPlanning = color.ToString(CultureInfo.InvariantCulture)" />
+                </div>
+            </div>
+        </ChildContent>
+    </FicheSection>
+
+    <FicheSection Title="Déchets" Class="fiche-section--center mf-section">
+        <Aside>
+            <div class="mf-dechet-actions">
+                <button type="button" class="mf-icon-btn" @onclick="() => _picking = !_picking" title="@(_dechet is null ? "Choisir un déchet" : "Changer de déchet")"
+                        aria-expanded="@(_picking ? "true" : "false")">
+                    <Icon Name="fiche.Plus" />
+                </button>
+                <button type="button" class="mf-icon-btn mf-icon-btn--remove" @onclick="() => SelectDechet(null)" disabled="@(_dechet is null)"
+                        title="Retirer le déchet" aria-label="Retirer le déchet">−</button>
+            </div>
+        </Aside>
+        <ChildContent>
+            @if (_picking)
+            {
+                <DechetPicker OnSelect="SelectDechet" OnClose="() => _picking = false" />
+            }
+            <div class="mf-dechet">
+                <div class="field">
+                    <span class="field-label">Code Déchets</span>
+                    <span class="fiche-readonly mf-dechet-code">@(string.IsNullOrEmpty(_dechet?.Code) ? " " : _dechet.Code)</span>
+                </div>
+                <div class="field">
+                    <span class="field-label">Description</span>
+                    <span class="fiche-readonly">@(string.IsNullOrEmpty(_dechet?.Description_dechet) ? " " : _dechet.Description_dechet)</span>
+                </div>
+            </div>
+        </ChildContent>
+    </FicheSection>
+</form>
+
+@code {
+    // Champs envoyés à l'API (CreateMarchandiseDto) : CouleurPlanning est une
+    // couleur WinDev en texte ("0" = aucune) ; IDDECHETS "" = aucun déchet ;
+    // Is_dechet/Archive sont des codes 0/1.
+    private sealed class Model
+    {
+        public string Nom_marchandise { get; set; } = "";
+        public string CouleurPlanning { get; set; } = "0";
+        public string IDDECHETS { get; set; } = "";
+        public double Is_dechet { get; set; }
+        public double Archive { get; set; }
+    }
+
+    private Model _form = new();
+    // Code/description du déchet lié, pour l'affichage seulement.
+    private Dechet? _dechet;
+    private bool _picking;
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public MarchandiseDetail? Initial { get; set; }
+    [Parameter] public Func<CreateMarchandiseDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    // Number(CouleurPlanning) || 0.
+    private long ColorValue
+    {
+        get
+        {
+            var n = JsNumber.Parse(_form.CouleurPlanning);
+            return double.IsFinite(n) && n != 0 ? (long)n : 0;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            Nom_marchandise = Initial?.Nom_marchandise ?? "",
+            CouleurPlanning = Initial?.CouleurPlanning ?? "0",
+            IDDECHETS = FormModel.LinkId(Initial?.IDDECHETS),
+            Is_dechet = Initial?.Is_dechet ?? 0,
+            Archive = Initial?.Archive ?? 0,
+        };
+        _dechet = Initial?.Dechet is { } d && _form.IDDECHETS.Length > 0 ? new Dechet(_form.IDDECHETS, d.Code, d.Description_dechet) : null;
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private void SelectDechet(Dechet? next)
+    {
+        _dechet = next;
+        _form.IDDECHETS = next?.IDDECHETS ?? "";
+        _form.Is_dechet = next is null ? 0 : 1;
+        _picking = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateMarchandiseDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

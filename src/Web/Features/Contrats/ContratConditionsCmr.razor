@@ -1,0 +1,118 @@
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Bloc « Conditions CMR » de la fiche contrat : contrairement au reste du
+   formulaire, chaque ajout / coche / suppression est envoyé tout de suite à
+   l'API sans attendre « Enregistrer » — ce sont des lignes à part entière,
+   pas des champs du contrat. *@
+<div class="contrat-conditions">
+    <div class="contrat-conditions-add">
+        <label class="field contrat-conditions-libelle">
+            Condition
+            @* Entrée ajoute la condition sans soumettre le formulaire du contrat. *@
+            <input value="@_libelle" @oninput="e => _libelle = (string)e.Value!" @onkeydown="OnKeyDown" data-enter-select maxlength="200"
+                   disabled="@Disabled" placeholder="@(Disabled ? "Enregistrez d’abord le contrat" : "Ajouter une condition")" />
+        </label>
+        <label class="checkbox contrat-checkbox contrat-conditions-box">
+            <input type="checkbox" checked="@_boite" @onchange="e => _boite = e.Value is true" disabled="@Disabled" />
+            Case à cocher
+        </label>
+        <button type="button" class="icon-btn primary" @onclick="AddAsync" disabled="@(Disabled || _busy || _libelle.Trim().Length == 0)"
+                aria-label="Ajouter la condition" title="Ajouter la condition">
+            <Icon Name="contrats.Plus" />
+        </button>
+    </div>
+
+    @if (Conditions.Count == 0)
+    {
+        <p class="muted">Aucune condition CMR.</p>
+    }
+    else
+    {
+        <ul class="contrat-conditions-list">
+            @foreach (var c in Conditions)
+            {
+                <li @key="c.IDCONDITIONS_CMR" class="contrat-conditions-item">
+                    <span class="contrat-conditions-text">@c.Libelle</span>
+                    <label class="checkbox contrat-checkbox" title="Case à cocher">
+                        <input type="checkbox" checked="@(c.Boite_a_cocher is { } v && v != 0)" @onchange="() => ToggleAsync(c)" disabled="@_busy" />
+                        <span class="sr-only">Case à cocher</span>
+                    </label>
+                    <button type="button" class="icon-btn danger" @onclick="() => DeleteAsync(c)" disabled="@_busy" aria-label="Supprimer la condition" title="Supprimer">
+                        <Icon Name="contrats.Trash" />
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private string _libelle = "";
+    private bool _boite;
+    private bool _busy;
+
+    // null en création : la condition a besoin d'un contrat enregistré pour
+    // s'y rattacher, le bloc est alors désactivé.
+    [Parameter] public string? ContratId { get; set; }
+    [Parameter] public IReadOnlyList<ConditionCmr> Conditions { get; set; } = [];
+    [Parameter] public EventCallback<List<ConditionCmr>> ConditionsChanged { get; set; }
+
+    private bool Disabled => ContratId is null;
+
+    // Verrouille les boutons pendant l'appel et affiche l'échec.
+    private async Task RunAsync(Func<Task> action, string failure)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"{failure} : {e.Message}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        var label = _libelle.Trim();
+        if (ContratId is null || label.Length == 0 || _busy) return;
+        await RunAsync(async () =>
+        {
+            var created = (await Api.SendJsonAsync<ConditionCmr>(HttpMethod.Post, "conditions-cmr",
+                new CreateConditionCmrDto { IDCONTRATS = ContratId, Libelle = label, Boite_a_cocher = _boite ? 1 : 0 }))!;
+            await ConditionsChanged.InvokeAsync([.. Conditions, created]);
+            // Champ vidé seulement s'il contient encore le texte envoyé — sinon
+            // on écraserait ce que l'utilisateur a tapé pendant la requête.
+            if (_libelle.Trim() == label) _libelle = "";
+            _boite = false;
+        }, "Échec de l'ajout");
+    }
+
+    private Task ToggleAsync(ConditionCmr condition) => RunAsync(async () =>
+    {
+        var updated = (await Api.SendJsonAsync<ConditionCmr>(HttpMethod.Patch, $"conditions-cmr/{condition.IDCONDITIONS_CMR}",
+            new UpdateConditionCmrDto { Boite_a_cocher = condition.Boite_a_cocher is { } v && v != 0 ? 0 : 1 }))!;
+        await ConditionsChanged.InvokeAsync([.. Conditions.Select(c => c.IDCONDITIONS_CMR == updated.IDCONDITIONS_CMR ? updated : c)]);
+    }, "Échec de la modification");
+
+    private async Task DeleteAsync(ConditionCmr condition)
+    {
+        if (!await Browser.ConfirmAsync($"Supprimer la condition « {condition.Libelle ?? "null"} » ?")) return;
+        await RunAsync(async () =>
+        {
+            await Api.SendAsync(HttpMethod.Delete, $"conditions-cmr/{condition.IDCONDITIONS_CMR}");
+            await ConditionsChanged.InvokeAsync([.. Conditions.Where(c => c.IDCONDITIONS_CMR != condition.IDCONDITIONS_CMR)]);
+        }, "Échec de la suppression");
+    }
+}

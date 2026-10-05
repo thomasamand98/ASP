@@ -1,2 +1,46 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : PointsPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Point" TDto="CreatePointDto" TDetail="PointDetail"
+          Title="Points" LoadingLabel="Chargement des points..."
+          Source="_list" Columns="Columns" GetRowId="p => p.IDPOINTS"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce point ?" CreateModalTitle="Nouveau point" EditModalTitle="Modifier le point"
+          Entity="points" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <PointForm Initial="form.Initial" Defaults="Projection?.Defaults" Societes="_societes.Data" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private static readonly IReadOnlyList<Column<Point>> Columns =
+    [
+        Col.Key<Point>("Libelle", "Nom", p => p.Libelle),
+        Col.Key<Point>("Nom_societe", "Société", p => p.Nom_societe),
+        Col.Key<Point>("Telephone", "Téléphone", p => p.Telephone),
+        Col.Of<Point>("adresse_rue", "Adresse", p => p.Adresse?.Adresse1 ?? ""),
+        Col.Of<Point>("code_postal", "Code postal", p => p.Adresse?.CP ?? ""),
+        Col.Of<Point>("localite", "Localité", p => p.Adresse?.Localite ?? ""),
+    ];
+
+    private ApiList<Point> _list = default!;
+    private CrudApi<CreatePointDto, Point, PointDetail> _api = default!;
+    // Liste du sélecteur Société, chargée une fois tant que l'onglet reste
+    // ouvert (pas à chaque ouverture de fiche).
+    private ApiList<Societe> _societes = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Point>(Api, "points") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreatePointDto, Point, PointDetail>(Api, "points");
+        _societes = new ApiList<Societe>(Api, "societes");
+        _societes.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _societes.RefetchAsync());
+    }
+}

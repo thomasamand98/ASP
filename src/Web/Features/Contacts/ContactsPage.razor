@@ -1,2 +1,52 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : ContactsPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Contact" TDto="CreateContactDto" TDetail="ContactDetail"
+          Title="Contacts" LoadingLabel="Chargement des contacts..."
+          Source="_list" Columns="Columns" GetRowId="c => c.IDCONTACTS"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce contact ?" CreateModalTitle="Nouveau contact" EditModalTitle="Modifier le contact"
+          Entity="contacts" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <ContactForm Initial="form.Initial" DefaultSocieteId="@Projection?.Default("IDSOCIETES")" Societes="_societes.Data"
+                     OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    // Colonnes partagées avec l'onglet Contacts de la fiche Société. La
+    // société/fonction/service viennent de la relation SocieteContacts (le
+    // premier élément).
+    public static readonly IReadOnlyList<Column<Contact>> Columns =
+    [
+        Col.Key<Contact>("Civilite", "Civilité", c => c.Civilite),
+        Col.Key<Contact>("Nom_contact", "Nom", c => c.Nom_contact),
+        Col.Key<Contact>("Prenom_contact", "Prénom", c => c.Prenom_contact),
+        Col.Of<Contact>("societe", "Société", c => c.SocieteContacts.FirstOrDefault()?.Societe?.Nom_societe ?? ""),
+        Col.Of<Contact>("fonction", "Fonction", c => c.SocieteContacts.FirstOrDefault()?.Fonction_contact ?? ""),
+        Col.Of<Contact>("service_bureau", "Service / Bureau", c => c.SocieteContacts.FirstOrDefault()?.Service_bureau ?? ""),
+        Col.Key<Contact>("Telephone_portable", "Portable", c => c.Telephone_portable),
+        Col.Key<Contact>("Telephone_fixe", "Fixe", c => c.Telephone_fixe),
+        Col.Key<Contact>("E_mail", "Email", c => c.E_mail),
+    ];
+
+    private ApiList<Contact> _list = default!;
+    private CrudApi<CreateContactDto, Contact, ContactDetail> _api = default!;
+    // Pour la liste « Société » de la fiche.
+    private ApiList<Societe> _societes = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Contact>(Api, "contacts") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreateContactDto, Contact, ContactDetail>(Api, "contacts");
+        _societes = new ApiList<Societe>(Api, "societes");
+        _societes.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _societes.RefetchAsync());
+    }
+}

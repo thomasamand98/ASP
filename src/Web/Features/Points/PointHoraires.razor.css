@@ -1,0 +1,139 @@
+/* ---------- Plage horaire ---------- */
+
+.pt-week {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.pt-week-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Conteneur étroit : les jours passent en lignes. */
+@container (max-width: 44rem) {
+  .pt-week-days {
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  }
+}
+
+.pt-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.pt-day.is-closed {
+  background: transparent;
+  border-style: dashed;
+}
+
+.pt-day-name {
+  color: var(--text-h);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pt-day-closed {
+  color: var(--text);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.pt-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.3rem 1.1rem 0.3rem 0.3rem;
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.pt-slot input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.1rem 0.2rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pt-slot input:focus-visible {
+  outline: none;
+  border-color: var(--accent-border);
+  box-shadow: var(--focus-ring);
+}
+
+.pt-slot input:invalid {
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.pt-slot-remove {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.pt-slot-remove:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.pt-slot-remove:focus-visible,
+.pt-day-add:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 1px;
+}
+
+.pt-day-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.pt-day-add:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+

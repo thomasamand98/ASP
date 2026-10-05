@@ -31,3 +31,14 @@
   color: var(--danger);
   margin: 0 0 0.5rem;
 }
+
+/* Fiche contrat (voir Features/Contrats/ContratForm.razor) : règle sur un
+   ancêtre du composant, impossible à isoler (classe doublée : doit l'emporter
+   sur la règle isolée de Modal.razor.css, de même poids et chargée après). */
+/* La modale générique (Components/Modal.razor.css) est limitée à 480px, trop
+   étroit pour deux colonnes de cartes : élargie pour cette fiche seulement
+   (les autres modes d'affichage ont leur propre largeur). */
+.modal-panel.modal-panel:has(.contrat-form) {
+  max-width: min(1100px, 100%);
+}
+

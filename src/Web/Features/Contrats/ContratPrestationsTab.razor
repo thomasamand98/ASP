@@ -1,0 +1,46 @@
+@inject EnumerationLabels Enumerations
+
+@* Onglet « Prestations » de la fiche contrat — lecture seule, les
+   prestations viennent avec la fiche. L'unité est un code de l'énumération
+   « unite_prestation » : son libellé, ou le code brut tant que les libellés
+   ne sont pas chargés. *@
+@if (Prestations.Count == 0)
+{
+    <p class="muted">Aucune prestation sur ce contrat.</p>
+}
+else
+{
+    <div class="contrat-table-wrapper">
+        <table class="contrat-table">
+            <thead>
+                <tr>
+                    <th class="contrat-num">N°</th>
+                    <th>Description</th>
+                    <th>Marchandise</th>
+                    <th class="contrat-num">Prix unitaire</th>
+                    <th>Unité</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Prestations)
+                {
+                    <tr @key="p.IDPRESTATIONS">
+                        <td class="contrat-num" data-label="N°">@(p.Ordre is { } ordre ? JsNumber.ToString(ordre) : "—")</td>
+                        <td data-label="Description">@(string.IsNullOrEmpty(p.Description_prestation) ? "—" : p.Description_prestation)</td>
+                        <td data-label="Marchandise">@(string.IsNullOrEmpty(p.Marchandise?.Nom_marchandise) ? "—" : p.Marchandise.Nom_marchandise)</td>
+                        <td class="contrat-num" data-label="Prix unitaire">@ContratFormat.Euro(p.Prix_unitaire)</td>
+                        <td data-label="Unité">@(p.Unite is { } unite ? _unites.GetValueOrDefault(JsNumber.ToString(unite)) ?? JsNumber.ToString(unite) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyDictionary<string, string> _unites = new Dictionary<string, string>();
+
+    [Parameter] public IReadOnlyList<ContratPrestation> Prestations { get; set; } = [];
+
+    protected override async Task OnInitializedAsync() => _unites = await Enumerations.LoadAsync("unite_prestation");
+}

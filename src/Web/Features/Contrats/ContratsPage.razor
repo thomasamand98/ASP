@@ -1,2 +1,48 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : ContratsPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Contrat" TDto="CreateContratDto" TDetail="ContratDetail"
+          Title="Contrats" LoadingLabel="Chargement des contrats..."
+          Source="_list" Columns="Columns" GetRowId="c => c.IDCONTRATS"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce contrat ?" CreateModalTitle="Nouveau contrat" EditModalTitle="Modifier le contrat"
+          Entity="contrats" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <ContratForm Initial="form.Initial" DefaultSocieteId="@Projection?.Default("IDSOCIETES")" Societes="_lookups.Societes.Data"
+                     TypesFacture="_lookups.TypesFacture" DocumentTemplates="_lookups.Templates" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    // Colonnes partagées avec l'onglet Contrats de la fiche Société.
+    public static readonly IReadOnlyList<Column<Contrat>> Columns =
+    [
+        Col.Key<Contrat>("Num_contrat", "Numéro", c => c.Num_contrat),
+        Col.Of<Contrat>("societe", "Société", c => c.Societe?.Nom_societe ?? ""),
+        Col.Of<Contrat>("numero_tva", "N° TVA", c => c.Societe?.TVA ?? ""),
+        Col.Date<Contrat>("Date_debut", "Début", c => c.Date_debut),
+        Col.Date<Contrat>("Date_fin", "Fin", c => c.Date_fin),
+        Col.Key<Contrat>("Description_projet", "Description", c => c.Description_projet),
+    ];
+
+    private ApiList<Contrat> _list = default!;
+    private CrudApi<CreateContratDto, Contrat, ContratDetail> _api = default!;
+    // Listes de la fiche (sociétés, types de facture, modèles « CONTRAT »),
+    // chargées une fois tant que l'onglet reste ouvert.
+    private ContratLookups _lookups = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Contrat>(Api, "contrats") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreateContratDto, Contrat, ContratDetail>(Api, "contrats");
+        _lookups = new ContratLookups(Api);
+        _lookups.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _lookups.LoadAsync());
+    }
+}

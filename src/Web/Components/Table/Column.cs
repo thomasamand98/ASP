@@ -16,6 +16,11 @@ public sealed class Column<T>
     public required string Header { get; init; }
     public Func<T, object?>? Accessor { get; init; }
     public bool IsKey { get; init; }
+
+    // enableColumnFilter : false = le filtre de la colonne est ignoré
+    // (l'entonnoir reste affiché, comme dans le front d'origine).
+    public bool Filterable { get; init; } = true;
+
     public Func<T, string>? Text { get; init; }
     public RenderFragment<T>? Template { get; init; }
 

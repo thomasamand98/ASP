@@ -1,2 +1,45 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : SocietesPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Societe" TDto="CreateSocieteDto" TDetail="SocieteDetail"
+          Title="Sociétés" LoadingLabel="Chargement des sociétés..."
+          Source="_list" Columns="Columns" GetRowId="s => s.IDSOCIETES"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer cette société ?" CreateModalTitle="Nouvelle société" EditModalTitle="Modifier la société"
+          Entity="societes" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <SocieteForm Initial="form.Initial" Contacts="_contacts.Data" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private static readonly IReadOnlyList<Column<Societe>> Columns =
+    [
+        Col.Key<Societe>("Nom_societe", "Nom", s => s.Nom_societe),
+        Col.Key<Societe>("Denomination", "Dénomination", s => s.Denomination),
+        Col.Key<Societe>("TVA", "N° TVA", s => s.TVA),
+        Col.Key<Societe>("Activite", "Activité", s => s.Activite),
+        Col.Key<Societe>("Site_web", "Site web", s => s.Site_web),
+    ];
+
+    private ApiList<Societe> _list = default!;
+    private CrudApi<CreateSocieteDto, Societe, SocieteDetail> _api = default!;
+    // Sélecteurs « Contact pour la comptabilité » des sous-onglets Client /
+    // Fournisseur, chargés une fois tant que l'onglet reste ouvert.
+    private ApiList<Contact> _contacts = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Societe>(Api, "societes") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreateSocieteDto, Societe, SocieteDetail>(Api, "societes");
+        _contacts = new ApiList<Contact>(Api, "contacts");
+        _contacts.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _contacts.RefetchAsync());
+    }
+}

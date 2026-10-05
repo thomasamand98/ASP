@@ -1,0 +1,68 @@
+.societe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.societe-form ::deep .societe-form-principale {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* auto-fit plutôt qu'une media query sur le viewport : la fiche vit dans
+   des conteneurs de largeurs très différentes selon le mode d'affichage
+   choisi (voir components/view-modes/) — modale, tiroir étroit, colonne de
+   la vue divisée... Les deux colonnes passent seules l'une sous l'autre
+   dès que le conteneur n'a plus la place. */
+.societe-form ::deep .societe-form-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.societe-form ::deep .societe-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.societe-form ::deep .societe-form-billing {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+}
+
+.societe-form ::deep .societe-form-section-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-h);
+}
+
+.societe-form ::deep .societe-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+}
+
+.societe-form ::deep .societe-form-hint {
+  margin: -0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.societe-form ::deep .societe-billing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* Onglets Contacts/Contrats/Messages : tables standard (CrudPage /
+   DataTable), seul le message de chargement est propre à la fiche. */
+.societe-form ::deep .societe-tab-loading {
+  color: var(--text);
+  font-size: 0.85rem;
+}

@@ -1,0 +1,58 @@
+@inject EnumerationLabels Enumerations
+
+@* Onglet « Factures » de la fiche contrat — lecture seule, les factures
+   viennent avec la fiche. L'état est un code de l'énumération
+   « etat_facture » : son libellé, ou le code brut tant que les libellés ne
+   sont pas chargés. *@
+@if (Factures.Count == 0)
+{
+    <p class="muted">Aucune facture sur ce contrat.</p>
+}
+else
+{
+    <div class="contrat-table-wrapper">
+        <table class="contrat-table">
+            <thead>
+                <tr>
+                    <th>N° facture</th>
+                    <th>Date</th>
+                    <th>Échéance</th>
+                    <th class="contrat-num">Montant HT</th>
+                    <th class="contrat-num">TVA</th>
+                    <th>État</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in Factures)
+                {
+                    <tr @key="f.IDFACTURES">
+                        <td class="contrat-nowrap" data-label="N° facture">@(string.IsNullOrEmpty(f.num_Facture) ? "—" : f.num_Facture)</td>
+                        <td class="contrat-nowrap" data-label="Date">@ContratFormat.Date(f.Date_Facture)</td>
+                        <td class="contrat-nowrap" data-label="Échéance">@ContratFormat.Date(f.Date_echeance)</td>
+                        <td class="contrat-num" data-label="Montant HT">@ContratFormat.Euro(f.Montant_Facture_HT)</td>
+                        <td class="contrat-num" data-label="TVA">@(f.Taux_TVA is { } taux ? $"{JsNumber.ToString(taux)} %" : "—")</td>
+                        <td data-label="État">
+                            @(f.etat_Facture is { } etat ? _etats.GetValueOrDefault(JsNumber.ToString(etat)) ?? JsNumber.ToString(etat) : "—")
+                            @if (f.Proformat is { } p && p != 0)
+                            {
+                                <span class="contrat-badge">Proforma</span>
+                            }
+                            @if (f.Note_de_Credit is { } n && n != 0)
+                            {
+                                <span class="contrat-badge">Note de crédit</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyDictionary<string, string> _etats = new Dictionary<string, string>();
+
+    [Parameter] public IReadOnlyList<ContratFacture> Factures { get; set; } = [];
+
+    protected override async Task OnInitializedAsync() => _etats = await Enumerations.LoadAsync("etat_facture");
+}

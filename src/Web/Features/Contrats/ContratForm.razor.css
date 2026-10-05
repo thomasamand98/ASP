@@ -1,0 +1,273 @@
+.contrat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+/* ---------- Bouton « Voir le PDF » ---------- */
+
+.contrat-form ::deep .contrat-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.contrat-form ::deep .contrat-pdf-select {
+  width: auto;
+  max-width: 12rem;
+}
+
+.contrat-form ::deep .contrat-pdf-error {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+/* ---------- Détail : deux colonnes de cartes ---------- */
+
+.contrat-form ::deep .contrat-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* auto-fit plutôt qu'une media query sur le viewport : la fiche vit dans des
+   conteneurs de largeurs très différentes selon le mode d'affichage choisi
+   (voir components/view-modes/) — les deux colonnes passent seules l'une
+   sous l'autre dès que le conteneur n'a plus la place. */
+.contrat-form ::deep .contrat-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.contrat-form ::deep .contrat-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.contrat-form ::deep .contrat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem 1rem 1rem;
+  min-width: 0;
+}
+
+.contrat-form ::deep .contrat-card-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-h);
+}
+
+.contrat-form ::deep .contrat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.contrat-form ::deep .contrat-row > .field {
+  flex: 1 1 8rem;
+}
+
+.contrat-form ::deep .contrat-row-center {
+  align-items: flex-end;
+}
+
+.contrat-form ::deep .contrat-grow {
+  flex: 2 1 12rem !important;
+}
+
+.contrat-form ::deep .contrat-field-narrow {
+  flex: 0 1 8rem !important;
+}
+
+/* Aligne la case à cocher sur le bas des champs voisins d'une ligne. */
+.contrat-form ::deep .contrat-checkbox {
+  padding-bottom: 0.3rem;
+}
+
+/* ---------- Conditions CMR ---------- */
+
+.contrat-form ::deep .contrat-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.contrat-form ::deep .contrat-conditions-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.contrat-form ::deep .contrat-conditions-libelle {
+  flex: 1 1 10rem;
+}
+
+.contrat-form ::deep .contrat-conditions-box {
+  padding-bottom: 0.55rem;
+}
+
+.contrat-form ::deep .contrat-conditions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.contrat-form ::deep .contrat-conditions-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+  color: var(--text-h);
+}
+
+.contrat-form ::deep .contrat-conditions-item:last-child {
+  border-bottom: none;
+}
+
+.contrat-form ::deep .contrat-conditions-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.contrat-form ::deep .contrat-conditions-item .contrat-checkbox {
+  padding-bottom: 0;
+}
+
+/* ---------- Chiffres clés ---------- */
+
+.contrat-form ::deep .contrat-kpi {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.contrat-form ::deep .contrat-kpi-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.contrat-form ::deep .contrat-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Onglets Prestations / Factures ---------- */
+
+.contrat-form ::deep .contrat-table-wrapper {
+  overflow-x: auto;
+}
+
+.contrat-form ::deep .contrat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.contrat-form ::deep .contrat-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.contrat-form ::deep .contrat-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.contrat-form ::deep .contrat-table tbody tr:hover {
+  background: var(--brand-bg);
+}
+
+.contrat-form ::deep .contrat-table .contrat-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Dates et numéros : jamais coupés sur deux lignes (le tableau défile
+   horizontalement si besoin). */
+.contrat-form ::deep .contrat-table .contrat-nowrap {
+  white-space: nowrap;
+}
+
+.contrat-form ::deep .contrat-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--code-bg);
+  color: var(--text-h);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* Mobile : chaque ligne devient une carte label/valeur, comme le DataTable
+   (voir components/DataTable.css). */
+@media (max-width: 640px) {
+  .contrat-form ::deep .contrat-table thead {
+    display: none;
+  }
+
+  .contrat-table,
+  .contrat-table tbody,
+  .contrat-table tr,
+  .contrat-form ::deep .contrat-table td {
+    display: block;
+  }
+
+  .contrat-form ::deep .contrat-table tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.25rem 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .contrat-form ::deep .contrat-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: none;
+    padding: 0.3rem 0.75rem;
+    text-align: right;
+  }
+
+  .contrat-form ::deep .contrat-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: left;
+  }
+}

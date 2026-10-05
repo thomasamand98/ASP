@@ -1,2 +1,54 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : MarchandisesPage</p>
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Marchandise" TDto="CreateMarchandiseDto" TDetail="MarchandiseDetail"
+          Title="Marchandises" LoadingLabel="Chargement des marchandises..."
+          Source="_list" Columns="Columns" GetRowId="m => m.IDMARCHANDISES"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer cette marchandise ?" CreateModalTitle="Nouvelle marchandise" EditModalTitle="Modifier la marchandise"
+          Entity="marchandises" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <MarchandiseForm Initial="form.Initial" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    // Booléen 0/1 affiché « Oui » / « Non ».
+    private static string Bool(double? value) => value is { } v && v != 0 ? "Oui" : "Non";
+
+    private static readonly IReadOnlyList<Column<Marchandise>> Columns =
+    [
+        Col.Key<Marchandise>("Nom_marchandise", "Marchandise", m => m.Nom_marchandise),
+        Col.Of<Marchandise>("dechet", "Déchet", m => m.Dechet?.Description_dechet ?? ""),
+        Col.Of<Marchandise>("code_dechet", "Code déchet", m => m.Dechet?.Code ?? ""),
+        Col.Of<Marchandise>("dangereux", "Dangereux", m => m.Dechet?.Dangereux, m => Bool(m.Dechet?.Dangereux)),
+        Col.Of<Marchandise>("autorisation", "Autorisation", m => m.Dechet?.Autorisation, m => Bool(m.Dechet?.Autorisation)),
+        Col.Of<Marchandise>("interte", "Inerte", m => m.Dechet?.Inerte, m => Bool(m.Dechet?.Inerte)),
+        Col.Of<Marchandise>("menage", "Ménage", m => m.Dechet?.Menager, m => Bool(m.Dechet?.Menager)),
+        new()
+        {
+            Id = "CouleurPlanning",
+            Header = "Couleur",
+            Accessor = m => m.CouleurPlanning,
+            IsKey = true,
+            Filterable = false,
+            Template = m => @<ColorSwatch Value="m.CouleurPlanning" />,
+        },
+    ];
+
+    private ApiList<Marchandise> _list = default!;
+    private CrudApi<CreateMarchandiseDto, Marchandise, MarchandiseDetail> _api = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Marchandise>(Api, "marchandises") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreateMarchandiseDto, Marchandise, MarchandiseDetail>(Api, "marchandises");
+        await _list.RefetchAsync();
+    }
+}

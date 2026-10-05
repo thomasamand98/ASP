@@ -1,0 +1,38 @@
+@inject ApiClient Api
+
+@* Onglet « Contrats / Offres » de la fiche Société : la même table que la
+   page Contrats, limitée aux contrats de cette société — « Nouveau » ouvre la
+   fiche contrat avec la société déjà sélectionnée. *@
+<CrudPage T="Contrat" TDto="CreateContratDto" TDetail="ContratDetail"
+          Title="Contrats" LoadingLabel="Chargement des contrats..."
+          Source="_list" Columns="Columns" GetRowId="c => c.IDCONTRATS"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce contrat ?" CreateModalTitle="Nouveau contrat" EditModalTitle="Modifier le contrat"
+          Entity="contrats" NewRecordScope="@($"societe:{SocieteId}")">
+    <RenderForm Context="form">
+        <ContratForm Initial="form.Initial" Societes="_lookups.Societes.Data" TypesFacture="_lookups.TypesFacture"
+                     DocumentTemplates="_lookups.Templates" DefaultSocieteId="@SocieteId" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    // Colonnes de la page Contrats, sans Société / N° TVA : toujours la
+    // société de la fiche ici.
+    private static readonly IReadOnlyList<Column<Contrat>> Columns = [.. ContratsPage.Columns.Where(c => c.Id is not "societe" and not "numero_tva")];
+
+    private ApiList<Contrat> _list = default!;
+    private CrudApi<CreateContratDto, Contrat, ContratDetail> _api = default!;
+    private ContratLookups _lookups = default!;
+
+    [Parameter, EditorRequired] public string SocieteId { get; set; } = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Contrat>(Api, "contrats") { Paginated = true };
+        _list.Configure(1, 25, "", new Dictionary<string, string> { ["societeId"] = SocieteId });
+        _api = new CrudApi<CreateContratDto, Contrat, ContratDetail>(Api, "contrats");
+        _lookups = new ContratLookups(Api);
+        _lookups.Changed += StateHasChanged;
+        await Task.WhenAll(_list.RefetchAsync(), _lookups.LoadAsync());
+    }
+}

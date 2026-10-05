@@ -1,0 +1,86 @@
+@implements IDisposable
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Recherche d'un déchet par code ou description (GET /dechets?search=),
+   relancée 250 ms après la dernière frappe. Entrée choisit le seul résultat
+   (sans enregistrer la fiche), Échap referme la recherche. *@
+<div class="mf-picker">
+    <input @ref="_input" type="search" placeholder="Rechercher un code ou une description..." value="@_search"
+           @oninput="e => SearchAsync((string)e.Value!)" @onkeydown="OnKeyDown"
+           aria-label="Rechercher un déchet" data-enter-select />
+    <ul class="mf-picker-list" aria-busy="@(_loading ? "true" : "false")">
+        @foreach (var d in _results)
+        {
+            <li @key="d.IDDECHETS">
+                <button type="button" @onclick="() => OnSelect.InvokeAsync(d)">
+                    <span class="mf-picker-code">@d.Code</span>
+                    <span>@d.Description_dechet</span>
+                </button>
+            </li>
+        }
+        @if (!_loading && _results.Count == 0)
+        {
+            <li class="mf-picker-empty">Aucun déchet trouvé.</li>
+        }
+    </ul>
+</div>
+
+@code {
+    private string _search = "";
+    private List<Dechet> _results = [];
+    private bool _loading = true;
+    private int _request;
+    private CancellationTokenSource? _debounce;
+    private ElementReference _input;
+
+    [Parameter] public EventCallback<Dechet> OnSelect { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    protected override Task OnInitializedAsync() => SearchAsync("");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.FocusAsync(_input);
+    }
+
+    private async Task SearchAsync(string search)
+    {
+        _search = search;
+        _debounce?.Cancel();
+        var token = (_debounce = new CancellationTokenSource()).Token;
+        var request = ++_request;
+        try
+        {
+            await Task.Delay(250, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var json = await Api.GetAsync<DechetsResponse>($"dechets?search={Js.EncodeUriComponent(search)}");
+            if (request == _request) _results = json.dechets;
+        }
+        catch (Exception)
+        {
+            if (request == _request) _results = [];
+        }
+        finally
+        {
+            if (request == _request) _loading = false;
+        }
+    }
+
+    // Entrée ne doit pas enregistrer la fiche : elle choisit le seul résultat.
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && _results.Count == 1) await OnSelect.InvokeAsync(_results[0]);
+        if (e.Key == "Escape") await OnClose.InvokeAsync();
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

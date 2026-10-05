@@ -1,0 +1,288 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Fiche point, en création (Initial null) ou en modification (fiche
+   complète chargée par CrudPage). Le formulaire couvre les onglets
+   Principale et Carte ; l'onglet Contacts (fiches contact complètes, avec
+   leur propre enregistrement) est hors du <form> — pas de formulaires
+   imbriqués — et réservé à un point déjà enregistré. *@
+<div class="fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" form="@_formId" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+
+    <FicheHero Title="@(Libelle.Length > 0 ? Libelle : Initial is not null ? "Sans libellé" : "Nouveau point")"
+               Subtitle="@(Adresse.Length > 0 ? Adresse : "Renseignez la société et l’adresse ci-dessous")">
+        <Badge>
+            <span class="fiche-avatar fiche-avatar--icon" aria-hidden="true"><Icon Name="fiche.MapPin" /></span>
+        </Badge>
+        <Actions>
+            @if (_form.Archive == 1)
+            {
+                <span class="pt-archived">Archivé</span>
+            }
+            @if (_form.Telephone.Trim().Length > 0)
+            {
+                <a class="btn sm" href="@($"tel:{PhoneDigits(_form.Telephone)}")" title="@($"Appeler le {_form.Telephone}")"><Icon Name="fiche.Phone" /> Appeler</a>
+            }
+            @if (MapsUrl.Length > 0)
+            {
+                <a class="btn sm" href="@MapsUrl" target="_blank" rel="noreferrer"><Icon Name="fiche.MapPin" Size="14" /> Google Maps</a>
+            }
+        </Actions>
+    </FicheHero>
+
+    <FicheTabs AriaLabel="Sections de la fiche point" @bind-Value="_tab" Tabs="Tabs" />
+
+    <form id="@_formId" @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="pt-form">
+        <FichePanel Active="@(_tab == "principal")">
+            <div class="pt-principal">
+                <div class="fiche-columns">
+                    <div class="fiche-column">
+                        <FicheSection Title="Identification">
+                            <Aside>
+                                <FicheSwitch Label="Archivé" Checked="@(_form.Archive == 1)" CheckedChanged="on => _form.Archive = on ? 1 : 0" />
+                            </Aside>
+                            <ChildContent>
+                                <div class="fiche-grid">
+                                    <FicheField Label="Libellé" Wide="true">
+                                        <input value="@Libelle" readonly tabindex="-1" title="Calculé à partir de la ville et du nom de société" />
+                                    </FicheField>
+                                    <FicheField Label="Société liée" Wide="true">
+                                        <select value="@_form.IDSOCIETES" @onchange="e => SelectSociete((string)e.Value!)">
+                                            <option value="">— Aucune —</option>
+                                            @foreach (var s in Societes)
+                                            {
+                                                <SelectOption @key="s.IDSOCIETES" Value="@s.IDSOCIETES" Current="@_form.IDSOCIETES">@s.Nom_societe</SelectOption>
+                                            }
+                                        </select>
+                                    </FicheField>
+                                    <FicheField Label="Nom société"><input value="@_form.Nom_societe" maxlength="50" @oninput="e => _form.Nom_societe = (string)e.Value!" /></FicheField>
+                                    <FicheField Label="Téléphone"><input type="tel" value="@_form.Telephone" maxlength="50" placeholder="+32 …" @oninput="e => _form.Telephone = (string)e.Value!" /></FicheField>
+                                    <FicheField Label="Contact par défaut" Wide="true">
+                                        <select value="@_form.IDCONTACTS_DEFAUTS" @onchange="e => _form.IDCONTACTS_DEFAUTS = (string)e.Value!" disabled="@(DefaultChoices.Count == 0)">
+                                            <option value="">@(DefaultChoices.Count == 0 ? "— Aucun contact lié —" : "— Aucun —")</option>
+                                            @foreach (var (id, label) in DefaultChoices)
+                                            {
+                                                <option @key="id" value="@id">@label</option>
+                                            }
+                                        </select>
+                                    </FicheField>
+                                </div>
+                            </ChildContent>
+                        </FicheSection>
+
+                        <FicheSection Title="Instruction">
+                            <textarea value="@_form.Instruction" maxlength="300" class="control" rows="4" aria-label="Instruction"
+                                      placeholder="Consignes d’accès, quai, horaires particuliers…" @oninput="e => _form.Instruction = (string)e.Value!"></textarea>
+                            <span class="fiche-counter">@_form.Instruction.Length / 300</span>
+                        </FicheSection>
+                    </div>
+
+                    <div class="fiche-column">
+                        <FicheSection Title="Adresse">
+                            <AdresseFields Value="AdresseValue" OnChange="SetAdresse" />
+                        </FicheSection>
+                    </div>
+                </div>
+
+                <FicheSection Title="Plage horaire" Class="pt-hours">
+                    <PointHoraires Value="_form.Horaires" ValueChanged="h => _form.Horaires = h" />
+                </FicheSection>
+            </div>
+        </FichePanel>
+
+        <FichePanel Active="@(_tab == "carte")">
+            <FicheSection Title="Localisation">
+                <FicheField Label="Lien Google Maps">
+                    <input type="url" value="@_form.Lien_googleMap" maxlength="300" placeholder="https://maps.app.goo.gl/… (sinon, l’adresse est utilisée)"
+                           @oninput="e => _form.Lien_googleMap = (string)e.Value!" />
+                </FicheField>
+                @if (Adresse.Length > 0)
+                {
+                    <iframe class="pt-map" title="@($"Carte : {Adresse}")" src="@($"https://maps.google.com/maps?q={Js.EncodeUriComponent(Adresse)}&z=15&output=embed")"
+                            loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                }
+                else
+                {
+                    <p class="fiche-empty">Renseignez l’adresse du point pour afficher la carte.</p>
+                }
+            </FicheSection>
+        </FichePanel>
+    </form>
+
+    @* Gardé monté : une fiche contact en cours de saisie survit au
+       changement d'onglet. *@
+    @if (Initial is not null)
+    {
+        <FichePanel Active="@(_tab == "contacts")">
+            <PointContactsTab PointId="@Initial.IDPOINTS" />
+        </FichePanel>
+    }
+</div>
+
+@code {
+    private static int _next;
+    private readonly string _formId = $"point-form-{++_next}";
+
+    // Champs envoyés à l'API (CreatePointDto) : ids en texte, Archive code
+    // 0/1. L'adresse est aplatie et les plages horaires envoyées en entier :
+    // l'API enregistre les deux à part.
+    private sealed class Model
+    {
+        public string Libelle { get; set; } = "";
+        public string Nom_societe { get; set; } = "";
+        public string Telephone { get; set; } = "";
+        public string IDSOCIETES { get; set; } = "";
+        public double Archive { get; set; }
+        public string Lien_googleMap { get; set; } = "";
+        public string Instruction { get; set; } = "";
+        public string IDCONTACTS_DEFAUTS { get; set; } = "";
+        public string Adresse1 { get; set; } = "";
+        public string Adresse2 { get; set; } = "";
+        public string Adresse3 { get; set; } = "";
+        public string CP { get; set; } = "";
+        public string Localite { get; set; } = "";
+        public string Pays { get; set; } = "";
+        public string Pays_full_name { get; set; } = "";
+        public List<PointHoraires.Horaire> Horaires { get; set; } = [];
+    }
+
+    private Model _form = new();
+    private string _tab = "principal";
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public PointDetail? Initial { get; set; }
+
+    // Valeurs préremplies en création (projection depuis une seule ligne).
+    [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
+
+    // Liste du sélecteur Société, chargée par PointsPage.
+    [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
+    [Parameter] public Func<CreatePointDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private IReadOnlyList<FicheTab> Tabs =>
+    [
+        new("principal", "Principale"),
+        new("contacts", "Contacts", Initial?.PointContacts.Count ?? 0, Initial is null, Initial is null ? "Enregistrez d’abord le point pour lui lier des contacts" : null),
+        new("carte", "Carte"),
+    ];
+
+    // Libellé du point, calculé comme dans WinDev : « VILLE, NOM SOCIÉTÉ » ;
+    // s'ils sont vides, le libellé existant est gardé tel quel.
+    private string Libelle
+    {
+        get
+        {
+            var computed = string.Join(", ", new[] { _form.Localite, _form.Nom_societe }.Select(v => v.Trim()).Where(v => v.Length > 0));
+            return computed.Length > 0 ? computed : _form.Libelle;
+        }
+    }
+
+    private string Adresse => AdresseValues.Format(_form.Adresse1, _form.CP, _form.Localite, _form.Pays_full_name);
+
+    private string MapsUrl
+    {
+        get
+        {
+            var lien = _form.Lien_googleMap.Trim();
+            if (lien.Length > 0) return lien;
+            return Adresse.Length > 0 ? $"https://www.google.com/maps/search/?api=1&query={Js.EncodeUriComponent(Adresse)}" : "";
+        }
+    }
+
+    private static string PhoneDigits(string phone) => new([.. phone.Where(c => char.IsAsciiDigit(c) || c == '+')]);
+
+    private static string FullName(string? prenom, string? nom)
+    {
+        var name = FormModel.JoinNonEmpty(" ", prenom, nom);
+        return name.Length > 0 ? name : "Sans nom";
+    }
+
+    // Le contact par défaut se choisit parmi les contacts liés (à l'ouverture
+    // de la fiche) ; un contact par défaut enregistré mais non lié reste
+    // proposé.
+    private List<(string Id, string Label)> DefaultChoices
+    {
+        get
+        {
+            var contacts = Initial?.PointContacts ?? [];
+            var choices = new List<(string, string)>();
+            if (_form.IDCONTACTS_DEFAUTS.Length > 0 && !contacts.Any(pc => pc.IDCONTACTS == _form.IDCONTACTS_DEFAUTS))
+            {
+                choices.Add((_form.IDCONTACTS_DEFAUTS, FullName(Initial?.ContactDefauts?.Prenom_contact, Initial?.ContactDefauts?.Nom_contact)));
+            }
+            choices.AddRange(contacts.Where(pc => !string.IsNullOrEmpty(pc.IDCONTACTS)).Select(pc => (pc.IDCONTACTS!, FullName(pc.Contact?.Prenom_contact, pc.Contact?.Nom_contact))));
+            return choices;
+        }
+    }
+
+    private AdresseValues AdresseValue => new(_form.Adresse1, _form.Adresse2, _form.Adresse3, _form.CP, _form.Localite, _form.Pays, _form.Pays_full_name);
+
+    private void SetAdresse(AdresseValues a)
+    {
+        (_form.Adresse1, _form.Adresse2, _form.Adresse3, _form.CP, _form.Localite, _form.Pays, _form.Pays_full_name) =
+            (a.Adresse1, a.Adresse2, a.Adresse3, a.CP, a.Localite, a.Pays, a.Pays_full_name);
+    }
+
+    // Choisir une société reprend son nom (modifiable ensuite).
+    private void SelectSociete(string id)
+    {
+        var societe = Societes.FirstOrDefault(s => s.IDSOCIETES == id);
+        _form.IDSOCIETES = id;
+        if (societe?.Nom_societe is { } nom) _form.Nom_societe = nom.Length > 50 ? nom[..50] : nom;
+    }
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            Libelle = Initial?.Libelle ?? "",
+            Nom_societe = Initial?.Nom_societe ?? "",
+            Telephone = Initial?.Telephone ?? "",
+            IDSOCIETES = Initial?.IDSOCIETES ?? "",
+            Archive = Initial?.Archive ?? 0,
+            Lien_googleMap = Initial?.Lien_googleMap ?? "",
+            Instruction = Initial?.Instruction ?? "",
+            IDCONTACTS_DEFAUTS = Initial?.IDCONTACTS_DEFAUTS ?? "",
+            Horaires = [.. (Initial?.Horaires ?? []).Select(h => new PointHoraires.Horaire(h.Jour_semaine, h.Heure_debut, h.Heure_fin))],
+        };
+        SetAdresse(AdresseValues.From(Initial?.Adresse));
+        if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            var dto = FormModel.ToDto<CreatePointDto>(_form);
+            dto.Libelle = Libelle;
+            dto.Horaires = _form.Horaires.Select(h => new HorairePointDto { Jour_semaine = h.Jour_semaine, Heure_debut = h.Heure_debut, Heure_fin = h.Heure_fin }).ToList();
+            await OnSubmit(dto);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

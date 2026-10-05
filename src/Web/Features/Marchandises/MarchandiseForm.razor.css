@@ -1,0 +1,70 @@
+/* Fiche marchandise : cartes « Marchandise » (nom + couleur planning) et
+   « Déchets » (déchet lié, en lecture seule, choisi via la recherche). */
+.fiche ::deep .mf-section + .mf-section {
+  margin-top: 0.75rem;
+}
+
+.mf-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 0.6rem 1.5rem;
+}
+
+.mf-dechet {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.mf-dechet-code {
+  max-width: 13rem;
+}
+
+.mf-dechet-actions {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.mf-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--brand);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.mf-icon-btn:hover:not(:disabled) {
+  background: var(--brand-bg);
+}
+
+.mf-icon-btn--remove {
+  color: var(--danger);
+}
+
+.mf-icon-btn--remove:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+.mf-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.mf-icon-btn:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 1px;
+}
+
+@media (max-width: 480px) {
+  .mf-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,360 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject ApiClient Api
+
+@* Fiche contact, en création (Initial null) ou en modification (fiche
+   complète chargée par CrudPage). Utilisée aussi par les onglets Contacts des
+   fiches Société et Point. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+
+    <FicheHero Title="@(FullName.Length > 0 ? FullName : Initial is not null ? "Sans nom" : "Nouveau contact")"
+               Subtitle="@(Subtitle.Length > 0 ? Subtitle : "Renseignez l’identité et l’entreprise ci-dessous")">
+        <Badge>
+            <span class="fiche-avatar@(_form.Personne_physique == 1 ? string.Empty : " fiche-avatar--icon")" aria-hidden="true">
+                @if (_form.Personne_physique == 1)
+                {
+                    @Initials(_form.Prenom_contact, _form.Nom_contact)
+                }
+                else
+                {
+                    <Icon Name="fiche.Building" />
+                }
+            </span>
+        </Badge>
+        <Actions>
+            @if (_form.E_mail.Trim().Length > 0)
+            {
+                <a class="btn sm" href="@($"mailto:{_form.E_mail.Trim()}")" title="@($"Écrire à {_form.E_mail.Trim()}")"><Icon Name="fiche.Mail" /> Email</a>
+            }
+            @if (Phone.Trim().Length > 0)
+            {
+                <a class="btn sm" href="@($"tel:{PhoneDigits(Phone)}")" title="@($"Appeler le {Phone}")"><Icon Name="fiche.Phone" /> Appeler</a>
+            }
+        </Actions>
+    </FicheHero>
+
+    <div class="fiche-columns">
+        <div class="fiche-column">
+            <FicheSection Title="Renseignements">
+                <Aside>
+                    <FicheSwitch Label="Personne physique" Checked="@(_form.Personne_physique == 1)" CheckedChanged="on => _form.Personne_physique = on ? 1 : 0" />
+                </Aside>
+                <ChildContent>
+                    <div class="fiche-grid cf-grid--identity">
+                        <FicheField Label="Civilité">
+                            <select value="@_form.Civilite" @onchange="e => _form.Civilite = (string)e.Value!">
+                                <option value="">—</option>
+                                @foreach (var c in Civilites)
+                                {
+                                    <option @key="c" value="@c">@c</option>
+                                }
+                            </select>
+                        </FicheField>
+                        <FicheField Label="Nom"><input value="@_form.Nom_contact" maxlength="50" autocomplete="off" @oninput="e => _form.Nom_contact = (string)e.Value!" /></FicheField>
+                        <FicheField Label="Prénom"><input value="@_form.Prenom_contact" maxlength="50" autocomplete="off" @oninput="e => _form.Prenom_contact = (string)e.Value!" /></FicheField>
+                    </div>
+                </ChildContent>
+            </FicheSection>
+
+            <FicheSection Title="Entreprise">
+                <div class="fiche-grid">
+                    <FicheField Label="Société" Wide="true">
+                        <select value="@_form.IDSOCIETES" @onchange="e => _form.IDSOCIETES = (string)e.Value!">
+                            <option value="">— Aucune —</option>
+                            @foreach (var s in Societes)
+                            {
+                                <SelectOption @key="s.IDSOCIETES" Value="@s.IDSOCIETES" Current="@_form.IDSOCIETES">@s.Nom_societe</SelectOption>
+                            }
+                        </select>
+                    </FicheField>
+                    @if (_form.IDSOCIETES.Length > 0)
+                    {
+                        <FicheField Label="Fonction">
+                            <input value="@_form.Fonction_contact" maxlength="50" list="cf-fonctions" placeholder="Ex. Directeur Général" @oninput="e => _form.Fonction_contact = (string)e.Value!" />
+                            <datalist id="cf-fonctions">
+                                @foreach (var f in Fonctions)
+                                {
+                                    <option @key="f" value="@f"></option>
+                                }
+                            </datalist>
+                        </FicheField>
+                        <FicheField Label="Service"><input value="@_form.Service_bureau" maxlength="50" placeholder="Ex. Comptabilité" @oninput="e => _form.Service_bureau = (string)e.Value!" /></FicheField>
+                    }
+                </div>
+                @if (AutresSocietes.Count > 0)
+                {
+                    <div class="cf-links">
+                        <span class="cf-links-label">Autres sociétés</span>
+                        <ul class="fiche-chips">
+                            @foreach (var sc in AutresSocietes)
+                            {
+                                <li class="fiche-chip">
+                                    @(sc.Societe?.Nom_societe ?? "—")
+                                    @if (!string.IsNullOrEmpty(sc.Fonction_contact))
+                                    {
+                                        <small>@sc.Fonction_contact</small>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </FicheSection>
+
+            <FicheSection Title="Commentaires">
+                <textarea value="@_form.Remarque" maxlength="200" class="control" rows="5" aria-label="Commentaires" placeholder="Notes internes sur ce contact…"
+                          @oninput="e => _form.Remarque = (string)e.Value!"></textarea>
+                <span class="fiche-counter">@_form.Remarque.Length / 200</span>
+            </FicheSection>
+        </div>
+
+        <div class="fiche-column">
+            <FicheSection Title="Coordonnées">
+                <div class="fiche-grid">
+                    <FicheField Label="Téléphone fixe"><input type="tel" value="@_form.Telephone_fixe" maxlength="50" placeholder="+32 …" @oninput="e => _form.Telephone_fixe = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Téléphone portable"><input type="tel" value="@_form.Telephone_portable" maxlength="50" placeholder="+32 …" @oninput="e => _form.Telephone_portable = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Téléphone autre"><input type="tel" value="@_form.Telephone_autre" maxlength="50" @oninput="e => _form.Telephone_autre = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Description"><input value="@_form.description_telephone" maxlength="50" placeholder="Ex. Standard, domicile…" @oninput="e => _form.description_telephone = (string)e.Value!" /></FicheField>
+                    <FicheField Label="Email" Wide="true"><input type="email" value="@_form.E_mail" maxlength="100" placeholder="nom@entreprise.com" @oninput="e => _form.E_mail = (string)e.Value!" /></FicheField>
+                </div>
+            </FicheSection>
+
+            <FicheSection Title="Adresse">
+                <Aside>
+                    <FicheSwitch Label="Adresse de l’entreprise" Checked="@(_form.Adresse_entreprise == 1)" CheckedChanged="on => _form.Adresse_entreprise = on ? 1 : 0" />
+                </Aside>
+                <ChildContent>
+                    @if (_form.Adresse_entreprise == 1)
+                    {
+                        @CompanyAddress(Societe?.Nom_societe, _form.IDSOCIETES.Length > 0 ? SocieteAdresse : (true, null))
+                    }
+                    else
+                    {
+                        <AdresseFields Value="Adresse" OnChange="SetAdresse" />
+                    }
+                </ChildContent>
+            </FicheSection>
+
+            @if (Initial is not null && Initial.PointContacts.Count > 0)
+            {
+                <FicheSection Title="Points liés">
+                    <ul class="fiche-chips">
+                        @foreach (var pc in Initial.PointContacts)
+                        {
+                            <li class="fiche-chip">
+                                @(pc.Point?.Libelle ?? "—")
+                                @if (!string.IsNullOrEmpty(pc.Lien))
+                                {
+                                    <small>@pc.Lien</small>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </FicheSection>
+            }
+        </div>
+    </div>
+</form>
+
+@code {
+    private static readonly string[] CivilitesConnues = ["Monsieur", "Madame", "Mademoiselle"];
+
+    // Suggestions seulement : la fonction reste en texte libre.
+    private static readonly string[] Fonctions =
+        ["Directeur Général", "Gérant", "Directeur", "Responsable logistique", "Responsable exploitation", "Comptable", "Commercial", "Assistant(e)", "Secrétaire"];
+
+    // Champs envoyés à l'API (CreateContactDto). Personne_physique /
+    // Adresse_entreprise sont des codes 0/1. IDSOCIETES : société principale
+    // (lien SocieteContacts géré par l'API), "" = aucune. L'adresse propre du
+    // contact est aplatie, enregistrée à part par l'API.
+    public sealed class Model
+    {
+        public string Civilite { get; set; } = "";
+        public string Nom_contact { get; set; } = "";
+        public string Prenom_contact { get; set; } = "";
+        public string Telephone_portable { get; set; } = "";
+        public string Telephone_fixe { get; set; } = "";
+        public string Telephone_autre { get; set; } = "";
+        public string E_mail { get; set; } = "";
+        public string Remarque { get; set; } = "";
+        public double Personne_physique { get; set; }
+        public double Adresse_entreprise { get; set; }
+        public string description_telephone { get; set; } = "";
+        public string IDSOCIETES { get; set; } = "";
+        public string Fonction_contact { get; set; } = "";
+        public string Service_bureau { get; set; } = "";
+        public string Adresse1 { get; set; } = "";
+        public string Adresse2 { get; set; } = "";
+        public string Adresse3 { get; set; } = "";
+        public string CP { get; set; } = "";
+        public string Localite { get; set; } = "";
+        public string Pays { get; set; } = "";
+        public string Pays_full_name { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+    // Adresse chargée, avec l'id de sa société : une adresse d'une autre
+    // société que celle choisie compte comme « en cours de chargement ».
+    private (string Id, SocieteAdresseLignes? Adresse)? _loadedAdresse;
+    private string? _adresseRequestedFor;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public ContactDetail? Initial { get; set; }
+
+    // Sociétés pour la liste « Société », chargées par la page.
+    [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
+
+    // Société présélectionnée en création (onglet Contacts de la fiche
+    // Société, projection) — ignorée en modification.
+    [Parameter] public string? DefaultSocieteId { get; set; }
+    [Parameter] public Func<CreateContactDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private List<ContactDetailSociete> AutresSocietes => Initial?.SocieteContacts.Skip(1).ToList() ?? [];
+
+    // Une civilité enregistrée mais absente de la liste reste proposée, pour
+    // ne pas être perdue à l'enregistrement.
+    private IEnumerable<string> Civilites =>
+        _form.Civilite.Length > 0 && !CivilitesConnues.Contains(_form.Civilite) ? [_form.Civilite, .. CivilitesConnues] : CivilitesConnues;
+
+    private Societe? Societe => Societes.FirstOrDefault(s => s.IDSOCIETES == _form.IDSOCIETES);
+
+    private string FullName => string.Join(' ', new[] { _form.Prenom_contact, _form.Nom_contact }.Where(v => v.Trim().Length > 0));
+
+    private string Subtitle => FormModel.JoinNonEmpty(" · ", _form.Fonction_contact, Societe?.Nom_societe);
+
+    private string Phone => _form.Telephone_portable.Length > 0 ? _form.Telephone_portable : _form.Telephone_fixe;
+
+    private static string PhoneDigits(string phone) => new([.. phone.Where(c => char.IsAsciiDigit(c) || c == '+')]);
+
+    private static string Initials(string prenom, string nom)
+    {
+        var initials = $"{prenom.Trim().FirstOrDefault()}{nom.Trim().FirstOrDefault()}".Replace("\0", "").ToUpperInvariant();
+        return initials.Length > 0 ? initials : "?";
+    }
+
+    private AdresseValues Adresse => new(_form.Adresse1, _form.Adresse2, _form.Adresse3, _form.CP, _form.Localite, _form.Pays, _form.Pays_full_name);
+
+    private void SetAdresse(AdresseValues a)
+    {
+        (_form.Adresse1, _form.Adresse2, _form.Adresse3, _form.CP, _form.Localite, _form.Pays, _form.Pays_full_name) =
+            (a.Adresse1, a.Adresse2, a.Adresse3, a.CP, a.Localite, a.Pays, a.Pays_full_name);
+    }
+
+    // (chargée, adresse) : non chargée pendant le chargement ; adresse null
+    // si la société n'en a pas.
+    private (bool Loaded, SocieteAdresseLignes? Adresse) SocieteAdresse =>
+        _loadedAdresse is { } loaded && loaded.Id == _form.IDSOCIETES ? (true, loaded.Adresse) : (false, null);
+
+    private static RenderFragment CompanyAddress(string? societe, (bool Loaded, SocieteAdresseLignes? Adresse) adresse) => __builder =>
+    {
+        if (societe is null)
+        {
+            <p class="fiche-empty">Choisissez une société dans « Entreprise » pour reprendre son adresse.</p>
+            return;
+        }
+        if (!adresse.Loaded)
+        {
+            <p class="fiche-empty">Chargement de l’adresse…</p>
+            return;
+        }
+        var ville = FormModel.JoinNonEmpty(" ", adresse.Adresse?.CP, adresse.Adresse?.Localite);
+        var lines = new[] { adresse.Adresse?.Adresse1, ville }.Where(l => !string.IsNullOrEmpty(l)).ToList();
+        <div class="cf-company-address">
+            <strong>@societe</strong>
+            @if (lines.Count > 0)
+            {
+                foreach (var line in lines)
+                {
+                    <span @key="line">@line</span>
+                }
+            }
+            else
+            {
+                <span class="fiche-empty">Aucune adresse renseignée pour cette société.</span>
+            }
+        </div>
+    };
+
+    protected override void OnInitialized()
+    {
+        var principal = Initial?.SocieteContacts.FirstOrDefault();
+        _form = new Model
+        {
+            Civilite = Initial?.Civilite ?? "",
+            Nom_contact = Initial?.Nom_contact ?? "",
+            Prenom_contact = Initial?.Prenom_contact ?? "",
+            Telephone_portable = Initial?.Telephone_portable ?? "",
+            Telephone_fixe = Initial?.Telephone_fixe ?? "",
+            Telephone_autre = Initial?.Telephone_autre ?? "",
+            E_mail = Initial?.E_mail ?? "",
+            Remarque = Initial?.Remarque ?? "",
+            Personne_physique = Initial?.Personne_physique ?? 1,
+            Adresse_entreprise = Initial?.Adresse_entreprise ?? 0,
+            description_telephone = Initial?.description_telephone ?? "",
+            IDSOCIETES = Initial is not null ? principal?.IDSOCIETES ?? "" : DefaultSocieteId ?? "",
+            Fonction_contact = principal?.Fonction_contact ?? "",
+            Service_bureau = principal?.Service_bureau ?? "",
+        };
+        SetAdresse(AdresseValues.From(Initial?.Adresse));
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+        await LoadCompanyAddressAsync();
+    }
+
+    // Adresse de la société principale, affichée à la place de l'adresse du
+    // contact quand « Adresse de l'entreprise » est activé.
+    private async Task LoadCompanyAddressAsync()
+    {
+        if (_form.Adresse_entreprise != 1 || _form.IDSOCIETES.Length == 0)
+        {
+            // Rechargée si on réactive l'option (comme l'effet d'origine).
+            _adresseRequestedFor = null;
+            return;
+        }
+        if (_adresseRequestedFor == _form.IDSOCIETES) return;
+        var id = _adresseRequestedFor = _form.IDSOCIETES;
+        try
+        {
+            var json = await Api.GetAsync<SocieteAdresse>($"societes/{id}");
+            if (_adresseRequestedFor == id) _loadedAdresse = (id, json.Adresse);
+        }
+        catch (Exception)
+        {
+            if (_adresseRequestedFor == id) _loadedAdresse = (id, null);
+        }
+        StateHasChanged();
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateContactDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

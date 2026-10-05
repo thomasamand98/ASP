@@ -1,0 +1,47 @@
+.mf-picker {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.mf-picker-list {
+  max-height: 14rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  list-style: none;
+}
+
+.mf-picker-list button {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mf-picker-list button:hover,
+.mf-picker-list button:focus-visible {
+  background: var(--brand-bg);
+  outline: none;
+}
+
+.mf-picker-code {
+  flex: none;
+  min-width: 5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.mf-picker-empty {
+  padding: 0.5rem 0.55rem;
+  color: var(--text);
+  font-size: 0.85rem;
+}

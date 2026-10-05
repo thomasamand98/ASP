@@ -15,7 +15,7 @@ public sealed class EnumerationLabels(ApiClient api)
     {
         try
         {
-            var json = await api.GetAsync<Response>($"enumerations?categorie={Uri.EscapeDataString(categorie)}");
+            var json = await api.GetAsync<Response>($"enumerations?categorie={Horizon.Web.Common.Js.EncodeUriComponent(categorie)}");
             var labels = new Dictionary<string, string>();
             foreach (var e in json.enumerations)
             {

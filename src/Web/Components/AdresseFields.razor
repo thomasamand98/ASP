@@ -79,7 +79,7 @@
         try
         {
             await Task.Delay(300, token);
-            _villes = (await Api.GetAsync<VillesResponse>($"villes?cp={Uri.EscapeDataString(cp)}")).villes;
+            _villes = (await Api.GetAsync<VillesResponse>($"villes?cp={Js.EncodeUriComponent(cp)}")).villes;
         }
         catch (Exception)
         {

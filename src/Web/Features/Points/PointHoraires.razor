@@ -1,0 +1,87 @@
+@* Semaine d'ouverture d'un point : une colonne par jour, plages éditables
+   sur place. Les plages sont gardées dans l'ordre de saisie ; l'API les
+   renvoie triées par jour puis par heure de début. Jour_semaine 1 = lundi
+   … 7 = dimanche. *@
+<div class="pt-week">
+    <div class="pt-week-days">
+        @foreach (var (jour, court, nom) in Jours)
+        {
+            var slots = ByDay(jour);
+            <div @key="jour" class="pt-day@(slots.Count > 0 ? string.Empty : " is-closed")" role="group" aria-label="@nom">
+                <span class="pt-day-name" title="@nom">@court</span>
+                @if (slots.Count == 0)
+                {
+                    <span class="pt-day-closed">Fermé</span>
+                }
+                @for (var i = 0; i < slots.Count; i++)
+                {
+                    var slot = slots[i];
+                    var numero = i + 1;
+                    <div class="pt-slot">
+                        <input type="time" value="@slot.Heure_debut" required aria-label="@($"{nom}, début de la plage {numero}")"
+                               @oninput="e => Update(slot, debut: (string)e.Value!)" />
+                        <input type="time" value="@slot.Heure_fin" required min="@slot.Heure_debut" aria-label="@($"{nom}, fin de la plage {numero}")"
+                               @oninput="e => Update(slot, fin: (string)e.Value!)" />
+                        <button type="button" class="pt-slot-remove" title="Retirer cette plage" aria-label="@($"Retirer la plage {numero} du {nom.ToLowerInvariant()}")"
+                                @onclick="() => ValueChanged.InvokeAsync([.. Value.Where(h => !ReferenceEquals(h, slot))])">
+                            <Icon Name="fiche.Close" />
+                        </button>
+                    </div>
+                }
+                <button type="button" class="pt-day-add" @onclick="() => ValueChanged.InvokeAsync([.. Value, NextSlot(slots, jour)])"
+                        aria-label="@($"Ajouter une plage le {nom.ToLowerInvariant()}")">
+                    <Icon Name="fiche.Plus" /> Plage
+                </button>
+            </div>
+        }
+    </div>
+    @if (ByDay(1).Count > 0)
+    {
+        <button type="button" class="btn ghost sm pt-week-copy" @onclick="CopyMondayToWeekdays">
+            Appliquer le lundi à toute la semaine (lun → ven)
+        </button>
+    }
+</div>
+
+@code {
+    private static readonly (int Jour, string Court, string Nom)[] Jours =
+    [
+        (1, "Lun", "Lundi"), (2, "Mar", "Mardi"), (3, "Mer", "Mercredi"), (4, "Jeu", "Jeudi"),
+        (5, "Ven", "Vendredi"), (6, "Sam", "Samedi"), (7, "Dim", "Dimanche"),
+    ];
+
+    // Plage modifiable : référence propre à chaque plage (une plage
+    // modifiée est remplacée par une nouvelle, comme dans le front d'origine).
+    public sealed record Horaire(int Jour_semaine, string Heure_debut, string Heure_fin);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Horaire> Value { get; set; } = [];
+    [Parameter] public EventCallback<List<Horaire>> ValueChanged { get; set; }
+
+    private List<Horaire> ByDay(int jour) => [.. Value.Where(h => h.Jour_semaine == jour)];
+
+    private Task Update(Horaire target, string? debut = null, string? fin = null) =>
+        ValueChanged.InvokeAsync([.. Value.Select(h => ReferenceEquals(h, target)
+            ? h with { Heure_debut = debut ?? h.Heure_debut, Heure_fin = fin ?? h.Heure_fin }
+            : h)]);
+
+    // Nouvelle plage : 8h-12h, ou à la suite de la dernière du jour.
+    private static Horaire NextSlot(List<Horaire> daySlots, int jour)
+    {
+        if (daySlots.Count == 0) return new Horaire(jour, "08:00", "12:00");
+        var parts = daySlots[^1].Heure_fin.Split(':');
+        var h = (int)JsNumber.Parse(parts[0]);
+        var m = (int)JsNumber.Parse(parts.Length > 1 ? parts[1] : "");
+        var start = Math.Min(h + 1, 22);
+        return new Horaire(jour, $"{start:00}:{m:00}", $"{Math.Min(start + 4, 23):00}:{m:00}");
+    }
+
+    // Reporte les plages du lundi sur mardi → vendredi.
+    private Task CopyMondayToWeekdays()
+    {
+        var lundi = ByDay(1);
+        return ValueChanged.InvokeAsync([
+            .. Value.Where(h => h.Jour_semaine == 1 || h.Jour_semaine > 5),
+            .. new[] { 2, 3, 4, 5 }.SelectMany(jour => lundi.Select(h => h with { Jour_semaine = jour })),
+        ]);
+    }
+}

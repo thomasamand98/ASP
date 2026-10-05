@@ -1,0 +1,35 @@
+/* Fiche point (voir PointForm.razor, PointHoraires.razor) — mise en page
+   commune dans components/FicheLayout.css, seuls les cas propres au point
+   ici. */
+
+.pt-form {
+  display: contents;
+}
+
+/* Onglet Principale : colonnes puis plage horaire. */
+.pt-principal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pt-archived {
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Carte ---------- */
+
+.pt-map {
+  width: 100%;
+  height: min(26rem, 55vh);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
