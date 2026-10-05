@@ -1,0 +1,78 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Formulaire de la modale de création/modification d'une catégorie (voir
+   EnumerationsPage). `Initial` vaut null en création. Le nom technique
+   (`Nom`) d'une catégorie système est verrouillé : le code applicatif la
+   retrouve par ce nom. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="enum-form">
+    <label class="field">
+        Libellé affiché
+        <input @ref="_first" value="@_form.Nom_affiche" @oninput="e => _form.Nom_affiche = (string)e.Value!" maxlength="50" required />
+    </label>
+    <label class="field">
+        Nom technique
+        <input value="@_form.Nom" @oninput="e => _form.Nom = (string)e.Value!" maxlength="50" required disabled="@IsSystem" placeholder="ex. type_vehicule" />
+        @if (IsSystem)
+        {
+            <span class="field-hint">Catégorie système : le nom technique ne peut pas être modifié.</span>
+        }
+    </label>
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+</form>
+
+@code {
+    private sealed class Model
+    {
+        public string Nom { get; set; } = "";
+        public string Nom_affiche { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private ElementReference _first;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public CategorieEnumeration? Initial { get; set; }
+    [Parameter] public Func<CreateCategorieEnumerationDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private bool IsSystem => Initial?.Enum_system is { } s && s != 0;
+
+    protected override void OnInitialized()
+    {
+        _form = new Model { Nom = Initial?.Nom ?? "", Nom_affiche = Initial?.Nom_affiche ?? "" };
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await _guard.TrackAsync(_formRef);
+        await Browser.FocusAsync(_first);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(new CreateCategorieEnumerationDto { Nom = _form.Nom.Trim(), Nom_affiche = _form.Nom_affiche.Trim() });
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

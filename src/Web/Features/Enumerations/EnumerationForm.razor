@@ -1,0 +1,107 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Formulaire de la modale de création/modification d'une valeur (voir
+   EnumerationsPage). `Initial` vaut null en création. La `Valeur` d'une
+   valeur système est verrouillée : le code applicatif la compare telle
+   quelle. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="enum-form">
+    <label class="field">
+        Valeur affichée
+        <input @ref="_first" value="@_form.Valeur_affiche" @oninput="e => _form.Valeur_affiche = (string)e.Value!" maxlength="150" required />
+    </label>
+    <label class="field">
+        Valeur
+        <input value="@_form.Valeur" @oninput="e => _form.Valeur = (string)e.Value!" maxlength="150" disabled="@IsSystem" />
+        @if (IsSystem)
+        {
+            <span class="field-hint">Valeur système : la valeur ne peut pas être modifiée.</span>
+        }
+    </label>
+    <label class="field">
+        Valeur associée
+        <input value="@_form.Valeur_associee" @oninput="e => _form.Valeur_associee = (string)e.Value!" maxlength="150" />
+    </label>
+    <label class="field enum-field-narrow">
+        Ordre
+        <input type="number" value="@JsNumber.ToString(_form.Ordre)" @oninput="e => _form.Ordre = JsNumber.Parse((string)e.Value!)" />
+    </label>
+    <label class="enum-checkbox">
+        <input type="checkbox" checked="@(_form.Valeur_system == 1)" @onchange="e => _form.Valeur_system = (bool)e.Value! ? 1 : 0" />
+        Valeur système
+        <span class="field-hint">Utilisée par l'application : elle ne peut pas être supprimée.</span>
+    </label>
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+</form>
+
+@code {
+    private sealed class Model
+    {
+        public string IDCATEGORIES_ENUMERATION { get; set; } = "";
+        public string Valeur_affiche { get; set; } = "";
+        public string Valeur { get; set; } = "";
+        public double Ordre { get; set; }
+        public string Valeur_associee { get; set; } = "";
+        public double Valeur_system { get; set; }
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private ElementReference _first;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter, EditorRequired] public string CategorieId { get; set; } = "";
+
+    // Ordre proposé à la création (dernier ordre de la catégorie + 1).
+    [Parameter] public double DefaultOrdre { get; set; }
+    [Parameter] public Enumeration? Initial { get; set; }
+    [Parameter] public Func<CreateEnumerationDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private bool IsSystem => Initial?.Valeur_system is { } s && s != 0;
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            IDCATEGORIES_ENUMERATION = CategorieId,
+            Valeur_affiche = Initial?.Valeur_affiche ?? "",
+            Valeur = Initial?.Valeur ?? "",
+            Ordre = Initial?.Ordre ?? DefaultOrdre,
+            Valeur_associee = Initial?.Valeur_associee ?? "",
+            Valeur_system = Initial?.Valeur_system ?? 0,
+        };
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await _guard.TrackAsync(_formRef);
+        await Browser.FocusAsync(_first);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateEnumerationDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

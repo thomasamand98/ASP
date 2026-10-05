@@ -1,2 +1,409 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : EnumerationsPage</p>
+@using System.Globalization
+@using System.Text
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Page « Énumérations » du groupe Configuration : liste des catégories à
+   gauche, valeurs de la catégorie sélectionnée à droite (maître/détail).
+   Pas de CrudPage : deux tables liées ne rentrent pas dans son modèle « une
+   table, une fiche » — les modales (Modal) sont en revanche les mêmes. *@
+@if (_loading)
+{
+    <p>Chargement des énumérations...</p>
+}
+else if (_error is not null)
+{
+    <p>Erreur : @_error <button type="button" class="btn" @onclick="LoadCategoriesAsync">Réessayer</button></p>
+}
+else
+{
+    <div class="enum-page">
+        <div class="page-header">
+            <h2>Énumérations</h2>
+            <button type="button" class="btn primary" @onclick="() => _categorieModal = new ModalState<CategorieEnumeration>(null)">
+                <Icon Name="enumerations.Plus" />
+                Nouvelle catégorie
+            </button>
+        </div>
+
+        <div class="enum-layout">
+            <aside class="enum-card enum-categories" aria-label="Catégories">
+                <label class="enum-search">
+                    <Icon Name="enumerations.Search" />
+                    <input type="search" value="@_categorySearch" @oninput="e => _categorySearch = (string)e.Value!" placeholder="Rechercher une catégorie" aria-label="Rechercher une catégorie" />
+                </label>
+                <ul class="enum-category-list">
+                    @foreach (var c in VisibleCategories)
+                    {
+                        <li @key="c.IDCATEGORIES_ENUMERATION">
+                            <button type="button" class="enum-category" aria-current="@(c.IDCATEGORIES_ENUMERATION == ActiveId ? "true" : "false")" @onclick="() => SelectCategoryAsync(c.IDCATEGORIES_ENUMERATION)">
+                                <span class="enum-category-text">
+                                    <span class="enum-category-label">@Label(c)</span>
+                                    <span class="enum-category-name">@c.Nom</span>
+                                </span>
+                                @if (IsSet(c.Enum_system))
+                                {
+                                    <span class="enum-lock" title="Catégorie système"><Icon Name="enumerations.Lock" /></span>
+                                }
+                                <span class="enum-count">@c._count.Enumerations</span>
+                            </button>
+                        </li>
+                    }
+                    @if (!VisibleCategories.Any())
+                    {
+                        <li class="enum-empty-small">Aucune catégorie trouvée</li>
+                    }
+                </ul>
+            </aside>
+
+            <section class="enum-card enum-values" aria-label="Valeurs de la catégorie">
+                @if (Selected is { } selected)
+                {
+                    @ValuesPanel(selected)
+                }
+                else
+                {
+                    <div class="enum-empty">
+                        <Icon Name="enumerations.List" />
+                        <p>Aucune catégorie. Créez-en une pour commencer.</p>
+                    </div>
+                }
+            </section>
+        </div>
+
+        @if (_categorieModal is { } categorieModal)
+        {
+            <Modal Title="@(categorieModal.Item is null ? "Nouvelle catégorie" : "Modifier la catégorie")" OnClose="CloseCategorieModal">
+                <CategorieEnumerationForm Initial="categorieModal.Item" OnSubmit="SaveCategorieAsync" OnCancel="CloseCategorieModal" />
+            </Modal>
+        }
+        @if (_enumerationModal is { } enumerationModal && ActiveId is { } activeId)
+        {
+            <Modal Title="@(enumerationModal.Item is null ? "Nouvelle valeur" : "Modifier la valeur")" OnClose="CloseEnumerationModal">
+                <EnumerationForm CategorieId="@activeId" DefaultOrdre="NextOrdre" Initial="enumerationModal.Item" OnSubmit="SaveEnumerationAsync" OnCancel="CloseEnumerationModal" />
+            </Modal>
+        }
+    </div>
+}
+
+@code {
+    // Modale ouverte : création (Item null) ou modification de l'élément.
+    private sealed record ModalState<T>(T? Item);
+
+    private List<CategorieEnumeration> _categories = [];
+    private List<Enumeration> _enumerations = [];
+    private string? _selectedId;
+    private string _categorySearch = "";
+    private string _valueSearch = "";
+    private bool _loading = true;
+    private string? _error;
+    // Valeurs de la catégorie « _valuesFor » : tant qu'elle ne correspond pas à
+    // la catégorie active, `loadingValues` est vrai et la liste vide — jamais
+    // les valeurs de la catégorie précédente, ni une réponse arrivée en retard.
+    private string? _valuesFor;
+    private string? _valuesError;
+    private int _valuesToken;
+    private ModalState<CategorieEnumeration>? _categorieModal;
+    private ModalState<Enumeration>? _enumerationModal;
+
+    // Minuscules sans accents, pour que « etat » retrouve « État de la facture ».
+    private static string Normalize(string? value)
+    {
+        var builder = new StringBuilder();
+        foreach (var c in (value ?? "").Normalize(NormalizationForm.FormD))
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) builder.Append(c);
+        }
+        return builder.ToString().ToLowerInvariant();
+    }
+
+    private static string Label(CategorieEnumeration c) => string.IsNullOrEmpty(c.Nom_affiche) ? c.Nom ?? "" : c.Nom_affiche;
+
+    private static bool IsSet(double? flag) => flag is { } f && f != 0;
+
+    // La sélection retombe sur la première catégorie tant que l'id choisi
+    // n'existe pas (premier chargement, ou catégorie supprimée).
+    private string? ActiveId => _categories.Any(c => c.IDCATEGORIES_ENUMERATION == _selectedId) ? _selectedId : _categories.FirstOrDefault()?.IDCATEGORIES_ENUMERATION;
+
+    private CategorieEnumeration? Selected => _categories.FirstOrDefault(c => c.IDCATEGORIES_ENUMERATION == ActiveId);
+
+    private bool LoadingValues => ActiveId is not null && _valuesFor != ActiveId;
+
+    private IEnumerable<CategorieEnumeration> VisibleCategories
+    {
+        get
+        {
+            var query = Normalize(_categorySearch);
+            return _categories.Where(c => Normalize(c.Nom_affiche).Contains(query) || Normalize(c.Nom).Contains(query));
+        }
+    }
+
+    private List<Enumeration> VisibleEnumerations
+    {
+        get
+        {
+            var query = Normalize(_valueSearch);
+            return [.. _enumerations.Where(e => new[] { e.Valeur_affiche, e.Valeur, e.Valeur_associee }.Any(f => Normalize(f).Contains(query)))];
+        }
+    }
+
+    private double NextOrdre => _enumerations.Aggregate(-1d, (max, e) => Math.Max(max, e.Ordre ?? 0)) + 1;
+
+    // Même tri que l'API (Ordre puis libellé) — réappliqué localement après un
+    // create/update pour que la ligne modifiée retrouve sa place sans refaire
+    // d'appel API.
+    private static List<Enumeration> Sort(IEnumerable<Enumeration> list) =>
+        [.. list.OrderBy(e => e.Ordre ?? 0)
+            .ThenBy(e => e.Valeur_affiche ?? "", FormModel.French)
+            .ThenBy(e => JsNumber.Parse(e.IDENUMERATIONS))];
+
+    protected override Task OnInitializedAsync() => LoadCategoriesAsync();
+
+    private async Task LoadCategoriesAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+        try
+        {
+            _categories = (await Api.GetAsync<CategoriesEnumerationResponse>("categories-enumeration")).categories;
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        _loading = false;
+        if (_error is null) await EnsureValuesAsync();
+    }
+
+    // Charge les valeurs de la catégorie active si ce n'est pas déjà fait.
+    private async Task EnsureValuesAsync()
+    {
+        if (ActiveId is not { } id || _valuesFor == id) return;
+        await LoadValuesAsync(id);
+    }
+
+    private async Task LoadValuesAsync(string id)
+    {
+        var token = ++_valuesToken;
+        _valuesFor = null;
+        _valuesError = null;
+        _enumerations = [];
+        StateHasChanged();
+        List<Enumeration> items = [];
+        string? error = null;
+        try
+        {
+            items = (await Api.GetAsync<EnumerationsResponse>($"enumerations?categorieId={Js.EncodeUriComponent(id)}")).enumerations;
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+        }
+        if (token != _valuesToken) return;
+        _enumerations = items;
+        _valuesError = error;
+        _valuesFor = id;
+        StateHasChanged();
+    }
+
+    private async Task SelectCategoryAsync(string id)
+    {
+        _selectedId = id;
+        _valueSearch = "";
+        await EnsureValuesAsync();
+    }
+
+    // Le nombre de valeurs affiché à côté de la catégorie suit les
+    // création/suppression sans recharger la liste des catégories.
+    private void AdjustCount(string categorieId, int delta) =>
+        _categories = [.. _categories.Select(c => c.IDCATEGORIES_ENUMERATION == categorieId ? c with { _count = new CategorieEnumerationCount(c._count.Enumerations + delta) } : c)];
+
+    private Task CloseCategorieModal()
+    {
+        _categorieModal = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseEnumerationModal()
+    {
+        _enumerationModal = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveCategorieAsync(CreateCategorieEnumerationDto dto)
+    {
+        try
+        {
+            if (_categorieModal?.Item is { } item)
+            {
+                var updated = (await Api.SendJsonAsync<CategorieEnumeration>(HttpMethod.Patch, $"categories-enumeration/{item.IDCATEGORIES_ENUMERATION}", dto))!;
+                _categories = [.. _categories.Select(c => c.IDCATEGORIES_ENUMERATION == item.IDCATEGORIES_ENUMERATION ? updated : c)];
+            }
+            else
+            {
+                var created = (await Api.SendJsonAsync<CategorieEnumeration>(HttpMethod.Post, "categories-enumeration", dto))!;
+                _categories = [.. _categories, created];
+                await SelectCategoryAsync(created.IDCATEGORIES_ENUMERATION);
+            }
+            _categorieModal = null;
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de l'enregistrement : {e.Message}");
+        }
+        StateHasChanged();
+    }
+
+    private async Task DeleteCategorieAsync(CategorieEnumeration categorie)
+    {
+        if (!await Browser.ConfirmAsync($"Supprimer la catégorie « {(categorie.Nom_affiche ?? categorie.Nom)} » ?")) return;
+        try
+        {
+            await Api.SendAsync(HttpMethod.Delete, $"categories-enumeration/{categorie.IDCATEGORIES_ENUMERATION}");
+            _categories = [.. _categories.Where(c => c.IDCATEGORIES_ENUMERATION != categorie.IDCATEGORIES_ENUMERATION)];
+            await EnsureValuesAsync();
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de la suppression : {e.Message}");
+        }
+    }
+
+    private async Task SaveEnumerationAsync(CreateEnumerationDto dto)
+    {
+        try
+        {
+            if (_enumerationModal?.Item is { } item)
+            {
+                var updated = (await Api.SendJsonAsync<Enumeration>(HttpMethod.Patch, $"enumerations/{item.IDENUMERATIONS}", dto))!;
+                _enumerations = Sort(_enumerations.Select(e => e.IDENUMERATIONS == item.IDENUMERATIONS ? updated : e));
+            }
+            else
+            {
+                var created = (await Api.SendJsonAsync<Enumeration>(HttpMethod.Post, "enumerations", dto))!;
+                _enumerations = Sort([.. _enumerations, created]);
+                AdjustCount(dto.IDCATEGORIES_ENUMERATION.Value!, 1);
+            }
+            _enumerationModal = null;
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de l'enregistrement : {e.Message}");
+        }
+        StateHasChanged();
+    }
+
+    private async Task DeleteEnumerationAsync(Enumeration enumeration)
+    {
+        if (!await Browser.ConfirmAsync($"Supprimer la valeur « {(enumeration.Valeur_affiche ?? enumeration.Valeur)} » ?")) return;
+        try
+        {
+            await Api.SendAsync(HttpMethod.Delete, $"enumerations/{enumeration.IDENUMERATIONS}");
+            _enumerations = [.. _enumerations.Where(e => e.IDENUMERATIONS != enumeration.IDENUMERATIONS)];
+            if (ActiveId is { } id) AdjustCount(id, -1);
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de la suppression : {e.Message}");
+        }
+    }
+
+    private RenderFragment ValuesPanel(CategorieEnumeration selected) =>
+        @<text>
+            <header class="enum-values-header">
+                <div class="enum-values-title">
+                    <h3>@Label(selected)</h3>
+                    <span class="enum-category-name">@selected.Nom</span>
+                    @if (IsSet(selected.Enum_system))
+                    {
+                        <span class="enum-badge"><Icon Name="enumerations.Lock" /> Système</span>
+                    }
+                </div>
+                <div class="enum-values-actions">
+                    <button type="button" class="btn" @onclick="() => _categorieModal = new ModalState<CategorieEnumeration>(selected)">
+                        <Icon Name="enumerations.Edit" />
+                        Modifier
+                    </button>
+                    <button type="button" class="btn danger" @onclick="() => DeleteCategorieAsync(selected)" disabled="@(DeleteBlocker(selected) is not null)" title="@DeleteBlocker(selected)">
+                        <Icon Name="enumerations.Trash" />
+                        Supprimer
+                    </button>
+                    <button type="button" class="btn primary" @onclick="() => _enumerationModal = new ModalState<Enumeration>(null)">
+                        <Icon Name="enumerations.Plus" />
+                        Nouvelle valeur
+                    </button>
+                </div>
+            </header>
+
+            <label class="enum-search">
+                <Icon Name="enumerations.Search" />
+                <input type="search" value="@_valueSearch" @oninput="e => _valueSearch = (string)e.Value!" placeholder="Rechercher une valeur" aria-label="Rechercher une valeur" />
+            </label>
+
+            @{ var visible = VisibleEnumerations; }
+            @if (LoadingValues)
+            {
+                <p class="enum-empty">Chargement des valeurs...</p>
+            }
+            else if (_valuesError is not null)
+            {
+                <p class="enum-empty">Erreur : @_valuesError <button type="button" class="btn" @onclick="() => LoadValuesAsync(selected.IDCATEGORIES_ENUMERATION)">Réessayer</button></p>
+            }
+            else if (visible.Count == 0)
+            {
+                <div class="enum-empty">
+                    <Icon Name="enumerations.List" />
+                    <p>@(_enumerations.Count == 0 ? "Cette catégorie ne contient encore aucune valeur." : "Aucune valeur ne correspond à la recherche.")</p>
+                </div>
+            }
+            else
+            {
+                <div class="enum-table-wrapper">
+                    <table class="enum-table">
+                        <thead>
+                            <tr>
+                                <th>Valeur affichée</th>
+                                <th>Valeur</th>
+                                <th>Valeur associée</th>
+                                <th class="enum-num">Ordre</th>
+                                <th class="enum-check">Système</th>
+                                <th aria-label="Actions"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in visible)
+                            {
+                                <tr @key="e.IDENUMERATIONS" @ondblclick="() => _enumerationModal = new ModalState<Enumeration>(e)">
+                                    <td class="enum-cell-main" data-label="Valeur affichée">@e.Valeur_affiche</td>
+                                    <td data-label="Valeur">@e.Valeur</td>
+                                    <td data-label="Valeur associée">@e.Valeur_associee</td>
+                                    <td class="enum-num" data-label="Ordre">@(e.Ordre is { } o ? JsNumber.ToString(o) : "")</td>
+                                    <td class="enum-check" data-label="Système">
+                                        <input type="checkbox" checked="@IsSet(e.Valeur_system)" disabled aria-label="Valeur système" />
+                                    </td>
+                                    <td class="enum-row-actions">
+                                        <button type="button" class="icon-btn" @onclick="() => _enumerationModal = new ModalState<Enumeration>(e)" aria-label="Modifier" title="Modifier">
+                                            <Icon Name="enumerations.Edit" />
+                                        </button>
+                                        <button type="button" class="icon-btn danger" @onclick="() => DeleteEnumerationAsync(e)" disabled="@IsSet(e.Valeur_system)" aria-label="Supprimer"
+                                                title="@(IsSet(e.Valeur_system) ? "Une valeur système ne peut pas être supprimée" : "Supprimer")">
+                                            <Icon Name="enumerations.Trash" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <p class="enum-footer">@visible.Count / @_enumerations.Count valeur@(_enumerations.Count > 1 ? "s" : "")</p>
+        </text>;
+
+    private static string? DeleteBlocker(CategorieEnumeration selected) =>
+        IsSet(selected.Enum_system) ? "Une catégorie système ne peut pas être supprimée"
+        : selected._count.Enumerations > 0 ? "Supprimez d’abord les valeurs de cette catégorie"
+        : null;
+}
