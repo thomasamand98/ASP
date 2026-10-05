@@ -12,6 +12,9 @@
     <!-- Le framework Blazor WebAssembly et son serveur de développement. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.12" PrivateAssets="all" />
+    <!-- Remplace DOMPurify (JS) : nettoie le HTML d'un modèle de document
+         avant de le poser dans l'éditeur (règle n°5, pas de JS ajouté). -->
+    <PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
   </ItemGroup>
 
   <ItemGroup>

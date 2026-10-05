@@ -1,0 +1,353 @@
+@implements IAsyncDisposable
+@inject DocEditorJs DocEditor
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Éditeur d'un modèle de document : trois zones contentEditable côte à côte
+   dans une même page A4 — en-tête et pied de page, répétés sur chaque page à
+   l'impression, et le contenu principal, affiché une fois. Chaque zone
+   glisse-dépose ses propres champs de fusion (MergeFieldPalette) et blocs
+   répétables liés aux listes du contrat (Prestations...) — la palette et la
+   barre d'outils agissent sur la « zone active » (dernière zone où le
+   curseur se trouvait, voir OnActiveZoneChanged), pas nécessairement celle
+   qui a le focus au moment du clic (les boutons de la palette/barre
+   d'outils le lui font perdre). Le contenu de chaque zone est manipulé
+   directement en DOM, en JS (pas piloté par un état Blazor à chaque frappe)
+   pour ne pas perdre la position du curseur à chaque rendu — voir
+   interop.js, docEditor. *@
+<div class="dte">
+    <EditorToolbar OnCommand="Exec" OnInsertFreeTable="InsertFreeTableAsync" OnInsertPageBreak="InsertPageBreakAsync"
+                   OnInsertRepeatGroup="InsertRepeatGroupByIdAsync" OnInsertPageNumber="@(_activeZone == "content" ? null : InsertPageNumberAsync)"
+                   OnToggleCodeView="ToggleCodeViewAsync" CodeViewActive="@(_codeZone == _activeZone)" />
+    <div class="dte-body">
+        <MergeFieldPalette OnInsertField="InsertFieldAsync" OnInsertGroup="InsertGroupAsync" />
+        <div class="dte-canvas-scroll">
+            <div class="dte-page">
+                <div class="dte-zone dte-zone-header@(_activeZone == "header" ? " active" : "")">
+                    <div class="dte-zone-label">En-tête <span>— répété en haut de chaque page</span></div>
+                    <div @ref="_headerCanvas" class="dte-zone-canvas dte-zone-canvas-header" hidden="@(_codeZone == "header")" contenteditable="true"></div>
+                    @if (_codeZone == "header")
+                    {
+                        @CodeTextarea("header", "En-tête")
+                    }
+                </div>
+                <div class="dte-zone dte-zone-content@(_activeZone == "content" ? " active" : "")">
+                    <div @ref="_contentCanvas" class="dte-zone-canvas dte-zone-canvas-content" hidden="@(_codeZone == "content")" contenteditable="true"></div>
+                    @if (_codeZone == "content")
+                    {
+                        @CodeTextarea("content", "Contenu")
+                    }
+                </div>
+                <div class="dte-zone dte-zone-footer@(_activeZone == "footer" ? " active" : "")">
+                    <div class="dte-zone-label">Pied de page <span>— répété en bas de chaque page</span></div>
+                    <div @ref="_footerCanvas" class="dte-zone-canvas dte-zone-canvas-footer" hidden="@(_codeZone == "footer")" contenteditable="true"></div>
+                    @if (_codeZone == "footer")
+                    {
+                        @CodeTextarea("footer", "Pied de page")
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="dte-actions">
+        <span class="dte-dirty-hint">@(_dirty ? "Modifications non enregistrées" : "Tout est enregistré")</span>
+        <button type="button" class="btn" @onclick="ResetAsync">Réinitialiser</button>
+        <button type="button" class="btn" @onclick="CloseAsync">Fermer</button>
+        <button type="button" class="btn primary" @onclick="SaveAsync" disabled="@Saving">@(Saving ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference _headerCanvas, _contentCanvas, _footerCanvas, _codeTextarea;
+    private string _activeZone = "content";
+    private bool _dirty;
+    // Zone actuellement éditée en code HTML brut plutôt qu'en visuel (bouton
+    // </> de la barre d'outils) — une seule à la fois. Tant qu'elle est
+    // active, le canvas contentEditable correspondant est masqué et
+    // `_codeHtml` fait foi pour cette zone : le canvas n'est réécrit qu'au
+    // moment de sortir du mode code (voir FlushCodeZoneAsync), pas à chaque
+    // frappe dans le textarea.
+    private string? _codeZone;
+    private string _codeHtml = "";
+    private string? _codeZoneRegistered;
+    private DotNetObjectReference<DocumentTemplateEditor>? _self;
+    private LeaveGuard _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter, EditorRequired] public TemplateZoneHtml Initial { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<TemplateZoneHtml, Task> OnSave { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Task> OnCancel { get; set; } = default!;
+    [Parameter] public bool Saving { get; set; }
+
+    private ElementReference CanvasRef(string key) => key switch
+    {
+        "header" => _headerCanvas,
+        "footer" => _footerCanvas,
+        _ => _contentCanvas,
+    };
+
+    private RenderFragment CodeTextarea(string key, string label) =>
+        @<textarea @ref="_codeTextarea" class="dte-zone-code" value="@_codeHtml" @oninput="e => { _codeHtml = (string)e.Value!; MarkDirty(); }"
+                   @onfocus="() => OnZoneFocus(key)" spellcheck="false" aria-label="@($"Code HTML — {label}")"></textarea>;
+
+    protected override void OnInitialized()
+    {
+        _guard = new LeaveGuard(() => _dirty, SaveAsync);
+        _guard.Register(Scope ?? Unsaved.Root);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            await DocEditor.RegisterZoneAsync(_headerCanvas, "header", _self);
+            await DocEditor.RegisterZoneAsync(_contentCanvas, "content", _self);
+            await DocEditor.RegisterZoneAsync(_footerCanvas, "footer", _self);
+            await DocEditor.TrackSelectionAsync(_self);
+            await SetZoneHtmlAsync("header", Initial.HeaderHtml);
+            await SetZoneHtmlAsync("content", Initial.ContentHtml);
+            await SetZoneHtmlAsync("footer", Initial.FooterHtml);
+        }
+        if (_codeZone is not null && _codeZone != _codeZoneRegistered)
+        {
+            _codeZoneRegistered = _codeZone;
+            await DocEditor.RegisterCodeZoneAsync(_codeTextarea, _codeZone, _self!);
+        }
+    }
+
+    private Task SetZoneHtmlAsync(string key, string html) => DocEditor.SetZoneHtmlAsync(CanvasRef(key), TemplateHtmlSanitizer.Sanitize(html)).AsTask();
+
+    private void MarkDirty() => _dirty = true;
+
+    // Réécrit le canvas de la zone en cours d'édition « code » avec le
+    // contenu du textarea, puis sort du mode code — sans effet si aucune
+    // zone n'y est (appelé avant de lire les canvas, à l'enregistrement ou à
+    // la réinitialisation).
+    private async Task FlushCodeZoneAsync()
+    {
+        if (_codeZone is not { } zone) return;
+        await SetZoneHtmlAsync(zone, _codeHtml);
+        _codeZone = null;
+        _codeZoneRegistered = null;
+    }
+
+    private async Task ToggleCodeViewAsync()
+    {
+        if (_codeZone == _activeZone)
+        {
+            await FlushCodeZoneAsync();
+            MarkDirty();
+            return;
+        }
+        // Une autre zone était en mode code : la refermer d'abord (son
+        // propre textarea ne serait sinon plus affiché ni modifiable une
+        // fois qu'on aurait quitté cette zone).
+        await FlushCodeZoneAsync();
+        _codeHtml = await DocEditor.GetZoneHtmlAsync(CanvasRef(_activeZone));
+        _codeZone = _activeZone;
+    }
+
+    private async Task Exec(string command, string? value)
+    {
+        await DocEditor.ExecAsync(_activeZone, command, value);
+        MarkDirty();
+    }
+
+    // Insère du HTML dans le textarea de code source de la zone active, à la
+    // position donnée — utilisé par InsertFieldAsync/InsertGroupAsync quand
+    // la palette est utilisée pendant que cette zone est en mode code, et
+    // par OnCodeDrop (glisser-déposer), pour ne pas écrire silencieusement
+    // dans le canvas caché (qui serait de toute façon écrasé par le contenu
+    // du textarea à la sortie du mode code).
+    private async Task InsertHtmlIntoCodeAsync(string html, int start, int end)
+    {
+        start = Math.Clamp(start, 0, _codeHtml.Length);
+        end = Math.Clamp(Math.Max(end, start), 0, _codeHtml.Length);
+        _codeHtml = _codeHtml[..start] + html + _codeHtml[end..];
+        MarkDirty();
+        var caret = start + html.Length;
+        StateHasChanged();
+        await Task.Yield();
+        await DocEditor.FocusAndSelectAsync(_codeTextarea, caret, caret);
+    }
+
+    private async Task InsertHtmlIntoCodeAtCaretAsync(string html)
+    {
+        var selection = await DocEditor.GetTextareaSelectionAsync(_codeTextarea);
+        await InsertHtmlIntoCodeAsync(html, selection[0], selection[1]);
+    }
+
+    private async Task InsertFieldAsync(MergeField field)
+    {
+        if (_activeZone == _codeZone)
+        {
+            await InsertHtmlIntoCodeAtCaretAsync(TemplateChipHtml.Chip(field));
+            return;
+        }
+        MarkDirty();
+        await DocEditor.InsertFieldAsync(_activeZone, field);
+    }
+
+    private async Task InsertGroupAsync(MergeFieldGroup group)
+    {
+        if (group.ListPath is null) return;
+        var columns = group.Columns();
+        if (_activeZone == _codeZone)
+        {
+            await InsertHtmlIntoCodeAtCaretAsync(TemplateChipHtml.RepeatBlock(group, columns));
+            return;
+        }
+        MarkDirty();
+        await DocEditor.InsertGroupAsync(_activeZone, new RepeatGroupPayload(group.Label, group.ListPath, columns));
+    }
+
+    private Task InsertRepeatGroupByIdAsync(string groupId) =>
+        MergeFields.FindGroup(groupId) is { } group ? InsertGroupAsync(group) : Task.CompletedTask;
+
+    private async Task InsertFreeTableAsync()
+    {
+        MarkDirty();
+        await DocEditor.InsertFreeTableAsync(_activeZone);
+    }
+
+    private async Task InsertPageBreakAsync()
+    {
+        MarkDirty();
+        await DocEditor.InsertPageBreakAsync(_activeZone);
+    }
+
+    // Numéro de page (en-tête/pied uniquement) : pas un champ de fusion — un
+    // texte littéral que Chromium remplit lui-même à l'impression.
+    private async Task InsertPageNumberAsync()
+    {
+        MarkDirty();
+        await DocEditor.InsertPageNumberAsync(_activeZone);
+    }
+
+    [JSInvokable]
+    public void OnZoneFocus(string key)
+    {
+        _activeZone = key;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnActiveZoneChanged(string key)
+    {
+        _activeZone = key;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnZoneChanged(string key)
+    {
+        MarkDirty();
+        StateHasChanged();
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions DragOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    private sealed record DragPayload(string Type, string? Path, string? GroupId);
+
+    [JSInvokable]
+    public async Task OnZoneDrop(string key, string raw, double x, double y)
+    {
+        _activeZone = key;
+        DragPayload? payload;
+        try
+        {
+            payload = System.Text.Json.JsonSerializer.Deserialize<DragPayload>(raw, DragOptions);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return;
+        }
+        if (payload is null) return;
+
+        // Un groupe (liste) se dépose toujours comme un bloc de premier
+        // niveau : un <div>/<table> inséré au milieu d'un paragraphe
+        // produirait du HTML imbriqué invalide.
+        if (payload.Type == "group")
+        {
+            if (payload.GroupId is not { } groupId || MergeFields.FindGroup(groupId) is not { } group) return;
+            await DocEditor.InsertGroupAtPointAsync(key, new RepeatGroupPayload(group.Label, group.ListPath!, group.Columns()), x, y);
+            MarkDirty();
+            StateHasChanged();
+            return;
+        }
+
+        // Un champ simple se dépose au fil du texte, à la position exacte du
+        // pointeur.
+        if (payload.Path is not { } path || MergeFields.FindField(path) is not { } field) return;
+        await DocEditor.InsertFieldAtPointAsync(key, field, x, y);
+        MarkDirty();
+        StateHasChanged();
+    }
+
+    // Glisser-déposer depuis la palette pendant l'édition du code HTML brut :
+    // pas d'équivalent de la position par point pour un <textarea> (son
+    // contenu n'est pas du DOM adressable par point), donc insertion à la
+    // position du curseur relevée par interop.js au moment du dépose.
+    [JSInvokable]
+    public Task OnCodeDrop(string key, string raw, int start, int end)
+    {
+        DragPayload? payload;
+        try
+        {
+            payload = System.Text.Json.JsonSerializer.Deserialize<DragPayload>(raw, DragOptions);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return Task.CompletedTask;
+        }
+        if (payload is null) return Task.CompletedTask;
+
+        if (payload.Type == "group")
+        {
+            if (payload.GroupId is not { } groupId || MergeFields.FindGroup(groupId) is not { } group) return Task.CompletedTask;
+            return InsertHtmlIntoCodeAsync(TemplateChipHtml.RepeatBlock(group, group.Columns()), start, end);
+        }
+
+        if (payload.Path is not { } path || MergeFields.FindField(path) is not { } field) return Task.CompletedTask;
+        return InsertHtmlIntoCodeAsync(TemplateChipHtml.Chip(field), start, end);
+    }
+
+    private async Task SaveAsync()
+    {
+        await FlushCodeZoneAsync();
+        var header = await DocEditor.GetZoneHtmlAsync(_headerCanvas);
+        var content = await DocEditor.GetZoneHtmlAsync(_contentCanvas);
+        var footer = await DocEditor.GetZoneHtmlAsync(_footerCanvas);
+        await OnSave(new TemplateZoneHtml(header, content, footer));
+        _dirty = false;
+    }
+
+    // Quitter l'éditeur modifié (Fermer, retour à la liste, fermeture de
+    // l'onglet) demande « Enregistrer / Annuler les modifications ».
+    private async Task CloseAsync()
+    {
+        if (await Unsaved.ConfirmLeaveAsync(LeaveTarget.Of(_guard))) await OnCancel();
+    }
+
+    private async Task ResetAsync()
+    {
+        if (!await Browser.ConfirmAsync("Réinitialiser le modèle avec la mise en page de départ ? Les modifications non enregistrées seront perdues.")) return;
+        _codeZone = null;
+        _codeZoneRegistered = null;
+        await SetZoneHtmlAsync("header", Initial.HeaderHtml);
+        await SetZoneHtmlAsync("content", Initial.ContentHtml);
+        await SetZoneHtmlAsync("footer", Initial.FooterHtml);
+        MarkDirty();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DocEditor.UnregisterZoneAsync("header");
+        await DocEditor.UnregisterZoneAsync("content");
+        await DocEditor.UnregisterZoneAsync("footer");
+        await DocEditor.UntrackSelectionAsync();
+        _guard.Dispose();
+        _self?.Dispose();
+    }
+}

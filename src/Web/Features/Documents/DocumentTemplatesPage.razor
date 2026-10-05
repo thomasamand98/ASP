@@ -1,2 +1,264 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : DocumentTemplatesPage</p>
+@implements IDisposable
+@inject ApiClient Api
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Page « Modèles de documents » (groupe Gestion documentaire) : liste de
+   tous les modèles créés (tous types confondus), et éditeur
+   (DocumentTemplateEditor) pour glisser-déposer les champs de fusion
+   dedans, en-tête/contenu/pied de page. La fiche contrat, elle, ne charge
+   que les modèles de type « CONTRAT » pour son bouton « Voir le PDF » —
+   d'où le filtre par type choisi ici à la création, pas à l'affichage de
+   cette liste. *@
+@* `dtp-page` : seul point commun entre les trois états (liste / éditeur /
+   chargement) rendus par ce composant, pour que le CSS isolé (préfixé
+   `dtp-page ::deep`, voir DocumentTemplatesPage.razor.css) s'applique quel
+   que soit l'état affiché. *@
+<div class="dtp-page">
+@if (_opening)
+{
+    <p>Chargement du modèle...</p>
+}
+else if (_open is { } open)
+{
+    <div class="dtp-editor-page">
+        <div class="page-header">
+            <div class="dtp-editor-title">
+                <button type="button" class="btn" @onclick="CloseEditorAsync">&larr; Modèles</button>
+                <input class="dtp-name-input" value="@_nameDraft" @oninput="e => _nameDraft = (string)e.Value!" @onblur="RenameAsync" placeholder="Nom du modèle" />
+                <span class="dtp-type-badge">@TypeLabel(open.Type_document)</span>
+            </div>
+        </div>
+        <GuardBoundary @key="open.IDDOCUMENT_TEMPLATES" Scope="_editorScope">
+            <DocumentTemplateEditor Initial="@(new TemplateZoneHtml(open.Contenu_entete ?? "", open.Contenu_html, open.Contenu_pied ?? ""))"
+                                     OnSave="SaveAsync" OnCancel="CloseEditorAsync" />
+        </GuardBoundary>
+    </div>
+}
+else
+{
+    <div>
+        <div class="page-header">
+            <h2>Modèles de documents</h2>
+            <div class="page-actions">
+                <button type="button" class="btn primary" @onclick="() => _creating = true">
+                    <Icon Name="documents.Plus" />
+                    Nouveau modèle
+                </button>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <p>Chargement des modèles...</p>
+        }
+        @if (_error is not null)
+        {
+            <p>Erreur : @_error</p>
+        }
+
+        @if (!_loading && _templates.Count == 0)
+        {
+            <div class="dtp-empty">
+                <Icon Name="documents.Document" />
+                <p>Aucun modèle pour l’instant. Créez-en un pour définir la mise en page d’un document (état de contrat, facture…) et y glisser les champs de fusion.</p>
+                <button type="button" class="btn primary" @onclick="() => _creating = true">Nouveau modèle</button>
+            </div>
+        }
+        else if (!_loading)
+        {
+            <div class="dtp-grid">
+                @foreach (var template in _templates)
+                {
+                    <div @key="template.IDDOCUMENT_TEMPLATES" class="dtp-card" @ondblclick="() => OpenAsync(template.IDDOCUMENT_TEMPLATES)">
+                        <div class="dtp-card-preview" aria-hidden="true">
+                            <Icon Name="documents.Document" />
+                        </div>
+                        <div class="dtp-card-body">
+                            <p class="dtp-card-name">
+                                @template.Nom
+                                <span class="dtp-type-badge">@TypeLabel(template.Type_document)</span>
+                            </p>
+                            <p class="dtp-card-date">Modifié le @FormatDate(template.Date_heure_modification)</p>
+                        </div>
+                        <div class="dtp-card-actions">
+                            <button type="button" class="btn" @onclick="() => OpenAsync(template.IDDOCUMENT_TEMPLATES)">Ouvrir</button>
+                            <button type="button" class="icon-btn" title="Dupliquer" @onclick="() => DuplicateAsync(template.IDDOCUMENT_TEMPLATES)"><Icon Name="documents.Copy" /></button>
+                            <button type="button" class="icon-btn danger" title="Supprimer" @onclick="() => DeleteAsync(template.IDDOCUMENT_TEMPLATES)"><Icon Name="documents.Trash" /></button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (_creating)
+    {
+        <Modal Title="Nouveau modèle" OnClose="() => { _creating = false; return Task.CompletedTask; }">
+            <NewTemplateForm OnCreate="CreateAsync" OnCancel="() => { _creating = false; return Task.CompletedTask; }" />
+        </Modal>
+    }
+}
+</div>
+
+@code {
+    private List<DocumentTemplateSummary> _templates = [];
+    private bool _loading = true;
+    private string? _error;
+    private bool _creating;
+    // Fiche complète (avec le HTML des trois zones, absent de la liste) du
+    // modèle ouvert dans l'éditeur — chargée à la demande (voir OpenAsync).
+    private DocumentTemplateDetail? _open;
+    private bool _opening;
+    private string _nameDraft = "";
+    private GuardScope _editorScope = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+
+    private static string TypeLabel(string type) => type == CreateDocumentTemplateDto.TypeContrat ? "Contrat" : type;
+
+    private static string FormatDate(string? iso) => iso is null ? "—" : Format.DateTimeMedium(Format.ParseLocal(iso) ?? DateTime.MinValue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _templates = (await Api.GetAsync<DocumentTemplatesResponse>("document-templates")).documentTemplates;
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task CreateAsync(string nom, string type)
+    {
+        var dto = new CreateDocumentTemplateDto
+        {
+            Nom = nom.Trim().Length > 0 ? nom.Trim() : "Nouveau modèle",
+            Type_document = type,
+            Description = "",
+            Contenu_entete = StarterTemplate.Header,
+            Contenu_html = StarterTemplate.Content,
+            Contenu_pied = StarterTemplate.Footer,
+        };
+        var created = await Api.SendJsonAsync<DocumentTemplateDetail>(HttpMethod.Post, "document-templates", dto) ?? throw new InvalidOperationException();
+        _templates = [.. _templates, ToSummary(created)];
+        _creating = false;
+        OpenEditor(created);
+        // Appelée depuis le formulaire de la modale (composant enfant) : son
+        // propre @onsubmit ne redessine que lui-même, pas cette page.
+        StateHasChanged();
+    }
+
+    private async Task OpenAsync(string id)
+    {
+        _opening = true;
+        StateHasChanged();
+        try
+        {
+            var detail = await Api.GetAsync<DocumentTemplateDetail>($"document-templates/{id}");
+            OpenEditor(detail);
+        }
+        finally
+        {
+            _opening = false;
+        }
+    }
+
+    private void OpenEditor(DocumentTemplateDetail detail)
+    {
+        _nameDraft = detail.Nom;
+        _open = detail;
+        _editorScope = GuardScopes.CreateChild(Scope, Unsaved);
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        var template = _templates.FirstOrDefault(t => t.IDDOCUMENT_TEMPLATES == id);
+        if (template is null) return;
+        if (!await Browser.ConfirmAsync($"Supprimer le modèle « {template.Nom} » ?")) return;
+        await Api.SendAsync(HttpMethod.Delete, $"document-templates/{id}");
+        _templates = [.. _templates.Where(t => t.IDDOCUMENT_TEMPLATES != id)];
+        if (_open?.IDDOCUMENT_TEMPLATES == id) _open = null;
+    }
+
+    // Pas d'endpoint dédié : charge la fiche complète et recrée un modèle à
+    // partir de son contenu (les trois zones, même type).
+    private async Task DuplicateAsync(string id)
+    {
+        var detail = await Api.GetAsync<DocumentTemplateDetail>($"document-templates/{id}");
+        var dto = new CreateDocumentTemplateDto
+        {
+            Nom = $"{detail.Nom} (copie)",
+            Type_document = detail.Type_document,
+            Description = detail.Description ?? "",
+            Contenu_entete = detail.Contenu_entete ?? "",
+            Contenu_html = detail.Contenu_html,
+            Contenu_pied = detail.Contenu_pied ?? "",
+        };
+        var copy = await Api.SendJsonAsync<DocumentTemplateDetail>(HttpMethod.Post, "document-templates", dto) ?? throw new InvalidOperationException();
+        _templates = [.. _templates, ToSummary(copy)];
+    }
+
+    private async Task RenameAsync()
+    {
+        if (_open is not { } open) return;
+        var dto = new UpdateDocumentTemplateDto { Nom = _nameDraft.Length > 0 ? _nameDraft : open.Nom };
+        var updated = await Api.SendJsonAsync<DocumentTemplateDetail>(HttpMethod.Patch, $"document-templates/{open.IDDOCUMENT_TEMPLATES}", dto) ?? throw new InvalidOperationException();
+        _templates = [.. _templates.Select(t => t.IDDOCUMENT_TEMPLATES == updated.IDDOCUMENT_TEMPLATES ? ToSummary(updated) : t)];
+        _open = updated;
+    }
+
+    private async Task SaveAsync(TemplateZoneHtml html)
+    {
+        if (_open is not { } open) return;
+        var dto = new UpdateDocumentTemplateDto
+        {
+            Nom = _nameDraft.Length > 0 ? _nameDraft : open.Nom,
+            Contenu_entete = html.HeaderHtml,
+            Contenu_html = html.ContentHtml,
+            Contenu_pied = html.FooterHtml,
+        };
+        var updated = await Api.SendJsonAsync<DocumentTemplateDetail>(HttpMethod.Patch, $"document-templates/{open.IDDOCUMENT_TEMPLATES}", dto) ?? throw new InvalidOperationException();
+        _templates = [.. _templates.Select(t => t.IDDOCUMENT_TEMPLATES == updated.IDDOCUMENT_TEMPLATES ? ToSummary(updated) : t)];
+        _open = updated;
+        // Appelée depuis l'éditeur (composant enfant) : son propre bouton
+        // Enregistrer ne redessine que lui-même, pas cette page (le nom/badge
+        // de l'en-tête doivent pourtant refléter la réponse du serveur).
+        StateHasChanged();
+    }
+
+    private static DocumentTemplateSummary ToSummary(DocumentTemplateDetail d) => new()
+    {
+        IDDOCUMENT_TEMPLATES = d.IDDOCUMENT_TEMPLATES,
+        Nom = d.Nom,
+        Type_document = d.Type_document,
+        Description = d.Description,
+        Date_heure_creation = d.Date_heure_creation,
+        Date_heure_modification = d.Date_heure_modification,
+    };
+
+    private async Task CloseEditorAsync()
+    {
+        if (await Unsaved.ConfirmLeaveAsync(_editorScope))
+        {
+            _editorScope.Detach();
+            _open = null;
+            // Appelée aussi comme OnCancel de l'éditeur (composant enfant) :
+            // son propre bouton Fermer ne redessine que lui-même, pas cette
+            // page, qui doit pourtant revenir à la liste.
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose() => _editorScope?.Detach();
+}

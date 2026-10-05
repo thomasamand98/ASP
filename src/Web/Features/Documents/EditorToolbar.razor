@@ -1,0 +1,107 @@
+@inject Browser Browser
+
+@* Barre d'outils de mise en forme : s'appuie sur document.execCommand, une
+   API dépréciée mais toujours largement supportée, plutôt que d'ajouter une
+   dépendance d'édition riche (tiptap, slate...) pour ce prototype interne —
+   à réévaluer si l'éditeur doit gagner en richesse plus tard. *@
+<div class="dte-toolbar" role="toolbar" aria-label="Mise en forme du modèle">
+    <fieldset class="dte-toolbar-fieldset" disabled="@CodeViewActive">
+        <select @ref="_formatBlockSelect" class="dte-toolbar-select" @onchange="ChangeFormatBlock">
+            <option value="" disabled selected>Style…</option>
+            <option value="P">Paragraphe</option>
+            <option value="H2">Titre</option>
+            <option value="H3">Sous-titre</option>
+        </select>
+
+        <div class="dte-toolbar-group">
+            <button type="button" title="Gras" @onmousedown:preventDefault="true" @onclick="Bold"><Icon Name="documents.Bold" /></button>
+            <button type="button" title="Italique" @onmousedown:preventDefault="true" @onclick="Italic"><Icon Name="documents.Italic" /></button>
+            <button type="button" title="Souligné" @onmousedown:preventDefault="true" @onclick="Underline"><Icon Name="documents.Underline" /></button>
+        </div>
+
+        <div class="dte-toolbar-group">
+            <button type="button" title="Aligner à gauche" @onmousedown:preventDefault="true" @onclick="JustifyLeft"><Icon Name="documents.AlignLeft" /></button>
+            <button type="button" title="Centrer" @onmousedown:preventDefault="true" @onclick="JustifyCenter"><Icon Name="documents.AlignCenter" /></button>
+            <button type="button" title="Aligner à droite" @onmousedown:preventDefault="true" @onclick="JustifyRight"><Icon Name="documents.AlignRight" /></button>
+        </div>
+
+        <div class="dte-toolbar-group">
+            <button type="button" title="Liste à puces" @onmousedown:preventDefault="true" @onclick="UnorderedList"><Icon Name="documents.List" /></button>
+            <button type="button" title="Tableau libre" @onmousedown:preventDefault="true" @onclick="OnInsertFreeTable"><Icon Name="documents.Table" /></button>
+            <button type="button" title="Saut de page" @onmousedown:preventDefault="true" @onclick="OnInsertPageBreak"><Icon Name="documents.PageBreak" /></button>
+            @if (OnInsertPageNumber is not null)
+            {
+                <button type="button" title="Numéro de page" @onmousedown:preventDefault="true" @onclick="OnInsertPageNumber"><Icon Name="documents.PageNumber" /></button>
+            }
+        </div>
+
+        <select @ref="_repeatGroupSelect" class="dte-toolbar-select" title="Insérer un bloc répétable" @onchange="ChangeRepeatGroup">
+            <option value="" disabled selected>↻ Bloc répétable…</option>
+            @foreach (var group in RepeatableGroups)
+            {
+                <option @key="group.Id" value="@group.Id">@group.Label</option>
+            }
+        </select>
+
+        <div class="dte-toolbar-group">
+            <button type="button" title="Annuler" @onmousedown:preventDefault="true" @onclick="Undo"><Icon Name="documents.Undo" /></button>
+            <button type="button" title="Rétablir" @onmousedown:preventDefault="true" @onclick="Redo"><Icon Name="documents.Redo" /></button>
+        </div>
+    </fieldset>
+
+    <div class="dte-toolbar-group dte-toolbar-group-end">
+        <button type="button" title="Voir/éditer le code HTML" aria-pressed="@CodeViewActive" @onmousedown:preventDefault="true" @onclick="OnToggleCodeView">
+            <Icon Name="documents.Code" />
+        </button>
+    </div>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<MergeFieldGroup> RepeatableGroups = [.. MergeFields.ListGroups()];
+
+    private ElementReference _formatBlockSelect, _repeatGroupSelect;
+
+    [Parameter, EditorRequired] public Func<string, string?, Task> OnCommand { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Task> OnInsertFreeTable { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Task> OnInsertPageBreak { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, Task> OnInsertRepeatGroup { get; set; } = default!;
+
+    // Numéro de page : uniquement pertinent en en-tête/pied (répétés sur
+    // chaque page) — absent tant que la zone active est le contenu, pour ne
+    // pas laisser insérer un jeton qui n'y sera jamais rempli.
+    [Parameter] public Func<Task>? OnInsertPageNumber { get; set; }
+
+    [Parameter, EditorRequired] public Func<Task> OnToggleCodeView { get; set; } = default!;
+    [Parameter] public bool CodeViewActive { get; set; }
+
+    private Task Bold() => OnCommand("bold", null);
+    private Task Italic() => OnCommand("italic", null);
+    private Task Underline() => OnCommand("underline", null);
+    private Task JustifyLeft() => OnCommand("justifyLeft", null);
+    private Task JustifyCenter() => OnCommand("justifyCenter", null);
+    private Task JustifyRight() => OnCommand("justifyRight", null);
+    private Task UnorderedList() => OnCommand("insertUnorderedList", null);
+    private Task Undo() => OnCommand("undo", null);
+    private Task Redo() => OnCommand("redo", null);
+
+    // Les deux sélecteurs ci-dessous sont des menus d'actions, pas des
+    // réglages : une fois la commande lancée, ils reviennent à leur
+    // placeholder (comme le `e.target.value = ''` du front d'origine), plutôt
+    // que de rester sur la dernière option choisie. Un <select> non lié par
+    // `value` ne revient pas spontanément en arrière au prochain rendu (Blazor
+    // ne force sa valeur que si l'expression liée change réellement) : on
+    // réinitialise donc l'élément directement.
+    private async Task ChangeFormatBlock(ChangeEventArgs e)
+    {
+        var value = (string)e.Value!;
+        await Browser.ClearValueAsync(_formatBlockSelect);
+        if (value.Length > 0) await OnCommand("formatBlock", value);
+    }
+
+    private async Task ChangeRepeatGroup(ChangeEventArgs e)
+    {
+        var value = (string)e.Value!;
+        await Browser.ClearValueAsync(_repeatGroupSelect);
+        if (value.Length > 0) await OnInsertRepeatGroup(value);
+    }
+}

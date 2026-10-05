@@ -1,0 +1,123 @@
+@* Panneau latéral de champs de fusion : glisser-déposer dans le canvas, ou
+   bouton « + » pour insérer sans souris. Les groupes sans `ListPath` sont
+   des champs simples (un seul jeton) ; ceux avec `ListPath` représentent une
+   collection (Prestations...) et se déposent comme un tableau répétable.
+   Le vrai glisser-déposer (DataTransfer) est amorcé en JS par délégation
+   (voir interop.js) : chaque ligne porte juste son payload prêt dans
+   `data-merge-drag`. *@
+<aside class="dte-palette">
+    <div class="dte-palette-search">
+        <Icon Name="documents.Search" />
+        <input type="search" placeholder="Rechercher un champ…" value="@_query" @oninput="e => _query = (string)e.Value!" />
+    </div>
+    @if (_query.Trim().Length > 0)
+    {
+        @SearchResults(_query.Trim())
+    }
+    else
+    {
+        <div class="dte-palette-groups">
+            @for (var i = 0; i < MergeFields.Groups.Count; i++)
+            {
+                @GroupSection(MergeFields.Groups[i], i < 2)
+            }
+        </div>
+    }
+</aside>
+
+@code {
+    private string _query = "";
+
+    [Parameter, EditorRequired] public Func<MergeField, Task> OnInsertField { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<MergeFieldGroup, Task> OnInsertGroup { get; set; } = default!;
+
+    private static string FieldDrag(MergeField field) => System.Text.Json.JsonSerializer.Serialize(new { type = "field", path = field.Path });
+
+    private static string GroupDrag(MergeFieldGroup group) => System.Text.Json.JsonSerializer.Serialize(new { type = "group", groupId = group.Id });
+
+    // Un champ simple de la palette : glisser dépose un jeton de fusion dans
+    // le texte au point de dépose ; le bouton « + » l'insère à la position
+    // du curseur (ou en fin de document), pour rester utilisable sans
+    // souris.
+    private RenderFragment FieldRow(MergeField field) =>
+        @<div class="dte-palette-field" draggable="true" data-merge-drag="@FieldDrag(field)">
+            <Icon Name="documents.Grip" />
+            <span class="dte-palette-field-label">@field.Label</span>
+            <button type="button" class="dte-palette-insert" @onclick="() => OnInsertField(field)" aria-label="@($"Insérer {field.Label}")">
+                <Icon Name="documents.Plus" />
+            </button>
+        </div>;
+
+    private RenderFragment GroupSection(MergeFieldGroup group, bool defaultOpen) =>
+        @<details class="dte-palette-group" open="@defaultOpen">
+            <summary class="dte-palette-group-summary" draggable="@(group.ListPath is not null)" data-merge-drag="@(group.ListPath is not null ? GroupDrag(group) : null)">
+                @if (group.ListPath is not null)
+                {
+                    <Icon Name="documents.Repeat" />
+                }
+                <span>@group.Label</span>
+                @if (group.ListPath is not null)
+                {
+                    <button type="button" class="dte-palette-insert" @onclick="() => OnInsertGroup(group)" @onclick:preventDefault="true" aria-label="@($"Insérer le tableau {group.Label}")">
+                        <Icon Name="documents.Plus" />
+                    </button>
+                }
+            </summary>
+            @if (group.ListPath is not null)
+            {
+                <p class="dte-palette-hint">Glisser insère un tableau répétable (une ligne par élément à la fusion).</p>
+            }
+            <div class="dte-palette-fields">
+                @foreach (var field in group.Fields)
+                {
+                    @FieldRow(field)
+                }
+            </div>
+            @if (group.Children is not null)
+            {
+                @foreach (var child in group.Children)
+                {
+                    @GroupSection(child, false)
+                }
+            }
+        </details>;
+
+    // Résultat de recherche : liste plate de champs correspondant au filtre,
+    // avec le libellé de leur groupe pour se repérer.
+    private RenderFragment SearchResults(string query)
+    {
+        var needle = query.ToLowerInvariant();
+        var results = Collect(MergeFields.Groups, needle);
+        if (results.Count == 0)
+        {
+            return @<p class="dte-palette-hint">Aucun champ ne correspond à « @query ».</p>;
+        }
+        return
+            @<div class="dte-palette-fields">
+                @foreach (var (group, field) in results)
+                {
+                    <div @key="field.Path" class="dte-palette-field" draggable="true" data-merge-drag="@FieldDrag(field)">
+                        <Icon Name="documents.Grip" />
+                        <span class="dte-palette-field-label">
+                            @field.Label
+                            <span class="dte-palette-field-group"> — @group.Label</span>
+                        </span>
+                        <button type="button" class="dte-palette-insert" @onclick="() => OnInsertField(field)" aria-label="@($"Insérer {field.Label}")">
+                            <Icon Name="documents.Plus" />
+                        </button>
+                    </div>
+                }
+            </div>;
+    }
+
+    private static List<(MergeFieldGroup Group, MergeField Field)> Collect(IReadOnlyList<MergeFieldGroup> groups, string needle)
+    {
+        var results = new List<(MergeFieldGroup, MergeField)>();
+        foreach (var group in groups)
+        {
+            results.AddRange(group.Fields.Where(f => f.Label.ToLowerInvariant().Contains(needle) || f.Path.ToLowerInvariant().Contains(needle)).Select(f => (group, f)));
+            if (group.Children is not null) results.AddRange(Collect(group.Children, needle));
+        }
+        return results;
+    }
+}

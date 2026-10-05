@@ -1,0 +1,61 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Formulaire de la modale « Nouveau modèle » : demande le type de modèle
+   avant tout (un modèle de facture n'a pas la même mise en page qu'un
+   modèle de contrat — un seul type existe pour l'instant, voir
+   CreateDocumentTemplateDto.TypeContrat). *@
+<form @ref="_formRef" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" class="dtp-create-form">
+    <label class="field">
+        Nom du modèle
+        <input @ref="_first" value="@_nom" @oninput="e => _nom = (string)e.Value!" placeholder="Ex. État de contrat" />
+    </label>
+    <label class="field">
+        Type de document
+        <select value="@_type" @onchange="e => _type = (string)e.Value!">
+            <option value="@CreateDocumentTemplateDto.TypeContrat">Contrat</option>
+        </select>
+    </label>
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary">Créer</button>
+    </div>
+</form>
+
+@code {
+    private sealed class Model
+    {
+        public string Nom { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+
+    private string _nom = "";
+    private string _type = CreateDocumentTemplateDto.TypeContrat;
+    private ElementReference _formRef;
+    private ElementReference _first;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter, EditorRequired] public Func<string, string, Task> OnCreate { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Task> OnCancel { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        _guard = new UnsavedForm(Unsaved, Browser, () => new Model { Nom = _nom, Type = _type }, SubmitAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await _guard.TrackAsync(_formRef);
+        await Browser.FocusAsync(_first);
+    }
+
+    private Task SubmitAsync() => OnCreate(_nom, _type);
+
+    public void Dispose() => _guard.Dispose();
+}

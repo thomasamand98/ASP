@@ -29,5 +29,6 @@ builder.Services.AddSingleton<Browser>();
 builder.Services.AddSingleton<ThemeService>();
 builder.Services.AddSingleton<UnsavedChangesService>();
 builder.Services.AddSingleton<EnumerationLabels>();
+builder.Services.AddSingleton<Horizon.Web.Features.Documents.DocEditorJs>();
 
 await builder.Build().RunAsync();
