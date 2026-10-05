@@ -1,2 +1,439 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : PlanningPage</p>
+@implements IDisposable
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Écran Planning (menu Production) : filtre de période, panneau des
+   commandes / déchargements en attente, et grille en mode « Colonne » (une
+   colonne par ressource) ou « Ligne » (une ligne par ressource). Chaque
+   glisser-déposer est enregistré aussitôt en base (voir PlanningStore) :
+   déplacer une carte change ses dates et sa ressource, tirer sa poignée
+   change sa fin, déposer une commande crée une exécution. *@
+<div class="planning@(_dragItem is not null ? " is-dragging" : string.Empty)">
+    <header class="pl-toolbar">
+        <div class="pl-toolbar-group">
+            <button type="button" class="icon-btn outlined pl-side-toggle@(_sidebarOpen ? " is-active" : string.Empty)" @onclick="() => _sidebarOpen = !_sidebarOpen"
+                    aria-pressed="@(_sidebarOpen ? "true" : "false")"
+                    aria-label="@(_sidebarOpen ? "Masquer le panneau des commandes" : "Afficher le panneau des commandes")"
+                    title="@(_sidebarOpen ? "Masquer le panneau" : "Afficher le panneau")">
+                <Icon Name="planning.Panel" />
+            </button>
+            <h2 class="pl-title">Planning</h2>
+        </div>
+
+        <div class="pl-toolbar-group pl-period" role="group" aria-label="Période du planning">
+            <button type="button" class="icon-btn outlined" @onclick="() => ShiftPeriodAsync(-1)" aria-label="Période précédente"><Icon Name="planning.ChevronLeft" /></button>
+            <label class="pl-date">
+                <span>Du</span>
+                <span class="pl-date-weekday">@Format.WeekdayLong(_from)</span>
+                <input type="date" value="@DateUtils.ToInputValue(_from)" @onchange="e => ChangeFromAsync((string)e.Value!)" />
+            </label>
+            <label class="pl-date">
+                <span>au</span>
+                <span class="pl-date-weekday">@Format.WeekdayLong(_to)</span>
+                <input type="date" value="@DateUtils.ToInputValue(_to)" @onchange="e => ChangeToAsync((string)e.Value!)" />
+            </label>
+            <button type="button" class="icon-btn outlined" @onclick="() => ShiftPeriodAsync(1)" aria-label="Période suivante"><Icon Name="planning.ChevronRight" /></button>
+            <button type="button" class="btn sm" @onclick="ResetToCurrentWeekAsync">Cette semaine</button>
+        </div>
+
+        <div class="pl-toolbar-group">
+            <div class="pl-segmented" role="group" aria-label="Regrouper par">
+                @foreach (var value in new[] { "executant", "remorque" })
+                {
+                    <button @key="value" type="button" class="@(_groupBy == value ? "is-active" : string.Empty)" aria-pressed="@(_groupBy == value ? "true" : "false")"
+                            @onclick="() => SetPrefsAsync(_viewMode, value)">
+                        @(value == "executant" ? "Exécutant" : "Remorque")
+                    </button>
+                }
+            </div>
+            <div class="pl-segmented" role="group" aria-label="Affichage">
+                <button type="button" class="@(_viewMode == "colonne" ? "is-active" : string.Empty)" aria-pressed="@(_viewMode == "colonne" ? "true" : "false")"
+                        @onclick="@(() => SetPrefsAsync("colonne", _groupBy))">
+                    <Icon Name="planning.Columns" /> Colonnes
+                </button>
+                <button type="button" class="@(_viewMode == "ligne" ? "is-active" : string.Empty)" aria-pressed="@(_viewMode == "ligne" ? "true" : "false")"
+                        @onclick="@(() => SetPrefsAsync("ligne", _groupBy))">
+                    <Icon Name="planning.Rows" /> Lignes
+                </button>
+            </div>
+        </div>
+
+        <div class="pl-kpis">
+            <div class="pl-kpi">
+                <span>Exécutions</span>
+                <strong>@Executions.Count</strong>
+            </div>
+            <div class="pl-kpi pl-kpi--accent">
+                <span>CA planning</span>
+                <strong>@Format.Money(Executions.Sum(e => e.Montant))</strong>
+            </div>
+        </div>
+    </header>
+
+    <div class="pl-body@(_sidebarOpen ? string.Empty : " is-collapsed")">
+        @if (_sidebarOpen)
+        {
+            <PlanningSidebar Commandes="@(Data?.Commandes ?? [])" Dechargements="@(Data?.Dechargements ?? [])" ChauffeurNom="ChauffeurNom"
+                             OnDragStartItem="DragStartItemAsync" OnDragEnd="DragEndAsync" OnDeleteDechargement="RemoveAsync" />
+        }
+
+        <div class="pl-board@(_store.Loading && Data is not null ? " is-loading" : string.Empty)" aria-busy="@(_store.Loading ? "true" : "false")">
+            @if (Data is null && _store.Loading)
+            {
+                <p class="pl-board-message">Chargement du planning…</p>
+            }
+            @if (Data is null && !_store.Loading && _store.Error is not null)
+            {
+                <div class="pl-board-message" role="alert">
+                    <p>@_store.Error</p>
+                    <button type="button" class="btn sm" @onclick="() => _store.ReloadAsync(_from, _to)">Réessayer</button>
+                </div>
+            }
+            @if (Data is not null)
+            {
+                var board = Board;
+                if (board.Resources.Count == 0)
+                {
+                    <p class="pl-board-message">
+                        @(_groupBy == "executant"
+                            ? "Aucun chauffeur actif. Ajoutez-en dans Gestion attelage → Chauffeurs."
+                            : "Aucune remorque utilisée dans un attelage. Créez des attelages dans Gestion attelage → Attelages.")
+                    </p>
+                }
+                else if (_viewMode == "colonne")
+                {
+                    <ColumnView Board="board" />
+                }
+                else
+                {
+                    <RowView Board="board" />
+                }
+            }
+
+            @if (Selected is { } selected)
+            {
+                <ExecutionDetails @key="selected.Id" Execution="selected" ChauffeurNom="@ChauffeurNom(selected.ChauffeurId)" OnClose="() => _selectedId = null" />
+            }
+
+            @if (_store.Saving || _notice is not null)
+            {
+                var error = _notice?.Error is not null && !_store.Saving;
+                <div class="pl-notice@(error ? " pl-notice--error" : string.Empty)" role="@(_notice?.Error is not null ? "alert" : "status")">
+                    @(_store.Saving ? "Enregistrement…" : _notice?.Error ?? "Modifications enregistrées")
+                    @if (error)
+                    {
+                        <button type="button" class="pl-notice-close" @onclick="() => _notice = null" aria-label="Fermer le message"><Icon Name="planning.Close" /></button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    // Au-delà, la grille devient illisible et trop lourde à afficher (l'API
+    // refuse aussi les périodes trop longues).
+    private const int MaxDays = 31;
+    // Période affichée à l'ouverture et par « Cette semaine » : du lundi au
+    // dimanche de la semaine en cours.
+    private const int DefaultDays = 7;
+    private const string PrefsStorageKey = "mvc-template:planningPrefs";
+    private const int SavedNoticeMs = 2500;
+
+    // Message affiché en bas du planning : enregistré (Error null) ou erreur.
+    private sealed record Notice(string? Error);
+
+    private sealed record Prefs(string? viewMode, string? groupBy);
+
+    private PlanningStore _store = default!;
+    private DateTime _from;
+    private DateTime _to;
+    private string _viewMode = "colonne";
+    private string _groupBy = "executant";
+    private bool _sidebarOpen = true;
+    private string? _selectedId;
+    private DragItem? _dragItem;
+    private DropPreview? _preview;
+    private Notice? _notice;
+    private CancellationTokenSource? _noticeTimer;
+    // Numéro du glisser en cours : un glisser terminé avant d'avoir été pris
+    // en compte (voir DragStartItemAsync) ne le réactive pas.
+    private int _dragSequence;
+    private double _now = Clock.Now;
+    private readonly CancellationTokenSource _stop = new();
+
+    private PlanningData? Data => _store.Data;
+
+    private IReadOnlyList<PlanningChauffeur> Chauffeurs => Data?.Chauffeurs ?? [];
+
+    private List<DateTime> Days => DateUtils.DaysInRange(_from, _to);
+
+    private List<PlanningExecution> Executions
+    {
+        get
+        {
+            var periodStart = Clock.ToMs(_from);
+            var periodEnd = Clock.ToMs(_to.AddDays(1));
+            return [.. (Data?.Executions ?? []).Where(e => e.End > periodStart && e.Start < periodEnd)];
+        }
+    }
+
+    private PlanningExecution? Selected => Data?.Executions.FirstOrDefault(e => e.Id == _selectedId);
+
+    private string? ChauffeurNom(string? id) => Chauffeurs.FirstOrDefault(c => c.id == id)?.nom;
+
+    private BoardContext Board
+    {
+        get
+        {
+            var executions = Executions;
+            List<PlanningResource> resources = _groupBy == "executant"
+                ? [.. Chauffeurs.Select(c => new PlanningResource(c.id, c.nom, c.sousTraitant ?? (c.tracteurParDefaut is { Length: > 0 } t ? $"Interne · {t}" : "Interne")))]
+                : [.. (Data?.Remorques ?? []).Select(r => new PlanningResource(r.id, r.immat, r.type))];
+            // Toujours proposée pendant un glisser, pour pouvoir désaffecter.
+            if (_dragItem is not null || executions.Any(e => PlanningBoard.ResourceIdOf(e, _groupBy) == PlanningBoard.UnassignedId))
+            {
+                resources.Add(new PlanningResource(PlanningBoard.UnassignedId, "Non affecté", null));
+            }
+            var ca = new Dictionary<string, double>();
+            var count = new Dictionary<string, int>();
+            foreach (var e in executions)
+            {
+                var id = PlanningBoard.ResourceIdOf(e, _groupBy);
+                ca[id] = ca.GetValueOrDefault(id) + e.Montant;
+                count[id] = count.GetValueOrDefault(id) + 1;
+            }
+            return new BoardContext(Days, resources, executions, _groupBy, ca, count, _selectedId, _dragItem, _preview,
+                SelectAsync, DragStartItemAsync, DragEndAsync, PreviewAsync, DropAsync, ResizeEndAsync, _now);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _store = new PlanningStore(Api);
+        _store.Changed += StateHasChanged;
+        _from = DateUtils.StartOfWeek(DateTime.Now);
+        _to = _from.AddDays(DefaultDays - 1);
+        ReadPrefs();
+        _ = _store.LoadAsync(_from, _to);
+        _ = TickAsync();
+    }
+
+    private void ReadPrefs()
+    {
+        try
+        {
+            var stored = System.Text.Json.JsonSerializer.Deserialize<Prefs>(Browser.GetItem(PrefsStorageKey) ?? "null");
+            _viewMode = stored?.viewMode == "ligne" ? "ligne" : "colonne";
+            _groupBy = stored?.groupBy == "remorque" ? "remorque" : "executant";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            (_viewMode, _groupBy) = ("colonne", "executant");
+        }
+    }
+
+    private async Task SetPrefsAsync(string viewMode, string groupBy)
+    {
+        (_viewMode, _groupBy) = (viewMode, groupBy);
+        await Browser.SetItemAsync(PrefsStorageKey, System.Text.Json.JsonSerializer.Serialize(new Prefs(viewMode, groupBy)));
+    }
+
+    // Heure courante, rafraîchie chaque minute, pour le trait « maintenant ».
+    private async Task TickAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token))
+            {
+                _now = Clock.Now;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Onglet fermé.
+        }
+    }
+
+    private void ShowNotice(Notice next)
+    {
+        _noticeTimer?.Cancel();
+        _notice = next;
+        if (next.Error is not null) return;
+        var token = (_noticeTimer = new CancellationTokenSource()).Token;
+        _ = Task.Delay(SavedNoticeMs, token).ContinueWith(_ =>
+        {
+            _notice = null;
+            InvokeAsync(StateHasChanged);
+        }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+    }
+
+    private void ShowError(Exception e) => ShowNotice(new Notice(e is ApiException ? e.Message : "L'enregistrement a échoué."));
+
+    // --- Période -----------------------------------------------------------
+
+    private Task LoadAsync() => _store.LoadAsync(_from, _to);
+
+    private Task ChangeFromAsync(string value)
+    {
+        if (DateUtils.FromInputValue(value) is not { } date) return Task.CompletedTask;
+        _from = date;
+        if (date > _to) _to = date;
+        else if (DateUtils.DaysInRange(date, _to).Count > MaxDays) _to = date.AddDays(MaxDays - 1);
+        return LoadAsync();
+    }
+
+    private Task ChangeToAsync(string value)
+    {
+        if (DateUtils.FromInputValue(value) is not { } date) return Task.CompletedTask;
+        _to = date;
+        if (date < _from) _from = date;
+        else if (DateUtils.DaysInRange(_from, date).Count > MaxDays) _from = date.AddDays(-(MaxDays - 1));
+        return LoadAsync();
+    }
+
+    // Décale la période de sa propre durée (semaine précédente / suivante
+    // pour une période d'une semaine).
+    private Task ShiftPeriodAsync(int direction)
+    {
+        var count = Days.Count;
+        var length = count <= 7 ? 7 : count;
+        _from = _from.AddDays(direction * length);
+        _to = _to.AddDays(direction * length);
+        return LoadAsync();
+    }
+
+    private Task ResetToCurrentWeekAsync()
+    {
+        _from = DateUtils.StartOfWeek(DateTime.Now);
+        _to = _from.AddDays(DefaultDays - 1);
+        return LoadAsync();
+    }
+
+    // --- Glisser-déposer ---------------------------------------------------
+
+    private Task SelectAsync(string? id)
+    {
+        _selectedId = id;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    // Différé : modifier le DOM pendant le dragstart annule le glisser dans
+    // certains navigateurs.
+    private async Task DragStartItemAsync(DragItem item)
+    {
+        var sequence = ++_dragSequence;
+        await Task.Delay(16);
+        if (sequence != _dragSequence) return;
+        _dragItem = item;
+        StateHasChanged();
+    }
+
+    private Task DragEndAsync()
+    {
+        _dragSequence++;
+        _dragItem = null;
+        _preview = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task PreviewAsync(DropPreview? preview)
+    {
+        _preview = preview;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    // Chauffeur / tracteur / remorque d'une exécution créée en déposant une
+    // commande sur une ressource : complétés avec l'attelage de référence.
+    private (string? ChauffeurId, string? TracteurId, string? RemorqueId) AssignmentFor(string? target)
+    {
+        if (_groupBy == "executant")
+        {
+            var chauffeur = Chauffeurs.FirstOrDefault(c => c.id == target);
+            return (target, chauffeur?.tracteurParDefautId, chauffeur?.remorqueParDefautId);
+        }
+        var parRemorque = target is null ? null : Chauffeurs.FirstOrDefault(c => c.remorqueParDefautId == target);
+        return (parRemorque?.id, parRemorque?.tracteurParDefautId, target);
+    }
+
+    private async Task DropAsync(string resourceId, double start)
+    {
+        var item = _dragItem;
+        await DragEndAsync();
+        if (item is null || Data is null) return;
+        var end = start + item.DurationMinutes * DateUtils.MinuteMs;
+        var target = resourceId == PlanningBoard.UnassignedId ? null : resourceId;
+        MoveChanges WithResource(MoveChanges changes) =>
+            _groupBy == "executant" ? changes with { ChauffeurId = (target, true) } : changes with { RemorqueId = (target, true) };
+
+        try
+        {
+            if (item.Kind == "execution")
+            {
+                var execution = Data.Executions.FirstOrDefault(e => e.Id == item.Id);
+                if (execution is null) return;
+                var changesResource = PlanningBoard.ResourceIdOf(execution, _groupBy) != resourceId;
+                if (!changesResource && execution.Start == start && execution.End == end) return;
+                _selectedId = execution.Id;
+                var changes = new MoveChanges(start, end);
+                await _store.MoveExecutionAsync(execution, changesResource ? WithResource(changes) : changes);
+            }
+            else if (item.Kind == "commande")
+            {
+                var (chauffeurId, tracteurId, remorqueId) = AssignmentFor(target);
+                _selectedId = await _store.CreateFromCommandeAsync(item.Id, start, end, chauffeurId, tracteurId, remorqueId);
+            }
+            else
+            {
+                await _store.PlaceDechargementAsync(item.Id, WithResource(new MoveChanges(start, end)));
+                _selectedId = item.Id;
+            }
+            ShowNotice(new Notice(null));
+        }
+        catch (Exception e)
+        {
+            ShowError(e);
+        }
+        StateHasChanged();
+    }
+
+    private async Task ResizeEndAsync(PlanningExecution execution, double end)
+    {
+        try
+        {
+            await _store.MoveExecutionAsync(execution, new MoveChanges(execution.Start, end));
+            ShowNotice(new Notice(null));
+        }
+        catch (Exception e)
+        {
+            ShowError(e);
+        }
+        StateHasChanged();
+    }
+
+    private async Task RemoveAsync(string id)
+    {
+        try
+        {
+            await _store.RemoveExecutionAsync(id);
+            if (_selectedId == id) _selectedId = null;
+            ShowNotice(new Notice(null));
+        }
+        catch (Exception e)
+        {
+            ShowError(e);
+        }
+    }
+
+    public void Dispose()
+    {
+        _stop.Cancel();
+        _stop.Dispose();
+        _noticeTimer?.Cancel();
+    }
+}

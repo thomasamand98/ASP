@@ -1,0 +1,18 @@
+@* En-tête d'une ressource (colonne ou ligne) : nom, sous-titre, nombre
+   d'exécutions et CA de la période. *@
+<div class="pl-res">
+    <div class="pl-res-name" title="@Resource.Label">@Resource.Label</div>
+    <div class="pl-res-meta">
+        @if (!string.IsNullOrEmpty(Resource.Sublabel))
+        {
+            <span class="pl-res-sub" title="@Resource.Sublabel">@Resource.Sublabel</span>
+        }
+        <span class="pl-res-stats">@Count · <strong>@Format.Money(Ca)</strong></span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PlanningResource Resource { get; set; } = default!;
+    [Parameter] public double Ca { get; set; }
+    [Parameter] public int Count { get; set; }
+}

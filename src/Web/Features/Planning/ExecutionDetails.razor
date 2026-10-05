@@ -1,0 +1,95 @@
+@implements IAsyncDisposable
+@inject Browser Browser
+
+@* Fiche de l'exécution sélectionnée, affichée par-dessus le planning : les
+   cartes de la grille sont souvent trop petites pour tout montrer. Échap la
+   referme. *@
+<section class="pl-details" aria-label="Détail de l'exécution" style="--m: @Execution.Marchandise.couleur">
+    <header class="pl-details-head">
+        <div>
+            <div class="pl-details-kicker">
+                <span class="pl-swatch"></span> @Execution.Marchandise.nom
+                @if (Execution.Nature == "chargement")
+                {
+                    <span class="pl-badge pl-badge--warn">Déchargement différé</span>
+                }
+                @if (Execution.Nature == "dechargement")
+                {
+                    <span class="pl-badge">Déchargement</span>
+                }
+            </div>
+            <h3>@Execution.Client</h3>
+        </div>
+        <button type="button" class="icon-btn outlined" @onclick="() => OnClose.InvokeAsync()" aria-label="Fermer"><Icon Name="planning.Close" /></button>
+    </header>
+
+    <dl class="pl-details-grid">
+        <dt>Statut</dt>
+        <dd class="pl-details-status"><span class="pl-status-dot pl-status-dot--@Execution.Statut"></span> @PlanningBoard.StatutLabels.GetValueOrDefault(Execution.Statut)</dd>
+        <dt>Horaire</dt>
+        <dd>@Format.DayLong(Clock.ToLocal(Execution.Start)), @Format.Time(Clock.ToLocal(Execution.Start)) – @Format.Time(Clock.ToLocal(Execution.End))</dd>
+        <dt>Trajet</dt>
+        <dd>@Execution.Depart → @Execution.Arrivee</dd>
+        <dt>Référence</dt>
+        <dd>@(Execution.Reference ?? "—")</dd>
+        <dt>Chauffeur</dt>
+        <dd>@(ChauffeurNom ?? "Non affecté")</dd>
+        <dt>Attelage</dt>
+        <dd>
+            @if (!string.IsNullOrEmpty(Execution.Tracteur))
+            {
+                <span class="pl-plate">@Execution.Tracteur</span>
+            }
+            else
+            {
+                @("—")
+            }
+            @(" ")
+            @if (!string.IsNullOrEmpty(Execution.RemorqueImmat))
+            {
+                <span class="pl-plate">@Execution.RemorqueImmat</span>
+            }
+        </dd>
+        <dt>Montant</dt>
+        <dd><strong>@Format.Money(Execution.Montant)</strong></dd>
+        @if (!string.IsNullOrEmpty(Execution.RefPlanning))
+        {
+            <dt>Réf. planning</dt>
+            <dd class="pl-mono">@Execution.RefPlanning</dd>
+        }
+        @if (!string.IsNullOrEmpty(Execution.Instruction))
+        {
+            <dt>Instruction</dt>
+            <dd>@Execution.Instruction</dd>
+        }
+    </dl>
+</section>
+
+@code {
+    private DotNetObjectReference<ExecutionDetails>? _self;
+    private int? _escape;
+
+    [Parameter, EditorRequired] public PlanningExecution Execution { get; set; } = default!;
+    [Parameter] public string? ChauffeurNom { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        _escape = await Browser.ListenEscapeAsync(_self);
+    }
+
+    [JSInvokable]
+    public bool OnEscape()
+    {
+        _ = InvokeAsync(() => OnClose.InvokeAsync());
+        return false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_escape is { } id) await Browser.UnlistenAsync(id);
+        _self?.Dispose();
+    }
+}

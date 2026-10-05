@@ -1,0 +1,201 @@
+@* Panneau gauche du Planning : les commandes à planifier (QT > QT_planifié)
+   et les déchargements en attente. Chaque élément se glisse sur la grille
+   pour créer une exécution. *@
+<aside class="pl-side" aria-label="Éléments à planifier">
+    <div class="pl-side-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="@(_tab == "commandes" ? "true" : "false")" class="@(_tab == "commandes" ? "is-active" : string.Empty)" @onclick="@(() => _tab = "commandes")">
+            Commandes <span class="pl-count">@Commandes.Count(c => c.QtPlanifie < c.Qt)</span>
+        </button>
+        <button type="button" role="tab" aria-selected="@(_tab == "dechargements" ? "true" : "false")" class="@(_tab == "dechargements" ? "is-active" : string.Empty)" @onclick="@(() => _tab = "dechargements")">
+            Déchargements <span class="pl-count">@Dechargements.Count</span>
+        </button>
+    </div>
+
+    <div class="pl-side-tools">
+        <label class="pl-search">
+            <Icon Name="planning.Search" />
+            <input type="search" placeholder="Client, référence, trajet…" value="@_search" @oninput="e => _search = (string)e.Value!" />
+        </label>
+        @if (_tab == "commandes")
+        {
+            <div class="pl-side-summary">
+                <span>@PlanningBoard.Num(TotalPlanifie) / @PlanningBoard.Num(TotalQt) planifiés</span>
+                <label class="pl-check">
+                    <input type="checkbox" checked="@_hidePlanned" @onchange="e => _hidePlanned = e.Value is true" />
+                    Masquer complètes
+                </label>
+            </div>
+        }
+        else
+        {
+            <div class="pl-side-summary">
+                <span>En attente de planification</span>
+            </div>
+        }
+    </div>
+
+    <div class="pl-side-list" role="tabpanel">
+        @if (_tab == "commandes")
+        {
+            var visible = VisibleCommandes;
+            if (visible.Count == 0)
+            {
+                <p class="pl-empty">Aucune commande à afficher.</p>
+            }
+            @foreach (var (day, items) in Groups(visible))
+            {
+                <section @key="@(day?.ToString(CultureInfo.InvariantCulture) ?? "sans-date")" class="pl-side-group">
+                    <h3 class="pl-side-date">@(day is { } d ? Format.DayLong(Clock.ToLocal(d)) : "Sans date")</h3>
+                    @foreach (var c in items)
+                    {
+                        @CommandeItem(c)
+                    }
+                </section>
+            }
+        }
+        else
+        {
+            var visible = VisibleDechargements;
+            if (visible.Count == 0)
+            {
+                <p class="pl-empty">Aucun déchargement en attente.</p>
+            }
+            @foreach (var d in visible)
+            {
+                <div @key="d.Id" class="pl-item" draggable="true" data-drag-effect="copy" data-drag-id="@d.Id" style="--m: @d.Marchandise.couleur"
+                     @ondragstart="() => StartDrag(DechargementKind, d.Id, d.DureeMinutes)"
+                     @ondragend="() => OnDragEnd.InvokeAsync()">
+                    <Icon Name="planning.Grip" Class="pl-item-grip" />
+                    <div class="pl-item-body">
+                        <div class="pl-item-head">
+                            <strong>@d.Client</strong>
+                            <button type="button" class="icon-btn sm danger" aria-label="@($"Supprimer le déchargement {d.Client}")" title="Supprimer"
+                                    @onclick="() => DeleteAsync(d.Id)">
+                                <Icon Name="planning.Trash" />
+                            </button>
+                        </div>
+                        <div class="pl-item-goods">
+                            <span class="pl-swatch"></span>
+                            @d.Marchandise.nom
+                            @if (!string.IsNullOrEmpty(d.Reference))
+                            {
+                                <span class="pl-muted"> · @d.Reference</span>
+                            }
+                        </div>
+                        <div class="pl-item-line"><Icon Name="planning.Route" /> @d.Depart → @d.Arrivee</div>
+                        <div class="pl-item-line">
+                            <Icon Name="planning.Truck" />
+                            @if (!string.IsNullOrEmpty(d.Tracteur))
+                            {
+                                <span class="pl-plate">@d.Tracteur</span>
+                            }
+                            @if (!string.IsNullOrEmpty(d.RemorqueImmat))
+                            {
+                                <span class="pl-plate">@d.RemorqueImmat</span>
+                            }
+                        </div>
+                        <div class="pl-item-line pl-muted">
+                            <Icon Name="planning.User" /> @(ChauffeurNom(d.ChauffeurId) ?? "Non affecté")@(d.DateChargement is { } date ? $" · chargé le {Format.DateShort(Clock.ToLocal(date))}" : "")
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+    <p class="pl-side-hint">Glissez un élément sur le planning pour créer une exécution.</p>
+</aside>
+
+@code {
+    private string _tab = "commandes";
+    private string _search = "";
+    private bool _hidePlanned;
+
+    [Inject] private Browser Browser { get; set; } = default!;
+
+    [Parameter] public IReadOnlyList<CommandeEnCours> Commandes { get; set; } = [];
+    [Parameter] public IReadOnlyList<DechargementEnAttente> Dechargements { get; set; } = [];
+    [Parameter, EditorRequired] public Func<string?, string?> ChauffeurNom { get; set; } = default!;
+    [Parameter] public EventCallback<DragItem> OnDragStartItem { get; set; }
+    [Parameter] public EventCallback OnDragEnd { get; set; }
+    [Parameter] public EventCallback<string> OnDeleteDechargement { get; set; }
+
+    private string Query => _search.Trim().ToLowerInvariant();
+
+    private static bool Matches(string query, params string?[] fields) => fields.Any(f => f?.ToLowerInvariant().Contains(query, StringComparison.Ordinal) == true);
+
+    private List<CommandeEnCours> VisibleCommandes =>
+    [
+        .. Commandes
+            .Where(c => !_hidePlanned || c.QtPlanifie < c.Qt)
+            .Where(c => Query.Length == 0 || Matches(Query, c.Client, c.Numero, c.Marchandise.nom, c.Reference, c.Depart, c.Arrivee))
+            .OrderBy(c => c.Date ?? 0),
+    ];
+
+    private List<DechargementEnAttente> VisibleDechargements =>
+    [
+        .. Dechargements
+            .Where(d => Query.Length == 0 || Matches(Query, d.Client, d.Marchandise.nom, d.Reference, d.Depart, d.Arrivee, d.Tracteur, d.RemorqueImmat))
+            .OrderBy(d => d.DateChargement ?? 0),
+    ];
+
+    private double TotalQt => Commandes.Sum(c => c.Qt);
+
+    private double TotalPlanifie => Commandes.Sum(c => Math.Min(c.QtPlanifie, c.Qt));
+
+    // Regroupement par date de commande, comme les séparateurs de l'écran WinDev.
+    private static List<(double? Day, List<CommandeEnCours> Items)> Groups(List<CommandeEnCours> commandes)
+    {
+        var groups = new List<(double? Day, List<CommandeEnCours> Items)>();
+        foreach (var c in commandes)
+        {
+            double? key = c.Date is { } date ? Clock.ToMs(Clock.ToLocal(date).Date) : null;
+            var index = groups.FindIndex(g => g.Day == key);
+            if (index < 0) groups.Add((key, [c]));
+            else groups[index].Items.Add(c);
+        }
+        return groups;
+    }
+
+    private const string CommandeKind = "commande";
+    private const string DechargementKind = "dechargement";
+
+    private Task StartDrag(string kind, string id, double durationMinutes) =>
+        OnDragStartItem.InvokeAsync(new DragItem(kind, id, durationMinutes, 0));
+
+    private async Task DeleteAsync(string id)
+    {
+        if (await Browser.ConfirmAsync("Supprimer ce déchargement en attente ?")) await OnDeleteDechargement.InvokeAsync(id);
+    }
+
+    private RenderFragment CommandeItem(CommandeEnCours c) => __builder =>
+    {
+        var complete = c.QtPlanifie >= c.Qt;
+        var ratio = c.Qt > 0 ? Math.Min(c.QtPlanifie / c.Qt, 1) : 1;
+        <div @key="c.Id" class="pl-item@(complete ? " is-complete" : string.Empty)" draggable="@(complete ? "false" : "true")"
+             data-drag-effect="copy" data-drag-id="@c.Id"
+             title="@(complete ? "Commande entièrement planifiée" : "Glisser sur le planning")" style="--m: @c.Marchandise.couleur"
+             @ondragstart="() => StartDrag(CommandeKind, c.Id, c.DureeMinutes)"
+             @ondragend="() => OnDragEnd.InvokeAsync()">
+            <Icon Name="planning.Grip" Class="pl-item-grip" />
+            <div class="pl-item-body">
+                <div class="pl-item-head">
+                    <strong>@c.Client</strong>
+                    <span class="pl-qty">@PlanningBoard.Num(c.QtPlanifie) / @PlanningBoard.Num(c.Qt)</span>
+                </div>
+                <div class="pl-item-goods">
+                    <span class="pl-swatch"></span>
+                    @c.Marchandise.nom
+                    @if (!string.IsNullOrEmpty(c.Reference))
+                    {
+                        <span class="pl-muted"> · @c.Reference</span>
+                    }
+                </div>
+                <div class="pl-item-line"><Icon Name="planning.Route" /> @c.Depart → @c.Arrivee</div>
+                <div class="pl-item-foot">
+                    <span class="pl-mono pl-muted">N° @c.Numero</span>
+                    <span class="pl-progress" aria-hidden="true"><span style="width: @($"{PlanningBoard.Num(ratio * 100)}%")"></span></span>
+                </div>
+            </div>
+        </div>
+    };
+}

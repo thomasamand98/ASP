@@ -239,10 +239,10 @@
     display: none;
   }
 
-  .contrat-table,
-  .contrat-table tbody,
-  .contrat-table tr,
-  .contrat-form ::deep .contrat-table td {
+  .contrat-form ::deep .contrat-table,
+.contrat-form ::deep .contrat-table tbody,
+.contrat-form ::deep .contrat-table tr,
+.contrat-form ::deep .contrat-table td {
     display: block;
   }
 

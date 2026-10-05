@@ -10,7 +10,7 @@
             + (tab.Id == ActiveId ? " active" : "")
             + (tab.Id == _draggedId ? " dragging" : "")
             + (tab.Id == _dragOverId && tab.Id != _draggedId ? " drag-over" : "");
-        <div @key="tab.Id" class="@classes" role="tab" data-drag-move aria-selected="@(tab.Id == ActiveId ? "true" : "false")" draggable="true"
+        <div @key="tab.Id" class="@classes" role="tab" data-drag-effect="move" data-drop-effect="move" aria-selected="@(tab.Id == ActiveId ? "true" : "false")" draggable="true"
              @ondragstart="() => _draggedId = tab.Id"
              @ondragend="EndDrag"
              @ondragover="() => { if (_draggedId is not null && _draggedId != tab.Id) _dragOverId = tab.Id; }"

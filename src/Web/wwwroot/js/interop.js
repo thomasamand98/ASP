@@ -186,24 +186,50 @@ window.horizon = (() => {
   // Comportements du navigateur que Blazor ne peut pas régler par événement :
   //   - Maj+clic sur une ligne sélectionnable d'un tableau : pas de
   //     surlignage du texte (voir DataTable.razor, data-shift-select) ;
-  //   - glisser-déposer des onglets : curseur « déplacer » (data-drag-move).
-  document.addEventListener('mousedown', (event) => {
-    if (event.shiftKey && event.target.closest?.('[data-shift-select]')) event.preventDefault()
-  })
   //   - onglets de fiche : flèches, Début et Fin changent d'onglet sans
   //     faire défiler la page (data-nav-keys, voir FicheTabs.razor) ;
   //   - champ de recherche dans une fiche : Entrée choisit un résultat sans
   //     enregistrer la fiche, Échap referme la recherche (data-enter-select) ;
+  //   - glisser-déposer (onglets, planning) : effet autorisé et donnée du
+  //     glisser posés au départ (data-drag-effect, data-drag-id), effet de
+  //     dépôt pendant le survol (data-drop-effect).
+  document.addEventListener('mousedown', (event) => {
+    if (event.shiftKey && event.target.closest?.('[data-shift-select]')) event.preventDefault()
+  })
   document.addEventListener('keydown', (event) => {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) && event.target.closest?.('[data-nav-keys]')) event.preventDefault()
     if (['Enter', 'Escape'].includes(event.key) && event.target.closest?.('[data-enter-select]')) event.preventDefault()
+    // Élément activable au clavier (carte du planning) : Espace ne fait pas
+    // défiler la page.
+    if (['Enter', ' '].includes(event.key) && event.target.matches?.('[data-activate-keys]')) event.preventDefault()
   })
   document.addEventListener('dragstart', (event) => {
-    if (event.target.closest?.('[data-drag-move]')) event.dataTransfer.effectAllowed = 'move'
+    const source = event.target.closest?.('[data-drag-effect]')
+    if (!source) return
+    event.dataTransfer.effectAllowed = source.dataset.dragEffect
+    if (source.dataset.dragId) event.dataTransfer.setData('text/plain', source.dataset.dragId)
   })
   document.addEventListener('dragover', (event) => {
-    if (event.target.closest?.('[data-drag-move]')) event.dataTransfer.dropEffect = 'move'
+    const target = event.target.closest?.('[data-drop-effect]')
+    if (target) event.dataTransfer.dropEffect = target.dataset.dropEffect
   })
+
+  // Position d'un élément, lue de façon synchrone pendant un glisser.
+  const rectSync = (element) => rect(element)
+
+  function scrollTop(element, top) {
+    element?.scrollTo({ top })
+  }
+
+  // Redimensionnement d'une carte du planning : le pointeur reste capturé
+  // par la poignée même s'il en sort.
+  function capturePointer(element, pointerId) {
+    try {
+      element?.setPointerCapture(pointerId)
+    } catch {
+      // Pointeur déjà relâché.
+    }
+  }
 
   // Taille d'un élément, suivie (graphique du tableau de bord).
   const observers = new Map()
@@ -239,6 +265,9 @@ window.horizon = (() => {
     setIndeterminate,
     reportValidity,
     rect,
+    rectSync,
+    scrollTop,
+    capturePointer,
     trackTouch,
     listenEscape,
     listenOutside,

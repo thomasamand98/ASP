@@ -1,0 +1,65 @@
+@inject Browser Browser
+
+@* Mode « Colonne » : une colonne par ressource, les journées de la période
+   empilées verticalement avec leur axe horaire (comme l'écran WinDev). *@
+<div class="pl-board-scroll" @ref="_scroll" @onclick="() => Board.OnSelect(null)">
+    <div class="pl-col-grid" style="@GridStyle">
+        <div class="pl-col-head pl-col-corner"></div>
+        @foreach (var r in Board.Resources)
+        {
+            <div @key="r.Id" class="pl-col-head">
+                <ResourceHeader Resource="r" Ca="Board.Ca(r.Id)" Count="Board.Count(r.Id)" />
+            </div>
+        }
+
+        @foreach (var day in Board.Days)
+        {
+            var dayStart = Clock.ToMs(day);
+            var dayEnd = Clock.ToMs(day.AddDays(1));
+            var segments = PlanningBoard.ClipToRange(Board.Executions, dayStart, dayEnd);
+            var today = DateUtils.IsSameDay(day, Clock.ToLocal(Board.Now));
+            <div class="pl-col-day@(today ? " is-today" : string.Empty)">
+                <span class="pl-col-day-label">
+                    @Format.DayLong(day)
+                    @if (today)
+                    {
+                        <span class="pl-today-pill">Aujourd'hui</span>
+                    }
+                    <span class="pl-col-day-count">@segments.Count exécution@(segments.Count > 1 ? "s" : "")</span>
+                </span>
+            </div>
+            <div class="pl-col-gutter" style="height: @PlanningBoard.Px(24 * HourPx)">
+                @foreach (var h in HourLabels)
+                {
+                    <span style="top: @PlanningBoard.Px(h * HourPx)">@($"{h:00}:00")</span>
+                }
+            </div>
+            @foreach (var r in Board.Resources)
+            {
+                <ColumnDayCell @key="(dayStart, r.Id)" Board="Board" DayStart="dayStart" Resource="r"
+                               Segments="segments.Where(s => PlanningBoard.ResourceIdOf(s.Execution, Board.GroupBy) == r.Id).ToList()"
+                               NowMinutes="@(today ? (Board.Now - dayStart) / DateUtils.MinuteMs : null)" Weekend="DateUtils.IsWeekend(day)" />
+            }
+        }
+    </div>
+</div>
+
+@code {
+    // Hauteur d'une heure en pixels : une journée complète fait 24 × HourPx.
+    public const double HourPx = 26;
+    private static readonly int[] HourLabels = [.. Enumerable.Range(0, 12).Select(i => i * 2)];
+    // Heure affichée en haut à l'ouverture (la nuit est rarement utilisée).
+    private const int InitialScrollHour = 5;
+
+    private ElementReference _scroll;
+
+    [Parameter, EditorRequired] public BoardContext Board { get; set; } = default!;
+
+    private string GridStyle =>
+        $"grid-template-columns: var(--pl-gutter) repeat({Board.Resources.Count}, minmax(11rem, 1fr)); min-width: calc(var(--pl-gutter) + {Board.Resources.Count} * 11rem)";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.ScrollTopAsync(_scroll, InitialScrollHour * HourPx);
+    }
+}

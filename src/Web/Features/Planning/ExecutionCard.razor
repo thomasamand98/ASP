@@ -1,0 +1,177 @@
+@inject Browser Browser
+
+@* Carte d'une exécution sur la grille. Sa couleur est celle de la
+   marchandise (Marchandise.CouleurPlanning) ; le contenu se réduit selon la
+   place disponible (voir les @container de PlanningPage.razor.css). La
+   poignée de fin (bord bas en mode colonne, bord droit en mode ligne) change
+   la fin de l'exécution. *@
+<div @ref="_element" role="button" tabindex="0" draggable="@(_resizeOrigin is null ? "true" : "false")"
+     data-drag-effect="move" data-drag-id="@Execution.Id" data-activate-keys
+     class="@CardClass" style="@CardStyle" title="@Title" aria-pressed="@(Selected ? "true" : "false")"
+     @onclick="() => OnSelect.InvokeAsync(Execution.Id)" @onclick:stopPropagation="true"
+     @onkeydown="OnKeyDown" @ondragstart="DragStartAsync" @ondragend="() => OnDragEnd.InvokeAsync()">
+    <div class="pl-card-inner">
+        <div class="pl-card-top">
+            <span class="pl-card-time">@Format.Time(Clock.ToLocal(Execution.Start)) – @Format.Time(Clock.ToLocal(EndShown))</span>
+            <span class="pl-status-dot pl-status-dot--@Execution.Statut" aria-label="@PlanningBoard.StatutLabels.GetValueOrDefault(Execution.Statut)"></span>
+        </div>
+        <div class="pl-card-client">@Execution.Client</div>
+        <div class="pl-card-line pl-card-goods">
+            @Execution.Marchandise.nom
+            @if (!string.IsNullOrEmpty(Execution.Reference))
+            {
+                <span class="pl-card-ref"> · @Execution.Reference</span>
+            }
+        </div>
+        <div class="pl-card-line pl-card-route">@Route</div>
+        @if (!string.IsNullOrEmpty(Execution.Tracteur) || !string.IsNullOrEmpty(Execution.RemorqueImmat) || Execution.Nature != "complete")
+        {
+            <div class="pl-card-tags">
+                @if (!string.IsNullOrEmpty(Execution.Tracteur))
+                {
+                    <span class="pl-plate">@Execution.Tracteur</span>
+                }
+                @if (!string.IsNullOrEmpty(Execution.RemorqueImmat))
+                {
+                    <span class="pl-plate">@Execution.RemorqueImmat</span>
+                }
+                @if (Execution.Nature == "chargement")
+                {
+                    <span class="pl-badge pl-badge--warn">Déch. différé</span>
+                }
+                @if (Execution.Nature == "dechargement")
+                {
+                    <span class="pl-badge">Déchargement</span>
+                }
+            </div>
+        }
+    </div>
+    @if (Resize is not null)
+    {
+        <span @ref="_handle" class="pl-card-resize pl-card-resize--@Resize.Axis" aria-hidden="true" title="Glisser pour changer la fin"
+              @onpointerdown="ResizeStartAsync" @onpointerdown:preventDefault="true" @onpointerdown:stopPropagation="true"
+              @onpointermove="ResizeMove" @onpointerup="ResizeEndAsync" @onpointercancel="ResizeCancel"
+              @onclick:stopPropagation="true"></span>
+    }
+</div>
+
+@code {
+    // Redimensionnement par la poignée de fin de carte : axe « y » en mode
+    // colonne, « x » en mode ligne.
+    public sealed record ResizeConfig(string Axis, double PxPerMinute, Func<PlanningExecution, double, Task> OnResizeEnd);
+
+    private ElementReference _element;
+    private ElementReference _handle;
+    // Écart de durée (minutes) pendant un redimensionnement en cours.
+    private double _deltaMinutes;
+    private double? _resizeOrigin;
+
+    [Parameter, EditorRequired] public PlanningExecution Execution { get; set; } = default!;
+
+    // Position et taille de la carte, en pixels (top / height en mode
+    // colonne, left / width en mode ligne) ; Left / Width peuvent être des
+    // expressions CSS.
+    [Parameter] public double Top { get; set; }
+    [Parameter] public double Height { get; set; }
+    [Parameter] public string? Left { get; set; }
+    [Parameter] public string? Width { get; set; }
+    [Parameter] public double? LeftPx { get; set; }
+    [Parameter] public double? WidthPx { get; set; }
+
+    [Parameter] public bool Selected { get; set; }
+
+    // La carte est coupée par le bord de la journée (mode colonne) ou de la
+    // période (mode ligne) : on l'indique pour ne pas laisser croire qu'elle
+    // s'arrête là.
+    [Parameter] public bool ContinuesBefore { get; set; }
+    [Parameter] public bool ContinuesAfter { get; set; }
+
+    // Absent quand la fin de l'exécution n'est pas visible sur ce segment.
+    [Parameter] public ResizeConfig? Resize { get; set; }
+
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    // Rectangle de la carte et position du pointeur au départ du glisser.
+    [Parameter] public Func<PlanningExecution, ElementRect, DragEventArgs, Task>? OnDragStart { get; set; }
+    [Parameter] public EventCallback OnDragEnd { get; set; }
+
+    private double EndShown => Execution.End + _deltaMinutes * DateUtils.MinuteMs;
+
+    private string Route => $"{Execution.Depart} → {Execution.Arrivee}";
+
+    private string Title =>
+        $"{Execution.Client} — {Execution.Marchandise.nom}\n{Route}\n{Format.Time(Clock.ToLocal(Execution.Start))} – {Format.Time(Clock.ToLocal(EndShown))} · {PlanningBoard.StatutLabels.GetValueOrDefault(Execution.Statut)}";
+
+    private string CardClass =>
+        $"pl-card pl-card--{Execution.Statut}" + (Selected ? " is-selected" : "") + (ContinuesBefore ? " continues-before" : "")
+        + (ContinuesAfter ? " continues-after" : "") + (_deltaMinutes != 0 ? " is-resizing" : "");
+
+    private string CardStyle
+    {
+        get
+        {
+            var extra = Resize is not null && _deltaMinutes != 0 ? _deltaMinutes * Resize.PxPerMinute : 0;
+            var height = Resize?.Axis == "y" ? Height + extra : Height;
+            var parts = new List<string>();
+            if (LeftPx is not null)
+            {
+                // Mode ligne : left, width, top, height en pixels.
+                var width = (WidthPx ?? 0) + (Resize?.Axis == "x" ? extra : 0);
+                parts.Add($"left: {PlanningBoard.Px(LeftPx.Value)}");
+                parts.Add($"width: {PlanningBoard.Px(width)}");
+                parts.Add($"top: {PlanningBoard.Px(Top)}");
+                parts.Add($"height: {PlanningBoard.Px(Height)}");
+            }
+            else
+            {
+                parts.Add($"top: {PlanningBoard.Px(Top)}");
+                parts.Add($"height: {PlanningBoard.Px(height)}");
+                parts.Add($"left: {Left}");
+                parts.Add($"width: {Width}");
+            }
+            parts.Add($"--m: {Execution.Marchandise.couleur}");
+            return string.Join("; ", parts);
+        }
+    }
+
+    private Task OnKeyDown(KeyboardEventArgs e) =>
+        e.Key is "Enter" or " " ? OnSelect.InvokeAsync(Execution.Id) : Task.CompletedTask;
+
+    private Task DragStartAsync(DragEventArgs e)
+    {
+        if (OnDragStart is null) return Task.CompletedTask;
+        return OnDragStart(Execution, Browser.GetRect(_element), e);
+    }
+
+    private double Position(PointerEventArgs e) => Resize?.Axis == "y" ? e.ClientY : e.ClientX;
+
+    private async Task ResizeStartAsync(PointerEventArgs e)
+    {
+        await Browser.CapturePointerAsync(_handle, e.PointerId);
+        _resizeOrigin = Position(e);
+    }
+
+    private void ResizeMove(PointerEventArgs e)
+    {
+        if (_resizeOrigin is not { } origin || Resize is null) return;
+        var minutes = DateUtils.Snap((Position(e) - origin) / Resize.PxPerMinute);
+        // Durée minimale : un pas de la grille.
+        var minDelta = DateUtils.SnapMinutes - (Execution.End - Execution.Start) / DateUtils.MinuteMs;
+        _deltaMinutes = Math.Max(minutes, minDelta);
+    }
+
+    private async Task ResizeEndAsync()
+    {
+        if (_resizeOrigin is null) return;
+        _resizeOrigin = null;
+        var delta = _deltaMinutes;
+        _deltaMinutes = 0;
+        if (delta != 0 && Resize is not null) await Resize.OnResizeEnd(Execution, Execution.End + delta * DateUtils.MinuteMs);
+    }
+
+    private void ResizeCancel()
+    {
+        _resizeOrigin = null;
+        _deltaMinutes = 0;
+    }
+}

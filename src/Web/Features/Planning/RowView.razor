@@ -1,0 +1,75 @@
+@* Mode « Ligne » : une ligne par ressource, la période en frise
+   horizontale — pratique pour voir d'un coup d'œil la charge de chacun. *@
+<div class="pl-board-scroll" @onclick="() => Board.OnSelect(null)">
+    <div class="pl-row-grid" style="width: calc(var(--pl-label) + @PlanningBoard.Px(TrackWidth))">
+        <div class="pl-row-head">
+            <div class="pl-row-corner">@(Board.GroupBy == "executant" ? "Exécutant" : "Remorque")</div>
+            @foreach (var d in Board.Days)
+            {
+                <div @key="d" class="pl-row-dayhead@(DateUtils.IsSameDay(d, Clock.ToLocal(Board.Now)) ? " is-today" : string.Empty)" style="width: @PlanningBoard.Px(DayW)">
+                    <strong>@Format.DayShort(d)</strong>
+                    <div class="pl-row-ticks">
+                        @foreach (var h in Ticks)
+                        {
+                            <span style="left: @PlanningBoard.Px(h * HourW)">@(h)h</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        @foreach (var r in Board.Resources)
+        {
+            <div @key="r.Id" class="pl-row">
+                <div class="pl-row-label">
+                    <ResourceHeader Resource="r" Ca="Board.Ca(r.Id)" Count="Board.Count(r.Id)" />
+                </div>
+                <RowTrack Board="Board" Resource="r" Timeline="this"
+                          Segments="_segments.Where(s => PlanningBoard.ResourceIdOf(s.Execution, Board.GroupBy) == r.Id).ToList()" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    // Largeur d'une heure en pixels : une journée fait 24 × HourW.
+    public const double HourW = 20;
+    public const double DayW = 24 * HourW;
+    public const double LaneH = 68;
+    private static readonly int[] Ticks = [0, 6, 12, 18];
+
+    private List<Segment> _segments = [];
+
+    [Parameter, EditorRequired] public BoardContext Board { get; set; } = default!;
+
+    public double PeriodStart => Clock.ToMs(Board.Days[0]);
+    public double PeriodEnd => Clock.ToMs(Board.Days[^1].AddDays(1));
+    public IReadOnlyList<double> DayStarts { get; private set; } = [];
+    public double TrackWidth => Board.Days.Count * DayW;
+
+    protected override void OnParametersSet()
+    {
+        DayStarts = [.. Board.Days.Select(Clock.ToMs)];
+        _segments = PlanningBoard.ClipToRange(Board.Executions, PeriodStart, PeriodEnd);
+    }
+
+    // Position horizontale d'un instant, calculée jour par jour pour rester
+    // juste les jours de changement d'heure (23 h ou 25 h).
+    public double XOf(double t)
+    {
+        if (t >= PeriodEnd) return TrackWidth;
+        var index = -1;
+        for (var i = 0; i < DayStarts.Count; i++)
+        {
+            if (t >= DayStarts[i] && (i == DayStarts.Count - 1 || t < DayStarts[i + 1]))
+            {
+                index = i;
+                break;
+            }
+        }
+        if (index == -1) index = 0;
+        return index * DayW + (t - DayStarts[index]) / DateUtils.MinuteMs / 60 * HourW;
+    }
+
+    public double? NowX => Board.Now >= PeriodStart && Board.Now < PeriodEnd ? XOf(Board.Now) : null;
+}

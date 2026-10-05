@@ -1,0 +1,234 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject ApiClient Api
+
+@* Fiche d'une commande, reprise de l'écran WinDev : carte « Informations »
+   avec le client, le contrat et ses dates en lecture seule, puis la
+   prestation du contrat, la date, la quantité, la référence et
+   l'instruction. En création, le contrat se choisit dans une liste ; il
+   n'est plus modifiable ensuite. Statut / QT_planifie (gérés par le
+   planning) ne sont pas affichés mais conservés. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+
+    <FicheSection Title="Informations" Class="fiche-section--center">
+        <div class="cmd-contrat">
+            <div class="field">
+                <span class="field-label">Client</span>
+                <span class="fiche-readonly">@Or(Selected?.Societe?.Nom_societe)</span>
+            </div>
+            @if (Initial is not null)
+            {
+                <div class="field">
+                    <span class="field-label">Contrat</span>
+                    <span class="fiche-readonly">@(Selected is { } c ? ContratFormat.Numero(c.Num_contrat, c.Version_contrat) : Nbsp)</span>
+                </div>
+            }
+            else
+            {
+                <FicheField Label="Contrat">
+                    <select value="@_form.IDCONTRATS" @onchange="e => ChangeContrat((string)e.Value!)" required>
+                        <option value=""></option>
+                        @foreach (var c in SortedContrats)
+                        {
+                            <SelectOption @key="c.IDCONTRATS" Value="@c.IDCONTRATS" Current="@_form.IDCONTRATS">
+                                @ContratFormat.Numero(c.Num_contrat, c.Version_contrat)@(string.IsNullOrEmpty(c.Societe?.Nom_societe) ? "" : $" — {c.Societe.Nom_societe}")
+                            </SelectOption>
+                        }
+                    </select>
+                </FicheField>
+            }
+            <div class="field">
+                <span class="field-label">Début du contrat</span>
+                <span class="fiche-readonly">@Or(Format.IsoDate(Selected?.Date_debut))</span>
+            </div>
+            <div class="field">
+                <span class="field-label">Fin du contrat</span>
+                <span class="fiche-readonly">@Or(Format.IsoDate(Selected?.Date_fin))</span>
+            </div>
+        </div>
+
+        <FicheField Label="Prestations">
+            <select value="@_form.IDPRESTATIONS" @onchange="e => _form.IDPRESTATIONS = (string)e.Value!" disabled="@(_form.IDCONTRATS.Length == 0)"
+                    title="@(_form.IDCONTRATS.Length > 0 ? null : "Choisissez d’abord un contrat")">
+                <option value="">@(_prestations is null ? "Chargement des prestations..." : "")</option>
+                @* Prestation liée absente de la liste (pas encore chargée...). *@
+                @if (_form.IDPRESTATIONS.Length > 0 && !PrestationListed)
+                {
+                    <option value="@_form.IDPRESTATIONS">
+                        @(Initial?.Prestation is { } p && _form.IDPRESTATIONS == FormModel.LinkId(Initial.IDPRESTATIONS)
+                            ? PrestationLabel(p.Description_prestation, null)
+                            : _form.IDPRESTATIONS)
+                    </option>
+                }
+                @foreach (var p in _prestations ?? [])
+                {
+                    <SelectOption @key="p.IDPRESTATIONS" Value="@p.IDPRESTATIONS" Current="@_form.IDPRESTATIONS">@PrestationLabel(p.Description_prestation, p.Description_courte)</SelectOption>
+                }
+            </select>
+        </FicheField>
+
+        <div class="cmd-saisie">
+            <FicheField Label="Date commande">
+                <input type="date" value="@_form.Date_commande" @oninput="e => _form.Date_commande = (string)e.Value!" />
+            </FicheField>
+            <FicheField Label="Quantité">
+                <input type="number" min="0" step="1" class="cmd-qt" value="@JsNumber.ToString(_form.QT)" @oninput="e => _form.QT = JsNumber.Parse((string)e.Value!)" />
+            </FicheField>
+            <FicheField Label="Référence">
+                <input value="@_form.NumRef" maxlength="50" @oninput="e => _form.NumRef = (string)e.Value!" />
+            </FicheField>
+        </div>
+
+        <FicheField Label="Instruction">
+            <input value="@_form.Instruction" maxlength="300" @oninput="e => _form.Instruction = (string)e.Value!" />
+        </FicheField>
+    </FicheSection>
+</form>
+
+@code {
+    private const string Nbsp = " ";
+
+    // Tri des contrats : société (« fr »), puis numéro (numérique : « 2 » avant « 10 »).
+    private static readonly StringComparer NumericFrench = StringComparer.Create(new CultureInfo("fr"), CompareOptions.NumericOrdering);
+
+    // Champs envoyés à l'API (CreateCommandeDto) : ids en texte ("" = aucun),
+    // date « AAAA-MM-JJ ».
+    private sealed class Model
+    {
+        public string Date_commande { get; set; } = "";
+        public string IDCONTRATS { get; set; } = "";
+        public string IDPRESTATIONS { get; set; } = "";
+        public double QT { get; set; }
+        public double QT_planifie { get; set; }
+        public string Statut { get; set; } = "";
+        public string NumRef { get; set; } = "";
+        public string Instruction { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    // null pendant le chargement.
+    private List<PrestationOption>? _prestations;
+    private string? _prestationsFor;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public Commande? Initial { get; set; }
+
+    // Valeurs préremplies en création (projection depuis une seule ligne).
+    [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
+
+    // Liste du sélecteur Contrat, chargée par CommandesPage.
+    [Parameter] public IReadOnlyList<Contrat> Contrats { get; set; } = [];
+    [Parameter] public Func<CreateCommandeDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private static string Or(string? value) => string.IsNullOrEmpty(value) ? Nbsp : value;
+
+    private static string PrestationLabel(string? description, string? courte) =>
+        !string.IsNullOrEmpty(description) ? description : !string.IsNullOrEmpty(courte) ? courte : "Prestation sans description";
+
+    private IEnumerable<Contrat> SortedContrats => Contrats
+        .OrderBy(c => c.Societe?.Nom_societe ?? "", FormModel.French)
+        .ThenBy(c => ContratFormat.Numero(c.Num_contrat, c.Version_contrat), NumericFrench);
+
+    // Contrat choisi : celui de la liste, sinon celui renvoyé avec la commande.
+    private CommandeContrat? Selected
+    {
+        get
+        {
+            if (Contrats.FirstOrDefault(c => c.IDCONTRATS == _form.IDCONTRATS) is { } listed)
+            {
+                return new CommandeContrat(listed.Num_contrat, listed.Version_contrat, listed.Date_debut, listed.Date_fin,
+                    listed.Societe is null ? null : new NomSociete(listed.Societe.Nom_societe));
+            }
+            return Initial is not null && _form.IDCONTRATS == FormModel.LinkId(Initial.IDCONTRATS) ? Initial.Contrat : null;
+        }
+    }
+
+    private bool PrestationListed => _prestations?.Any(p => p.IDPRESTATIONS == _form.IDPRESTATIONS) ?? false;
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            Date_commande = Initial is not null ? FormModel.DateInput(Initial.Date_commande) : DateUtils.ToInputValue(DateTime.Now),
+            IDCONTRATS = FormModel.LinkId(Initial?.IDCONTRATS),
+            IDPRESTATIONS = FormModel.LinkId(Initial?.IDPRESTATIONS),
+            QT = Initial?.QT ?? 0,
+            QT_planifie = Initial?.QT_planifie ?? 0,
+            Statut = Initial?.Statut ?? "",
+            NumRef = Initial?.NumRef is { Length: > 0 } numRef && numRef != "0" ? numRef : "",
+            Instruction = Initial?.Instruction ?? "",
+        };
+        if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+        await LoadPrestationsAsync();
+    }
+
+    // Prestations du contrat choisi, rechargées quand il change.
+    private async Task LoadPrestationsAsync()
+    {
+        var id = _form.IDCONTRATS;
+        if (id == _prestationsFor) return;
+        _prestationsFor = id;
+        if (id.Length == 0)
+        {
+            _prestations = [];
+            StateHasChanged();
+            return;
+        }
+        _prestations = null;
+        StateHasChanged();
+        List<PrestationOption> result;
+        try
+        {
+            result = (await Api.GetAsync<PrestationsResponse>($"contrats/{id}/prestations")).prestations;
+        }
+        catch (Exception)
+        {
+            result = [];
+        }
+        if (_prestationsFor != id) return;
+        _prestations = result;
+        StateHasChanged();
+    }
+
+    // Changer de contrat vide la prestation, qui appartient à l'ancien.
+    private void ChangeContrat(string id)
+    {
+        _form.IDCONTRATS = id;
+        _form.IDPRESTATIONS = "";
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreateCommandeDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

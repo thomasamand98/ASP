@@ -1,2 +1,71 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : CommandesPage</p>
+@inject ApiClient Api
+@inject EnumerationLabels Enumerations
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Commande" TDto="CreateCommandeDto" TDetail="Commande"
+          Title="Commandes" LoadingLabel="Chargement des commandes..."
+          Source="_list" Columns="_columns" GetRowId="c => c.IDCOMMANDES"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer cette commande ?" CreateModalTitle="Nouvelle commande" EditModalTitle="Modifier la commande"
+          Entity="commandes" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <ToolbarExtra>
+        <PeriodFilter Value="_period" ValueChanged="ChangePeriodAsync" />
+    </ToolbarExtra>
+    <RenderForm Context="form">
+        <CommandeForm Initial="form.Initial" Defaults="Projection?.Defaults" Contrats="_contrats.Data" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private ApiList<Commande> _list = default!;
+    private CrudApi<CreateCommandeDto, Commande, Commande> _api = default!;
+    // Liste du sélecteur Contrat, chargée une fois tant que l'onglet reste
+    // ouvert (pas à chaque ouverture de fiche).
+    private ApiList<Contrat> _contrats = default!;
+    private IReadOnlyList<Column<Commande>> _columns = [];
+    // Commandes du jour par défaut ; toutes en projection, pour ne masquer
+    // aucune ligne liée.
+    private Period? _period;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    private Dictionary<string, string> Filters() =>
+        ProjectionView.Filters(Projection).Concat(Period.Filters(_period)).ToDictionary();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _period = Projection is null ? Period.Today() : null;
+        _list = new ApiList<Commande>(Api, "commandes") { Paginated = true };
+        _list.Configure(1, 25, "", Filters());
+        _api = new CrudApi<CreateCommandeDto, Commande, Commande>(Api, "commandes");
+        _contrats = new ApiList<Contrat>(Api, "contrats");
+        _contrats.Changed += StateHasChanged;
+        _columns = MakeColumns(new Dictionary<string, string>());
+        var loading = Task.WhenAll(_list.RefetchAsync(), _contrats.RefetchAsync());
+        // Libellés de l'énumération « unite_prestation » indexés par code — le
+        // code brut s'affiche tant qu'ils ne sont pas chargés.
+        _columns = MakeColumns(await Enumerations.LoadAsync("unite_prestation"));
+        await loading;
+    }
+
+    private Task ChangePeriodAsync(Period? period)
+    {
+        _period = period;
+        return _list.SetFiltersAsync(Filters(), resetPage: true);
+    }
+
+    private static IReadOnlyList<Column<Commande>> MakeColumns(IReadOnlyDictionary<string, string> unites) =>
+    [
+        Col.Date<Commande>("Date_commande", "Date", c => c.Date_commande),
+        Col.Of<Commande>("client", "Client", c => c.Contrat?.Societe?.Nom_societe ?? ""),
+        Col.Of<Commande>("contrat", "N° contrat", c => c.Contrat is { } contrat ? ContratFormat.Numero(contrat.Num_contrat, contrat.Version_contrat) : ""),
+        Col.Of<Commande>("marchandise", "Marchandise", c => c.Marchandise?.Nom_marchandise ?? ""),
+        Col.Of<Commande>("unite", "Unité", c => c.Unite is { } unite ? unites.GetValueOrDefault(JsNumber.ToString(unite)) ?? JsNumber.ToString(unite) : ""),
+        Col.Key<Commande>("QT", "Quantité", c => c.QT),
+        Col.Key<Commande>("NumRef", "Référence", c => c.NumRef),
+        Col.Key<Commande>("Instruction", "Instruction", c => c.Instruction),
+    ];
+}

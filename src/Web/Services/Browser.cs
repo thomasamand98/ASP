@@ -40,6 +40,13 @@ public sealed class Browser(IJSRuntime js)
     public ValueTask SetIndeterminateAsync(ElementReference element, bool value) => js.InvokeVoidAsync("horizon.setIndeterminate", element, value);
     public bool ReportValidity(ElementReference element) => ((IJSInProcessRuntime)js).Invoke<bool>("horizon.reportValidity", element);
     public ValueTask<ElementRect> GetRectAsync(ElementReference element) => js.InvokeAsync<ElementRect>("horizon.rect", element);
+
+    // Lecture synchrone (WebAssembly) : pendant un glisser-déposer, la
+    // position doit être connue avant la fin de l'événement.
+    public ElementRect GetRect(ElementReference element) => ((IJSInProcessRuntime)js).Invoke<ElementRect>("horizon.rectSync", element);
+
+    public ValueTask ScrollTopAsync(ElementReference element, double top) => js.InvokeVoidAsync("horizon.scrollTop", element, top);
+    public ValueTask CapturePointerAsync(ElementReference element, long pointerId) => js.InvokeVoidAsync("horizon.capturePointer", element, pointerId);
     public ValueTask TrackTouchAsync<T>(ElementReference element, DotNetObjectReference<T> target) where T : class =>
         js.InvokeVoidAsync("horizon.trackTouch", element, target);
 

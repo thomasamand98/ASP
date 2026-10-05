@@ -1,0 +1,84 @@
+@inject Browser Browser
+
+@* Frise d'une ressource (mode « Ligne ») : ses cartes, réparties en couloirs
+   quand elles se chevauchent, et la zone de dépôt d'un glisser. *@
+<div @ref="_track" class="pl-row-track" style="@TrackStyle" data-drop-effect="@Board.DropEffect"
+     @ondragover="DragOverAsync" @ondragover:preventDefault="@(Board.DragItem is not null)"
+     @ondrop="DropAsync" @ondrop:preventDefault="@(Board.DragItem is not null)">
+    @for (var i = 0; i < Board.Days.Count; i++)
+    {
+        var d = Board.Days[i];
+        var today = DateUtils.IsSameDay(d, Clock.ToLocal(Board.Now));
+        if (DateUtils.IsWeekend(d) || today)
+        {
+            <div @key="i" class="pl-row-daybg@(today ? " is-today" : " is-weekend")" style="left: @PlanningBoard.Px(i * RowView.DayW); width: @PlanningBoard.Px(RowView.DayW)"></div>
+        }
+    }
+    @foreach (var s in Segments)
+    {
+        var lane = _lanes.TryGetValue(s.Id, out var l) ? l.Lane : 0;
+        var left = Timeline.XOf(s.Start);
+        var segment = s;
+        <ExecutionCard @key="s.Id" Execution="s.Execution" Selected="@(Board.SelectedId == s.Id)"
+                       Resize="@(s.ContinuesAfter ? null : new ExecutionCard.ResizeConfig("x", RowView.HourW / 60, Board.OnResizeEnd))"
+                       ContinuesBefore="s.ContinuesBefore" ContinuesAfter="s.ContinuesAfter"
+                       LeftPx="left + 1" WidthPx="Math.Max(Timeline.XOf(s.End) - left - 2, 26)" Top="4 + lane * RowView.LaneH" Height="RowView.LaneH - 6"
+                       OnSelect="id => Board.OnSelect(id)" OnDragEnd="() => Board.OnDragEnd()"
+                       OnDragStart="(execution, rect, e) => DragStartAsync(segment, execution, rect, e)" />
+    }
+    @if (Board.Preview is { } preview && preview.ResourceId == Resource.Id)
+    {
+        <div class="pl-drop-preview"
+             style="left: @PlanningBoard.Px(Timeline.XOf(preview.Start)); width: @PlanningBoard.Px(Math.Max(Timeline.XOf(Math.Min(preview.End, Timeline.PeriodEnd)) - Timeline.XOf(preview.Start), 8)); top: 4px; bottom: 4px"></div>
+    }
+    @if (Timeline.NowX is { } nowX)
+    {
+        <div class="pl-now pl-now--v" style="left: @PlanningBoard.Px(nowX)"></div>
+    }
+</div>
+
+@code {
+    private ElementReference _track;
+    private Dictionary<string, (int Lane, int Lanes)> _lanes = [];
+
+    [Parameter, EditorRequired] public BoardContext Board { get; set; } = default!;
+    [Parameter, EditorRequired] public PlanningResource Resource { get; set; } = default!;
+    [Parameter, EditorRequired] public RowView Timeline { get; set; } = default!;
+    [Parameter] public IReadOnlyList<Segment> Segments { get; set; } = [];
+
+    private int LaneCount => _lanes.Count == 0 ? 1 : Math.Max(1, _lanes.Values.Max(l => l.Lanes));
+
+    private string TrackStyle =>
+        $"width: {PlanningBoard.Px(Timeline.TrackWidth)}; height: {PlanningBoard.Px(LaneCount * RowView.LaneH + 8)}; background-size: {PlanningBoard.Px(RowView.HourW * 6)} 100%, {PlanningBoard.Px(RowView.DayW)} 100%";
+
+    protected override void OnParametersSet() => _lanes = PlanningBoard.Lanes(Segments);
+
+    private double? StartAt(DragEventArgs e)
+    {
+        if (Board.DragItem is not { } item) return null;
+        var rect = Browser.GetRect(_track);
+        var x = DateUtils.Clamp(e.ClientX - rect.left, 0, Timeline.TrackWidth - 1);
+        var index = (int)Math.Floor(x / RowView.DayW);
+        var minutes = (x - index * RowView.DayW) / RowView.HourW * 60 - item.GrabOffsetMinutes;
+        var start = Timeline.DayStarts[index] + DateUtils.Snap(minutes) * DateUtils.MinuteMs;
+        return DateUtils.Clamp(start, Timeline.PeriodStart, Timeline.PeriodEnd - DateUtils.SnapMinutes * DateUtils.MinuteMs);
+    }
+
+    private Task DragOverAsync(DragEventArgs e)
+    {
+        if (StartAt(e) is not { } start || Board.DragItem is not { } item) return Task.CompletedTask;
+        if (Board.Preview?.ResourceId != Resource.Id || Board.Preview.Start != start)
+        {
+            return Board.OnPreview(new DropPreview(Resource.Id, start, start + item.DurationMinutes * DateUtils.MinuteMs));
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task DropAsync(DragEventArgs e) => StartAt(e) is { } start ? Board.OnDrop(Resource.Id, start) : Task.CompletedTask;
+
+    private Task DragStartAsync(Segment segment, PlanningExecution execution, ElementRect rect, DragEventArgs e)
+    {
+        var grabbed = (e.ClientX - rect.left) / RowView.HourW * 60 + (segment.Start - execution.Start) / DateUtils.MinuteMs;
+        return Board.OnDragStartItem(new DragItem("execution", execution.Id, (execution.End - execution.Start) / DateUtils.MinuteMs, grabbed));
+    }
+}
