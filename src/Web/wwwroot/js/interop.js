@@ -243,6 +243,24 @@ window.horizon = (() => {
     return id
   }
 
+  // Taille [largeur, hauteur] de chaque texte dans la police du document
+  // (graphique du tableau de bord : étiquettes d'axe qui tiennent côte à
+  // côte), mesurée dans un <span> comme le faisait la bibliothèque de
+  // graphiques d'origine.
+  function measureTexts(texts, fontSize) {
+    const span = document.createElement('span')
+    span.setAttribute('aria-hidden', 'true')
+    Object.assign(span.style, { position: 'absolute', top: '-20000px', left: '0', padding: '0', margin: '0', border: 'none', whiteSpace: 'pre', fontSize: fontSize + 'px' })
+    document.body.appendChild(span)
+    const sizes = texts.flatMap((text) => {
+      span.textContent = text
+      const { width, height } = span.getBoundingClientRect()
+      return [width, height]
+    })
+    span.remove()
+    return sizes
+  }
+
   function unobserve(id) {
     observers.get(id)?.disconnect()
     observers.delete(id)
@@ -275,6 +293,7 @@ window.horizon = (() => {
     guardUnload,
     lockScroll,
     observeWidth,
+    measureTexts,
     unobserve,
   }
 })()

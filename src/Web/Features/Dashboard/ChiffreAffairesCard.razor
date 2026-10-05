@@ -1,0 +1,216 @@
+@implements IDisposable
+@inject ApiClient Api
+
+@* Carte « Chiffre d'affaires » du tableau de bord : facturé et production de
+   la période choisie (année en cours par défaut), comparés à la même période
+   un an plus tôt. Bascule Graphique / Tableau : le tableau donne les valeurs
+   exactes (et remplace le graphique pour qui ne distingue pas les couleurs). *@
+<section class="ca-card" aria-labelledby="ca-card-title">
+    <header class="ca-card-header">
+        <h3 id="ca-card-title" class="ca-card-title">
+            Chiffre d’affaires @if (YearComplete)
+            {
+                <span class="ca-card-year">@Year</span>
+            }
+        </h3>
+        <div class="ca-card-filters">
+            <div class="ca-period" role="group" aria-label="Période">
+                <button type="button" class="icon-btn outlined" @onclick="() => Shift(-1)" aria-label="Année précédente">
+                    <Icon Name="planning.ChevronLeft" />
+                </button>
+                <label class="ca-period-date">
+                    <span>Du</span>
+                    <input type="date" class="control" value="@_from" @oninput="e => ChangeBound(true, (string)e.Value!)" />
+                </label>
+                <label class="ca-period-date">
+                    <span>au</span>
+                    <input type="date" class="control" value="@_to" @oninput="e => ChangeBound(false, (string)e.Value!)" />
+                </label>
+                <button type="button" class="icon-btn outlined" @onclick="() => Shift(1)" aria-label="Année suivante">
+                    <Icon Name="planning.ChevronRight" />
+                </button>
+                @if (!YearComplete || Year != DateTime.Now.Year.ToString())
+                {
+                    <button type="button" class="btn sm" @onclick="CurrentYear">Année en cours</button>
+                }
+            </div>
+            <div class="ca-view-toggle" role="group" aria-label="Affichage">
+                @foreach (var (option, label) in Views)
+                {
+                    <button @key="option" type="button" class="@(_view == option ? "active" : "")" aria-pressed="@(_view == option ? "true" : "false")" @onclick="() => _view = option">@label</button>
+                }
+            </div>
+        </div>
+    </header>
+
+    @* Légende + totaux de la période : l'identité de chaque série ne repose
+       jamais sur la seule couleur. *@
+    <ul class="ca-totals">
+        @for (var index = 0; index < CaSeries.All.Count; index++)
+        {
+            var series = CaSeries.All[index];
+            var comparison = index % 2 == 0 ? Evolution(Sum(Elapsed, series), Sum(Elapsed, CaSeries.All[index + 1])) : null;
+            <li @key="series.Key" class="ca-total">
+                <span class="ca-total-label">
+                    <span class="ca-swatch" style="background: @series.Color" aria-hidden="true"></span>
+                    @series.Label
+                </span>
+                <strong class="ca-total-value">@Format.Money(Sum(Points, series), 0, 0)</strong>
+                @if (comparison is not null)
+                {
+                    <span class="ca-total-delta">@comparison</span>
+                }
+            </li>
+        }
+    </ul>
+
+    @if (_error is not null)
+    {
+        <p class="ca-message ca-message-error">@_error</p>
+    }
+    else if (_loading && _data is null)
+    {
+        <p class="ca-message">Chargement...</p>
+    }
+    else if (_view == "graphique")
+    {
+        <div class="ca-chart@(_loading ? " is-loading" : "")">
+            <ChiffreAffairesChart Points="Points" Granularite="@Granularite" Height="340" />
+        </div>
+    }
+    else
+    {
+        <div class="ca-table-wrap">
+            <table class="ca-table">
+                <thead>
+                    <tr>
+                        <th scope="col">@(Granularite == "mois" ? "Mois" : "Jour")</th>
+                        @foreach (var series in CaSeries.All)
+                        {
+                            <th @key="series.Key" scope="col">@series.Label</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var point in Points)
+                    {
+                        <tr @key="point.cle">
+                            <th scope="row">@CaSeries.LabelLong(point.cle, Granularite)</th>
+                            @foreach (var series in CaSeries.All)
+                            {
+                                <td @key="series.Key">@Format.Money(series.Value(point), 0, 0)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th scope="row">Total</th>
+                        @foreach (var series in CaSeries.All)
+                        {
+                            <td @key="series.Key">@Format.Money(Sum(Points, series), 0, 0)</td>
+                        }
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly (string Option, string Label)[] Views = [("graphique", "Graphique"), ("tableau", "Tableau")];
+
+    private string _from = "";
+    private string _to = "";
+    private string _view = "graphique";
+    private ChiffreAffairesResponse? _data;
+    private string? _error;
+    private bool _loading = true;
+    private CancellationTokenSource? _cancel;
+
+    private string Year => _from[..4];
+    private bool YearComplete => _from == $"{Year}-01-01" && _to == $"{Year}-12-31";
+    private string Granularite => _data?.granularite ?? "mois";
+    private IReadOnlyList<ChiffreAffairesPoint> Points => _data?.points ?? [];
+
+    // Période en cours : l'évolution ne compare que ce qui est écoulé (jusqu'au
+    // mois ou jour courant), pas 9 mois de cette année à 12 de l'an dernier.
+    private bool InProgress => string.CompareOrdinal(_to, DateUtils.ToInputValue(DateTime.Now)) > 0;
+
+    private IReadOnlyList<ChiffreAffairesPoint> Elapsed
+    {
+        get
+        {
+            if (!InProgress) return Points;
+            var today = DateUtils.ToInputValue(DateTime.Now);
+            var current = Granularite == "mois" ? today[..7] : today;
+            return [.. Points.Where(p => string.CompareOrdinal(p.cle, current) <= 0)];
+        }
+    }
+
+    private static double Sum(IEnumerable<ChiffreAffairesPoint> points, CaSeries series) => points.Sum(series.Value);
+
+    private string? Evolution(double current, double previous) =>
+        previous != 0 ? $"{Format.Percent((current - previous) / Math.Abs(previous))} vs N-1{(InProgress ? " à date" : "")}" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        (_from, _to) = CompleteYear(DateTime.Now.Year);
+        await LoadAsync();
+    }
+
+    private static (string From, string To) CompleteYear(int year) => ($"{year}-01-01", $"{year}-12-31");
+
+    // Même jour décalé d'un an (un 29 février devient le 28).
+    private static string ShiftYear(string day, int years)
+    {
+        var (y, m, d) = (int.Parse(day[..4]), int.Parse(day[5..7]), int.Parse(day[8..10]));
+        var last = DateTime.DaysInMonth(y + years, m);
+        return $"{y + years:0000}-{m:00}-{Math.Min(d, last):00}";
+    }
+
+    private Task Shift(int years)
+    {
+        (_from, _to) = (ShiftYear(_from, years), ShiftYear(_to, years));
+        return LoadAsync();
+    }
+
+    private Task CurrentYear()
+    {
+        (_from, _to) = CompleteYear(DateTime.Now.Year);
+        return LoadAsync();
+    }
+
+    private Task ChangeBound(bool isFrom, string value)
+    {
+        if (value.Length == 0) return Task.CompletedTask;
+        var (from, to) = isFrom ? (value, _to) : (_from, value);
+        // Une période inversée devient une période d'un jour sur la borne modifiée.
+        (_from, _to) = string.CompareOrdinal(from, to) <= 0 ? (from, to) : (value, value);
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _cancel?.Cancel();
+        var cancel = _cancel = new CancellationTokenSource();
+        _loading = true;
+        StateHasChanged();
+        var (from, to) = (_from, _to);
+        try
+        {
+            var response = await Api.GetAsync<ChiffreAffairesResponse>($"statistiques/chiffre-affaires?from={from}&to={to}");
+            if (cancel.IsCancellationRequested) return;
+            _data = response;
+            _error = null;
+        }
+        catch (Exception e)
+        {
+            if (cancel.IsCancellationRequested) return;
+            _error = string.IsNullOrEmpty(e.Message) ? "Impossible de charger le chiffre d’affaires." : e.Message;
+        }
+        _loading = false;
+    }
+
+    public void Dispose() => _cancel?.Cancel();
+}

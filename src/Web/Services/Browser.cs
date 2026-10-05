@@ -70,6 +70,8 @@ public sealed class Browser(IJSRuntime js)
     public ValueTask<int> ObserveWidthAsync<T>(ElementReference element, DotNetObjectReference<T> target) where T : class =>
         js.InvokeAsync<int>("horizon.observeWidth", element, target);
 
+    public ValueTask<double[]> MeasureTextsAsync(string[] texts, double fontSize) => js.InvokeAsync<double[]>("horizon.measureTexts", texts, fontSize);
+
     public ValueTask UnobserveAsync(int id) => js.InvokeVoidAsync("horizon.unobserve", id);
 }
 

@@ -107,6 +107,23 @@ public static class Format
     public static string Money(double value, int minFraction = 2, int maxFraction = 2) =>
         Number(value, minFraction, maxFraction) + Nbsp + "€";
 
+    // Intl.NumberFormat(..., { style: 'currency', currency: 'EUR', notation: 'compact',
+    // maximumFractionDigits: 1 }) : « 12,5 k € », « 2,5 M € », « 1 Md € ».
+    public static string MoneyCompact(double value)
+    {
+        var abs = Math.Abs(value);
+        var (divisor, suffix) = abs >= 1e12 ? (1e12, "Bn") : abs >= 1e9 ? (1e9, "Md") : abs >= 1e6 ? (1e6, "M") : abs >= 1e3 ? (1e3, "k") : (1d, "");
+        return Number(value / divisor, 0, 1) + (suffix.Length > 0 ? Nbsp + suffix : "") + Nbsp + "€";
+    }
+
+    // Intl.NumberFormat(..., { style: 'percent', maximumFractionDigits: 1,
+    // signDisplay: 'exceptZero' }) : « +5 % », « -19,7 % », « 0 % ».
+    public static string Percent(double ratio)
+    {
+        var text = Number(ratio * 100, 0, 1);
+        return (text is not "0" && ratio > 0 ? "+" : "") + (text == "-0" ? "0" : text) + Nbsp + "%";
+    }
+
     // toLocaleString() par défaut : « 1 234,5 ».
     public static string Number(long value) => Number((double)value);
 }

@@ -1,0 +1,259 @@
+@implements IAsyncDisposable
+@inject Browser Browser
+
+@* Graphique à barres du chiffre d'affaires, dessiné en SVG : une barre par
+   série et par mois (ou jour), grille et axes, infobulle qui suit le survol.
+   Largeur = celle du conteneur (suivie par un observateur de taille). *@
+<div @ref="_container" style="width: 100%; height: @(Height)px">
+    @if (_width > 0)
+    {
+        <div class="chart-wrapper" @ref="_wrapper" style="position: relative; cursor: default; width: @(Px(_width)); height: @(Px(Height))">
+            <svg role="application" class="chart-surface" width="@Px(_width)" height="@Height" viewBox="0 0 @Px(_width) @Height" style="width: 100%; height: 100%; display: block">
+                @* Grille horizontale. *@
+                <g>
+                    @foreach (var tick in _yTicks)
+                    {
+                        <line stroke="var(--line)" x1="@Px(PlotLeft)" y1="@Px(tick.Y)" x2="@Px(PlotRight)" y2="@Px(tick.Y)" fill="none"></line>
+                    }
+                </g>
+
+                @* Catégorie survolée (derrière les barres). *@
+                @if (_active is { } active)
+                {
+                    <rect x="@Px(PlotLeft + active * _band)" y="@Px(PlotTop + 0.5)" width="@Px(_band)" height="@Px(PlotHeight - 1)" fill="var(--surface)" pointer-events="none"></rect>
+                }
+
+                @foreach (var series in CaSeries.All)
+                {
+                    <g>
+                        @foreach (var bar in _bars.Where(b => b.Series == series))
+                        {
+                            <path fill="@series.Color" d="@bar.Path"></path>
+                        }
+                    </g>
+                }
+
+                <g>
+                    <line x1="@Px(PlotLeft)" y1="@Px(PlotBottom)" x2="@Px(PlotRight)" y2="@Px(PlotBottom)" stroke="var(--border)" fill="none"></line>
+                    @foreach (var label in _xLabels)
+                    {
+                        @Label(label.X, PlotBottom + 8, "middle", "0.71em", label.Text)
+                    }
+                </g>
+                <g>
+                    @foreach (var tick in _yTicks)
+                    {
+                        @Label(PlotLeft - 8, tick.LabelY, "end", "0.355em", tick.Text)
+                    }
+                </g>
+
+                @* Zone sensible à la souris. *@
+                <rect x="@Px(PlotLeft)" y="@Px(PlotTop)" width="@Px(PlotWidth)" height="@Px(PlotHeight)" fill="transparent"
+                      @onmousemove="OnMouseMove" @onmouseleave="OnMouseLeave"></rect>
+            </svg>
+
+            @{ var (tipX, tipY) = TooltipPosition(); }
+            <div @ref="_tooltip" style="visibility: @(_active is null ? "hidden" : "visible"); pointer-events: none; position: absolute; top: 0; left: 0; transition: transform 400ms; transform: translate(@(Px(tipX))px, @(Px(tipY))px)">
+                @if (_active is { } index && index < Points.Count)
+                {
+                    var point = Points[index];
+                    <div class="ca-tooltip">
+                        <p class="ca-tooltip-title">@CaSeries.LabelLong(point.cle, Granularite)</p>
+                        @foreach (var series in CaSeries.All)
+                        {
+                            <p class="ca-tooltip-row">
+                                <span class="ca-swatch" style="background: @series.Color" aria-hidden="true"></span>
+                                <span class="ca-tooltip-label">@series.Label</span>
+                                <span class="ca-tooltip-value">@Format.Money(series.Value(point), 0, 0)</span>
+                            </p>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const double MarginTop = 8, MarginRight = 8, MarginBottom = 0, MarginLeft = 8;
+    private const double YAxisWidth = 72, XAxisHeight = 30, FontSize = 12, MinTickGap = 8, TooltipOffset = 10;
+
+    private sealed record Bar(CaSeries Series, string Path);
+
+    private sealed record YTick(double Y, double LabelY, string Text);
+
+    private sealed record XLabel(double X, string Text);
+
+    private ElementReference _container, _wrapper, _tooltip;
+    private DotNetObjectReference<ChiffreAffairesChart>? _self;
+    private int _observer;
+    private double _width;
+    private int? _active;
+    private double _mouseX, _mouseY;
+    private double _tooltipWidth, _tooltipHeight;
+    private double _band;
+    private List<Bar> _bars = [];
+    private List<YTick> _yTicks = [];
+    private List<XLabel> _xLabels = [];
+    private IReadOnlyList<ChiffreAffairesPoint>? _laidOut;
+    private double _laidOutWidth;
+    private string _laidOutGranularite = "";
+    private bool _layoutPending;
+
+    [Parameter] public IReadOnlyList<ChiffreAffairesPoint> Points { get; set; } = [];
+    [Parameter] public string Granularite { get; set; } = "mois";
+    [Parameter] public int Height { get; set; } = 340;
+
+    private double PlotLeft => MarginLeft + YAxisWidth;
+    private double PlotRight => _width - MarginRight;
+    private double PlotWidth => PlotRight - PlotLeft;
+    private double PlotTop => MarginTop;
+    private double PlotBottom => Height - MarginBottom - XAxisHeight;
+    private double PlotHeight => PlotBottom - PlotTop;
+
+    private static string Px(double value) => ChartMath.Svg(value);
+
+    // Étiquette d'axe : <text> est un élément réservé de Razor, d'où le balisage
+    // construit à la main.
+    private static MarkupString Label(double x, double y, string anchor, string dy, string text) =>
+        new($"<text x=\"{Px(x)}\" y=\"{Px(y)}\" text-anchor=\"{anchor}\" font-size=\"{FontSize}\" fill=\"var(--text)\"><tspan x=\"{Px(x)}\" dy=\"{dy}\">{System.Net.WebUtility.HtmlEncode(text)}</tspan></text>");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _observer = await Browser.ObserveWidthAsync(_container, _self);
+        }
+        if (_width > 0 && !_layoutPending && (!ReferenceEquals(_laidOut, Points) || _laidOutWidth != _width || _laidOutGranularite != Granularite))
+        {
+            _layoutPending = true;
+            try
+            {
+                await LayoutAsync();
+            }
+            finally
+            {
+                _layoutPending = false;
+            }
+        }
+        if (_active is not null && _tooltip.Id is not null)
+        {
+            var rect = Browser.GetRect(_tooltip);
+            if (Math.Abs(rect.width - _tooltipWidth) > 0.5 || Math.Abs(rect.height - _tooltipHeight) > 0.5)
+            {
+                (_tooltipWidth, _tooltipHeight) = (rect.width, rect.height);
+                StateHasChanged();
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void OnWidth(double width)
+    {
+        // Largeur entière, comme le conteneur du graphique d'origine.
+        width = Math.Floor(width + 0.5);
+        if (width == _width) return;
+        _width = width;
+        StateHasChanged();
+    }
+
+    // Calcule graduations, barres et étiquettes à la taille courante : les
+    // tailles de texte viennent du navigateur, d'où l'appel asynchrone.
+    private async Task LayoutAsync()
+    {
+        var points = Points;
+        var granularite = Granularite;
+        var width = _width;
+
+        var values = points.SelectMany(p => CaSeries.All.Select(s => s.Value(p))).ToList();
+        var dataMin = values.Count > 0 ? Math.Min(0, values.Min()) : 0;
+        var dataMax = values.Count > 0 ? values.Max() : 0;
+        var tickValues = ChartMath.NiceTicks((decimal)dataMin, (decimal)dataMax);
+        var domainMin = (double)tickValues[0];
+        var domainMax = (double)tickValues[^1];
+        double Scale(double value) => domainMax == domainMin ? PlotBottom : PlotBottom - (value - domainMin) / (domainMax - domainMin) * PlotHeight;
+
+        var yTexts = tickValues.Select(v => Format.MoneyCompact((double)v)).ToList();
+        var xTexts = points.Select(p => CaSeries.LabelShort(p.cle, granularite)).ToList();
+        var sizes = await Browser.MeasureTextsAsync([.. yTexts, .. xTexts], FontSize);
+        if (width != _width) return;
+
+        var plotWidth = width - MarginRight - PlotLeft;
+        _band = points.Count > 0 ? plotWidth / points.Count : 0;
+
+        // Graduations : celle du haut est descendue pour que son texte ne
+        // déborde pas du haut du graphique.
+        _yTicks = [.. tickValues.Select((v, i) =>
+        {
+            var y = Scale((double)v);
+            var top = i == tickValues.Count - 1;
+            return new YTick(y, top ? Math.Max(y, sizes[i * 2 + 1] / 2) : y, yTexts[i]);
+        })];
+
+        var centers = Enumerable.Range(0, points.Count).Select(i => PlotLeft + (i + 0.5) * _band).ToList();
+        var widths = Enumerable.Range(0, points.Count).Select(i => sizes[(yTexts.Count + i) * 2]).ToList();
+        // Les limites de collision sont celles du graphique entier (0 à sa
+        // largeur), pas de la seule zone de tracé : une étiquette peut
+        // légèrement déborder dans la marge sans être écartée pour autant.
+        _xLabels = [.. ChartMath.VisibleXTicks(centers, widths, 0, _width, MinTickGap).Select(i => new XLabel(centers[i], xTexts[i]))];
+
+        var bars = new List<Bar>();
+        for (var s = 0; s < CaSeries.All.Count; s++)
+        {
+            var series = CaSeries.All[s];
+            var (offset, size) = ChartMath.BarPosition(_band, CaSeries.All.Count, s, 0.18, 2, 28);
+            for (var i = 0; i < points.Count; i++)
+            {
+                var value = series.Value(points[i]);
+                var baseline = Scale(0);
+                var y = Scale(value);
+                var height = Math.Abs(y - baseline);
+                if (height == 0 || double.IsNaN(height)) continue;
+                bars.Add(new Bar(series, BarPath(PlotLeft + i * _band + offset, Math.Min(y, baseline), size, height, value >= 0)));
+            }
+        }
+        _bars = bars;
+        (_laidOut, _laidOutWidth, _laidOutGranularite) = (points, width, granularite);
+        StateHasChanged();
+    }
+
+    // Rectangle aux coins arrondis (rayon 4) du côté opposé à l'axe.
+    private static string BarPath(double x, double y, double w, double h, bool positive)
+    {
+        var r = Math.Min(4, Math.Min(w / 2, h / 2));
+        string P(double px, double py) => $"{Px(px)},{Px(py)}";
+        return positive
+            ? $"M{P(x, y + r)}A {Px(r)},{Px(r)},0,0,1,{P(x + r, y)}L {P(x + w - r, y)}A {Px(r)},{Px(r)},0,0,1,{P(x + w, y + r)}L {P(x + w, y + h)}L {P(x, y + h)}Z"
+            : $"M{P(x, y)}L {P(x + w, y)}L {P(x + w, y + h - r)}A {Px(r)},{Px(r)},0,0,1,{P(x + w - r, y + h)}L {P(x + r, y + h)}A {Px(r)},{Px(r)},0,0,1,{P(x, y + h - r)}Z";
+    }
+
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        var rect = Browser.GetRect(_wrapper);
+        _mouseX = e.ClientX - rect.left;
+        _mouseY = e.ClientY - rect.top;
+        _active = _band > 0 ? Math.Clamp((int)Math.Floor((_mouseX - PlotLeft) / _band), 0, Points.Count - 1) : null;
+    }
+
+    private void OnMouseLeave() => _active = null;
+
+    // L'infobulle se place à droite et sous le curseur (au centre de la
+    // catégorie en horizontal), et passe de l'autre côté si elle déborde.
+    private (double X, double Y) TooltipPosition()
+    {
+        if (_active is not { } index) return (0, 0);
+        var anchorX = PlotLeft + (index + 0.5) * _band;
+        var x = anchorX + TooltipOffset;
+        if (x + _tooltipWidth > _width) x = anchorX - _tooltipWidth - TooltipOffset;
+        var y = _mouseY + TooltipOffset;
+        if (y + _tooltipHeight > Height) y = _mouseY - _tooltipHeight - TooltipOffset;
+        return (Math.Max(x, 0), Math.Max(y, 0));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_observer != 0) await Browser.UnobserveAsync(_observer);
+        _self?.Dispose();
+    }
+}
