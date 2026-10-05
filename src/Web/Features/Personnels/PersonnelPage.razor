@@ -1,0 +1,44 @@
+@inject ApiClient Api
+
+@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
+   lignes d'origine, avec son propre en-tête. *@
+<CrudPage T="Personnel" TDto="CreatePersonnelDto" TDetail="PersonnelDetail"
+          Title="Personnel" LoadingLabel="Chargement du personnel..."
+          Source="_list" Columns="Columns" GetRowId="p => p.IDPERSONNELS"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer ce personnel ?" CreateModalTitle="Nouveau personnel" EditModalTitle="Modifier le personnel"
+          Entity="personnel" Heading="@Projection?.Heading" NewRecordScope="@NewRecordScope">
+    <RenderForm Context="form">
+        <PersonnelForm Initial="form.Initial" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private static readonly IReadOnlyList<Column<Personnel>> Columns =
+    [
+        Col.Key<Personnel>("Civilite_Personnel", "Civilité", p => p.Civilite_Personnel),
+        Col.Key<Personnel>("Prenom_Personnel", "Prénom", p => p.Prenom_Personnel),
+        Col.Key<Personnel>("Nom_Personnel", "Nom", p => p.Nom_Personnel),
+        Col.Key<Personnel>("Telephone_professionnel", "Téléphone pro", p => p.Telephone_professionnel),
+        Col.Key<Personnel>("Telephone_fixe", "Téléphone fixe", p => p.Telephone_fixe),
+        Col.Date<Personnel>("Date_validite_CAP", "CAP", p => p.Date_validite_CAP),
+        Col.Date<Personnel>("Date_validite_selection_medicale", "Sélection médicale", p => p.Date_validite_selection_medicale),
+        Col.Date<Personnel>("Date_validite_carte_chauffeur", "Carte chauffeur", p => p.Date_validite_carte_chauffeur),
+        Col.Key<Personnel>("Num_service_social", "Code SS", p => p.Num_service_social),
+    ];
+
+    private ApiList<Personnel> _list = default!;
+    private CrudApi<CreatePersonnelDto, Personnel, PersonnelDetail> _api = default!;
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    private string? NewRecordScope => Projection is null ? null : $"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Personnel>(Api, "personnel") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreatePersonnelDto, Personnel, PersonnelDetail>(Api, "personnel");
+        await _list.RefetchAsync();
+    }
+}

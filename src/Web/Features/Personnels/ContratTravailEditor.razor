@@ -1,0 +1,233 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Carte d'un contrat de travail en cours de saisie (création ou
+   modification) : champs du contrat, activités et liste complète des taux
+   horaires. Quitter le contrat modifié (Annuler, ou fermer la fiche
+   personnel) demande « Enregistrer / Annuler les modifications ». *@
+<form @ref="_formRef" class="pct-card pct-card--editing" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+    @* Boutons en haut, comme sur les autres fiches. *@
+    <div class="pct-editor-head">
+        <p class="pct-editing-title">@(Initial is not null ? "Modifier le contrat" : "Nouveau contrat")</p>
+        <div class="page-actions">
+            <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)" disabled="@_submitting">Annuler</button>
+            <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement…" : "Enregistrer")</button>
+        </div>
+    </div>
+
+    @if (_error is not null)
+    {
+        <p class="alert-error" role="alert">@_error</p>
+    }
+
+    <div class="pct-fields">
+        <label class="field">
+            <span class="field-label">Type de contrat</span>
+            <input value="@_form.TypeContrat" maxlength="50" list="pct-types" placeholder="CDI, CDD…" @oninput="e => _form.TypeContrat = (string)e.Value!" />
+            <datalist id="pct-types">
+                @foreach (var t in ContratTravailFormat.TypesContrat)
+                {
+                    <option @key="t" value="@t"></option>
+                }
+            </datalist>
+        </label>
+        <label class="field">
+            <span class="field-label">Qualification</span>
+            <input value="@_form.Qualification" maxlength="50" placeholder="Ex. Chauffeur > 15 T" @oninput="e => _form.Qualification = (string)e.Value!" />
+        </label>
+        <label class="field">
+            <span class="field-label">Date de début</span>
+            <input type="date" value="@_form.Date_debut" required @oninput="e => _form.Date_debut = (string)e.Value!" />
+        </label>
+        <label class="field">
+            <span class="field-label">Date de fin <em>(vide = indéterminée)</em></span>
+            <input type="date" value="@_form.Date_fin" min="@(_form.Date_debut.Length > 0 ? _form.Date_debut : null)" @oninput="e => _form.Date_fin = (string)e.Value!" />
+        </label>
+    </div>
+
+    <div class="pf-activities" role="group" aria-label="Activités">
+        @Chip("Routier", () => _form.Routier, v => _form.Routier = v)
+        @Chip("Manutention", () => _form.Manutention, v => _form.Manutention = v)
+        @Chip("Atelier", () => _form.Atelier, v => _form.Atelier = v)
+    </div>
+
+    <div class="pct-rates-editor">
+        <div class="pct-rates-editor-head">
+            <span class="pf-section-title">Taux horaires</span>
+            <button type="button" class="btn ghost sm" @onclick="AddRate">+ Nouveau taux</button>
+        </div>
+        @if (_form.Taux.Count == 0)
+        {
+            <p class="muted">Aucun taux : ajoutez-en un pour calculer les pointages.</p>
+        }
+        @for (var index = 0; index < _form.Taux.Count; index++)
+        {
+            var i = index;
+            var t = _form.Taux[i];
+            <fieldset @key="@(t.IDTAUX_HORAIRE ?? $"new-{i}")" class="pct-rate-row">
+                <legend class="sr-only">Taux @(i + 1)</legend>
+                <label class="field">
+                    <span class="field-label">À partir du</span>
+                    <input type="date" value="@t.Date_application" required @oninput="e => t.Date_application = (string)e.Value!" />
+                </label>
+                @foreach (var r in ContratTravailFormat.Rates)
+                {
+                    <label @key="r.Field" class="field">
+                        <span class="field-label">@r.Label</span>
+                        <span class="pct-euro">
+                            <input type="number" inputmode="decimal" min="0" step="0.01" value="@t.Get(r.Field)" @oninput="e => t.Set(r.Field, (string)e.Value!)" />
+                        </span>
+                    </label>
+                }
+                <button type="button" class="icon-btn sm danger pct-remove" @onclick="() => _form.Taux.RemoveAt(i)"
+                        aria-label="@($"Retirer le taux {i + 1}")" title="Retirer ce taux">×</button>
+            </fieldset>
+        }
+    </div>
+</form>
+
+@code {
+    // Taux en cours de saisie (TauxHoraireDto) : valeurs en texte.
+    public sealed class RateModel
+    {
+        public string? IDTAUX_HORAIRE { get; set; }
+        public string Date_application { get; set; } = "";
+        public string Taux_horaire { get; set; } = "";
+        public string Taux_horaire_supplementaire { get; set; } = "";
+        public string Taux_horaire_nuitee { get; set; } = "";
+        public string Taux_nuitee { get; set; } = "";
+        public string Taux_samedi { get; set; } = "";
+        public string Taux_cheque_repas { get; set; } = "";
+        public string Taux_stanby { get; set; } = "";
+
+        public string Get(string field) => (string)typeof(RateModel).GetProperty(field)!.GetValue(this)!;
+
+        public void Set(string field, string value) => typeof(RateModel).GetProperty(field)!.SetValue(this, value);
+    }
+
+    // ContratTravailDto : dates « AAAA-MM-JJ », codes 0/1 ; Taux remplace la
+    // liste complète des taux du contrat.
+    private sealed class Model
+    {
+        public string TypeContrat { get; set; } = "";
+        public string Qualification { get; set; } = "";
+        public string Date_debut { get; set; } = "";
+        public string Date_fin { get; set; } = "";
+        public double Routier { get; set; }
+        public double Manutention { get; set; }
+        public double Atelier { get; set; }
+        public List<RateModel> Taux { get; set; } = [];
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    private string? _error;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public ContratTravail? Initial { get; set; }
+    [Parameter, EditorRequired] public PersonnelContratsTab.ContratDefaults Defaults { get; set; } = default!;
+    [Parameter] public Func<ContratTravailDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private static RateModel EmptyRate(RateModel? from = null) => new()
+    {
+        Date_application = ContratTravailFormat.Today(),
+        Taux_horaire = from?.Taux_horaire ?? "",
+        Taux_horaire_supplementaire = from?.Taux_horaire_supplementaire ?? "",
+        Taux_horaire_nuitee = from?.Taux_horaire_nuitee ?? "",
+        Taux_nuitee = from?.Taux_nuitee ?? "",
+        Taux_samedi = from?.Taux_samedi ?? "",
+        Taux_cheque_repas = from?.Taux_cheque_repas ?? "",
+        Taux_stanby = from?.Taux_stanby ?? "",
+    };
+
+    private RenderFragment Chip(string label, Func<double> get, Action<double> set) =>
+        @<button type="button" class="pf-chip@(get() == 1 ? " is-on" : string.Empty)" aria-pressed="@(get() == 1 ? "true" : "false")"
+                 @onclick="() => set(get() == 1 ? 0 : 1)">@label</button>;
+
+    private void AddRate() => _form.Taux.Insert(0, EmptyRate(_form.Taux.FirstOrDefault()));
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            TypeContrat = Initial?.TypeContrat ?? "",
+            Qualification = Initial is not null ? Initial.Qualification ?? "" : Defaults.Qualification,
+            Date_debut = Initial?.Date_debut is { } debut ? debut[..Math.Min(10, debut.Length)] : ContratTravailFormat.Today(),
+            Date_fin = Initial?.Date_fin is { } fin ? fin[..Math.Min(10, fin.Length)] : "",
+            Routier = Initial is not null ? Initial.Routier ?? 0 : Defaults.Routier,
+            Manutention = Initial is not null ? Initial.Manutention ?? 0 : Defaults.Manutention,
+            Atelier = Initial is not null ? Initial.Atelier ?? 0 : Defaults.Atelier,
+            Taux = Initial is not null
+                ? [.. Initial.TauxHoraireContratTravails.Select(t => new RateModel
+                {
+                    IDTAUX_HORAIRE = t.IDTAUX_HORAIRE,
+                    Date_application = t.Date_application is { } d ? d[..Math.Min(10, d.Length)] : "",
+                    Taux_horaire = ContratTravailFormat.RateInput(t.Taux_horaire),
+                    Taux_horaire_supplementaire = ContratTravailFormat.RateInput(t.Taux_horaire_supplementaire),
+                    Taux_horaire_nuitee = ContratTravailFormat.RateInput(t.Taux_horaire_nuitee),
+                    Taux_nuitee = ContratTravailFormat.RateInput(t.Taux_nuitee),
+                    Taux_samedi = ContratTravailFormat.RateInput(t.Taux_samedi),
+                    Taux_cheque_repas = ContratTravailFormat.RateInput(t.Taux_cheque_repas),
+                    Taux_stanby = ContratTravailFormat.RateInput(t.Taux_stanby),
+                })]
+                : [EmptyRate()],
+        };
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private static TauxHoraireDto ToDto(RateModel t)
+    {
+        var dto = new TauxHoraireDto
+        {
+            Date_application = t.Date_application,
+            Taux_horaire = t.Taux_horaire,
+            Taux_horaire_supplementaire = t.Taux_horaire_supplementaire,
+            Taux_horaire_nuitee = t.Taux_horaire_nuitee,
+            Taux_nuitee = t.Taux_nuitee,
+            Taux_samedi = t.Taux_samedi,
+            Taux_cheque_repas = t.Taux_cheque_repas,
+            Taux_stanby = t.Taux_stanby,
+        };
+        if (t.IDTAUX_HORAIRE is not null) dto.IDTAUX_HORAIRE = t.IDTAUX_HORAIRE;
+        return dto;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_form.Date_fin.Length > 0 && _form.Date_debut.Length > 0 && string.CompareOrdinal(_form.Date_fin, _form.Date_debut) < 0)
+        {
+            _error = "La date de fin doit être postérieure à la date de début.";
+            return;
+        }
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var dto = FormModel.ToDto<ContratTravailDto>(_form);
+            dto.Taux = _form.Taux.Select(ToDto).ToList();
+            await OnSubmit(dto);
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

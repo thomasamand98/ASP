@@ -43,3 +43,27 @@ public sealed record PersonnelDetail : Personnel
     // Adresse liée par IDADRESSES (table `adresses`).
     public AdresseView? Adresse { get; init; }
 }
+
+// Contrats de travail d'un personnel (GET /personnel/:id/contrats-travail),
+// avec leurs taux horaires du plus récent au plus ancien (Decimal en texte,
+// ex. « 13.400000 »).
+public sealed record TauxHoraire(string IDTAUX_HORAIRE, string? Date_application, string? Taux_horaire, string? Taux_horaire_supplementaire,
+    string? Taux_horaire_nuitee, string? Taux_nuitee, string? Taux_samedi, string? Taux_cheque_repas, string Taux_stanby);
+
+public sealed record ContratTravailSociete(string IDSOCIETES, string? Nom_societe);
+
+public sealed record ContratTravail
+{
+    public string IDCONTRATS_TRAVAIL { get; init; } = "";
+    public string? TypeContrat { get; init; }
+    public string? Qualification { get; init; }
+    public string? Date_debut { get; init; }
+    public string? Date_fin { get; init; }
+    public double? Routier { get; init; }
+    public double? Manutention { get; init; }
+    public double? Atelier { get; init; }
+    public ContratTravailSociete? Societe { get; init; }
+    public List<TauxHoraire> TauxHoraireContratTravails { get; init; } = [];
+}
+
+public sealed record ContratsTravailResponse(List<ContratTravail> contrats);

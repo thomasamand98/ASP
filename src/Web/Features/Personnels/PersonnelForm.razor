@@ -1,0 +1,455 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject ApiClient Api
+
+@* Fiche personnel, en création (Initial null) ou en modification (fiche
+   complète, adresse comprise). Les onglets Contrat / Contact / Documents ne
+   concernent qu'un personnel existant — désactivés en création. *@
+<div class="pf">
+    <FicheTabs AriaLabel="Sections de la fiche personnel" Value="@_tab" ValueChanged="SetTab" Tabs="Tabs" />
+
+    @* Gardé monté : un contrat en cours de saisie survit au changement d'onglet. *@
+    @if (Initial is not null)
+    {
+        <FichePanel Active="@(_tab == "contrat")">
+            <PersonnelContratsTab PersonnelId="@Initial.IDPERSONNELS"
+                                  Defaults="new PersonnelContratsTab.ContratDefaults(_form.Qualification, _form.Routier, _form.Manutention, _form.Atelier)" />
+        </FichePanel>
+    }
+
+    @if (_tab == "contact")
+    {
+        <Dev />
+    }
+    @if (_tab == "documents" && Initial is not null)
+    {
+        <DocumentsTab Type="DocumentCategorie.Personnel" ReferentId="@Initial.IDPERSONNELS" />
+    }
+
+    @if (_tab == "principal")
+    {
+        <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="pf-form">
+            <div class="form-actions">
+                <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+                <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+            </div>
+            <header class="pf-hero">
+                <span class="pf-avatar" aria-hidden="true">@Initials(_form.Prenom_Personnel, _form.Nom_Personnel)</span>
+                <div class="pf-hero-text">
+                    <strong>@(FullName.Length > 0 ? FullName : Initial is not null ? "Sans nom" : "Nouveau personnel")</strong>
+                    <span>@(Subtitle.Length > 0 ? Subtitle : "Renseignez l’identité ci-dessous")</span>
+                </div>
+                <div class="pf-activities" role="group" aria-label="Activités">
+                    @ActiviteChip("Routier", () => _form.Routier, v => _form.Routier = v)
+                    @ActiviteChip("Manutention", () => _form.Manutention, v => _form.Manutention = v)
+                    @ActiviteChip("Atelier", () => _form.Atelier, v => _form.Atelier = v)
+                </div>
+            </header>
+
+            <div class="pf-columns">
+                <div class="pf-column">
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Identification</h4>
+                        <div class="pf-grid">
+                            <label class="field">
+                                <span class="field-label">Civilité</span>
+                                <select value="@_form.Civilite_Personnel" @onchange="e => _form.Civilite_Personnel = (string)e.Value!">
+                                    <option value="">—</option>
+                                    @foreach (var c in Civilites)
+                                    {
+                                        <option @key="c" value="@c">@c</option>
+                                    }
+                                </select>
+                            </label>
+                            @Text("Nom", () => _form.Nom_Personnel, v => _form.Nom_Personnel = v, required: true, autocomplete: "off")
+                            @Text("Prénom", () => _form.Prenom_Personnel, v => _form.Prenom_Personnel = v, autocomplete: "off")
+                            <label class="field">
+                                <span class="field-label">Date de naissance</span>
+                                <input type="date" value="@_form.Date_naissance" @oninput="e => _form.Date_naissance = (string)e.Value!" />
+                            </label>
+                            @Text("Lieu de naissance", () => _form.Lieu_naissance, v => _form.Lieu_naissance = v)
+                            <label class="field">
+                                <span class="field-label">Pays de naissance</span>
+                                @PaysSelect(_form.Pays_Naissance, iso => _form.Pays_Naissance = iso)
+                            </label>
+                            @Text("N° service social", () => _form.Num_service_social, v => _form.Num_service_social = v)
+                            @Text("N° registre national", () => _form.Num_registre_national, v => _form.Num_registre_national = v)
+                            <label class="field">
+                                <span class="field-label">Personnes à charge</span>
+                                <input type="number" min="0" max="127" value="@JsNumber.ToString(_form.Nbr_personne_charge)" @oninput="e => _form.Nbr_personne_charge = JsNumber.Parse((string)e.Value!)" />
+                            </label>
+                            <label class="field">
+                                <span class="field-label">Statut marital</span>
+                                <input value="@_form.Etat_civil" maxlength="50" list="pf-etats-civils" @oninput="e => _form.Etat_civil = (string)e.Value!" />
+                                <datalist id="pf-etats-civils">
+                                    @foreach (var v in EtatsCivils)
+                                    {
+                                        <option @key="v" value="@v"></option>
+                                    }
+                                </datalist>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Validités</h4>
+                        <div class="pf-validities">
+                            @foreach (var (field, label) in Validites)
+                            {
+                                var value = ValidityValue(field);
+                                var (tone, state) = ValidityOf(value);
+                                <label @key="field" class="field pf-validity">
+                                    <span class="pf-validity-head">
+                                        <span>@label</span>
+                                        <span class="pf-badge pf-badge--@tone">@state</span>
+                                    </span>
+                                    <input type="date" value="@value" @oninput="e => SetValidity(field, (string)e.Value!)" />
+                                </label>
+                            }
+                        </div>
+                    </section>
+                </div>
+
+                <div class="pf-column">
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Coordonnées</h4>
+                        <div class="pf-grid">
+                            @Text("Téléphone fixe", () => _form.Telephone_fixe, v => _form.Telephone_fixe = v, type: "tel")
+                            @Text("Téléphone portable", () => _form.Telephone_portable, v => _form.Telephone_portable = v, type: "tel")
+                            @Text("Téléphone autre", () => _form.Telephone_autre, v => _form.Telephone_autre = v, type: "tel")
+                            @Text("Description", () => _form.Description_telephone, v => _form.Description_telephone = v)
+                            @Text("Email", () => _form.E_mail, v => _form.E_mail = v, maxLength: 100, wide: true, type: "email")
+                        </div>
+                    </section>
+
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Adresse</h4>
+                        <div class="pf-grid">
+                            @Text("Adresse", () => _form.Adresse1, v => _form.Adresse1 = v, maxLength: 250, wide: true, autocomplete: "address-line1")
+                            @Text("Complément", () => _form.Adresse2, v => _form.Adresse2 = v, maxLength: 250, wide: true, autocomplete: "address-line2")
+                            @Text("Complément 2", () => _form.Adresse3, v => _form.Adresse3 = v, maxLength: 250, wide: true, autocomplete: "address-line3")
+                            @Text("Code postal", () => _form.CP, v => _ = SetCp(v), autocomplete: "postal-code")
+                            <label class="field">
+                                <span class="field-label">Ville</span>
+                                <input value="@_form.Localite" maxlength="50" list="pf-villes" autocomplete="address-level2" @oninput="e => _form.Localite = (string)e.Value!" />
+                                <datalist id="pf-villes">
+                                    @foreach (var v in _form.CP.Trim().Length > 0 ? _villes : [])
+                                    {
+                                        <option @key="v.IDVILLES" value="@(v.Nom_ville ?? string.Empty)"></option>
+                                    }
+                                </datalist>
+                            </label>
+                            <label class="field pf-field--wide">
+                                <span class="field-label">Pays</span>
+                                @PaysSelect(_form.Pays, iso =>
+                                {
+                                    _form.Pays = iso;
+                                    _form.Pays_full_name = _pays.FirstOrDefault(p => p.ISO == iso)?.Nom ?? "";
+                                })
+                            </label>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="pf-column">
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Qualifications</h4>
+                        @Text("Qualification", () => _form.Qualification, v => _form.Qualification = v, placeholder: "Ex. Chauffeur, Mécanicien…")
+                    </section>
+
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Coordonnées professionnelles</h4>
+                        <div class="pf-grid">
+                            @Text("Téléphone professionnel", () => _form.Telephone_professionnel, v => _form.Telephone_professionnel = v, wide: true, type: "tel")
+                            @Text("Email professionnel", () => _form.E_mail_professionnel, v => _form.E_mail_professionnel = v, wide: true, type: "email")
+                        </div>
+                    </section>
+
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Coordonnées bancaires</h4>
+                        <div class="pf-grid">
+                            @Text("Nom de la banque", () => _form.Nom_Banque, v => _form.Nom_Banque = v, wide: true)
+                            @Text("IBAN", () => _form.Iban, v => _form.Iban = v, cssClass: "pf-mono", autocomplete: "off")
+                            @Text("BIC", () => _form.Bic, v => _form.Bic = v, cssClass: "pf-mono", autocomplete: "off")
+                        </div>
+                    </section>
+
+                    <section class="pf-section">
+                        <h4 class="pf-section-title">Commentaires</h4>
+                        <textarea value="@_form.Commentaire_Personnel" maxlength="50" class="control" rows="3" aria-label="Commentaires"
+                                  @oninput="e => _form.Commentaire_Personnel = (string)e.Value!"></textarea>
+                        <span class="pf-counter">@_form.Commentaire_Personnel.Length / 50</span>
+                    </section>
+                </div>
+            </div>
+        </form>
+    }
+</div>
+
+@code {
+    private static readonly string[] CivilitesConnues = ["Monsieur", "Madame", "Mademoiselle"];
+
+    // Suggestions seulement : la colonne est en texte libre et contient déjà
+    // d'autres graphies (MARIE, CELIB...), conservées telles quelles.
+    private static readonly string[] EtatsCivils = ["Célibataire", "Marié(e)", "Cohabitant(e)", "Divorcé(e)", "Séparé(e)", "Veuf / Veuve", "Isolé(e)"];
+
+    // Validités (documents du chauffeur), affichées avec leur état d'expiration.
+    private static readonly (string Field, string Label)[] Validites =
+    [
+        ("Date_validite_CAP", "C.A.P."),
+        ("Date_validite_selection_medicale", "Sélection médicale"),
+        ("Date_validite_carte_chauffeur", "Carte chauffeur"),
+        ("Date_validite_carte_identite", "Carte d'identité"),
+        ("Date_validite_A1", "A1"),
+        ("Date_validite_SIPSI", "SIPSI"),
+    ];
+
+    // En deçà, la validité est signalée comme « bientôt expirée ».
+    private const int ExpiryWarningDays = 60;
+
+    // Champs envoyés à l'API (CreatePersonnelDto) : dates « AAAA-MM-JJ »,
+    // adresse aplatie (enregistrée à part par l'API), codes 0/1 pour
+    // Routier / Manutention / Atelier.
+    private sealed class Model
+    {
+        public string Civilite_Personnel { get; set; } = "";
+        public string Nom_Personnel { get; set; } = "";
+        public string Prenom_Personnel { get; set; } = "";
+        public string Telephone_portable { get; set; } = "";
+        public string Telephone_fixe { get; set; } = "";
+        public string Telephone_autre { get; set; } = "";
+        public string Telephone_professionnel { get; set; } = "";
+        public string Description_telephone { get; set; } = "";
+        public string E_mail { get; set; } = "";
+        public string E_mail_professionnel { get; set; } = "";
+        public string Num_service_social { get; set; } = "";
+        public string Num_registre_national { get; set; } = "";
+        public string Date_naissance { get; set; } = "";
+        public string Lieu_naissance { get; set; } = "";
+        public string Pays_Naissance { get; set; } = "";
+        public string Etat_civil { get; set; } = "";
+        public double Nbr_personne_charge { get; set; }
+        public string Iban { get; set; } = "";
+        public string Bic { get; set; } = "";
+        public string Nom_Banque { get; set; } = "";
+        public string Qualification { get; set; } = "";
+        public double Routier { get; set; }
+        public double Manutention { get; set; }
+        public double Atelier { get; set; }
+        public string Commentaire_Personnel { get; set; } = "";
+        public string Date_validite_selection_medicale { get; set; } = "";
+        public string Date_validite_carte_chauffeur { get; set; } = "";
+        public string Date_validite_CAP { get; set; } = "";
+        public string Date_validite_carte_identite { get; set; } = "";
+        public string Date_validite_A1 { get; set; } = "";
+        public string Date_validite_SIPSI { get; set; } = "";
+        public string Adresse1 { get; set; } = "";
+        public string Adresse2 { get; set; } = "";
+        public string Adresse3 { get; set; } = "";
+        public string CP { get; set; } = "";
+        public string Localite { get; set; } = "";
+        public string Pays { get; set; } = "";
+        public string Pays_full_name { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private string _tab = "principal";
+    private bool _submitting;
+    private bool _track = true;
+    private List<PaysOption> _pays = [];
+    private List<VilleOption> _villes = [];
+    private CancellationTokenSource? _villesDebounce;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public PersonnelDetail? Initial { get; set; }
+    [Parameter] public Func<CreatePersonnelDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    private IReadOnlyList<FicheTab> Tabs
+    {
+        get
+        {
+            const string locked = "Enregistrez d’abord le personnel pour accéder à cet onglet";
+            FicheTab Tab(string id, string label) => id != "principal" && Initial is null ? new(id, label, null, true, locked) : new(id, label);
+            return [Tab("principal", "Principal"), Tab("contrat", "Contrat"), Tab("contact", "Contact"), Tab("documents", "Documents")];
+        }
+    }
+
+    // Une civilité enregistrée mais absente de la liste reste proposée.
+    private IEnumerable<string> Civilites =>
+        _form.Civilite_Personnel.Length > 0 && !CivilitesConnues.Contains(_form.Civilite_Personnel)
+            ? [_form.Civilite_Personnel, .. CivilitesConnues]
+            : CivilitesConnues;
+
+    private string FullName => string.Join(' ', new[] { _form.Prenom_Personnel, _form.Nom_Personnel }.Where(v => v.Trim().Length > 0));
+
+    private string Subtitle => FormModel.JoinNonEmpty(" · ", _form.Civilite_Personnel, _form.Qualification);
+
+    private static string Initials(string prenom, string nom)
+    {
+        var initials = $"{prenom.Trim().FirstOrDefault()}{nom.Trim().FirstOrDefault()}".Replace("\0", "").ToUpperInvariant();
+        return initials.Length > 0 ? initials : "?";
+    }
+
+    private string ValidityValue(string field) => (string)typeof(Model).GetProperty(field)!.GetValue(_form)!;
+
+    private void SetValidity(string field, string value) => typeof(Model).GetProperty(field)!.SetValue(_form, value);
+
+    // État d'une date de validité « AAAA-MM-JJ » par rapport à aujourd'hui.
+    // Les dates en 2099 ou après sont une convention WinDev pour « sans limite ».
+    private static (string Tone, string Label) ValidityOf(string day)
+    {
+        if (day.Length == 0) return ("none", "Non renseignée");
+        if (JsNumber.Parse(day[..Math.Min(4, day.Length)]) >= 2099) return ("ok", "Sans limite");
+        if (DateUtils.FromInputValue(day) is not { } date) return ("ok", "Valide");
+        var days = (int)DateUtils.JsRound((Clock.ToMs(date) - Clock.ToMs(DateTime.Today)) / 86_400_000);
+        if (days < 0) return ("expired", $"Expirée depuis {-days} j");
+        if (days <= ExpiryWarningDays) return ("soon", days == 0 ? "Expire aujourd'hui" : $"Expire dans {days} j");
+        return ("ok", "Valide");
+    }
+
+    private RenderFragment ActiviteChip(string label, Func<double> get, Action<double> set) =>
+        @<button type="button" class="pf-chip@(get() == 1 ? " is-on" : string.Empty)" aria-pressed="@(get() == 1 ? "true" : "false")"
+                 @onclick="() => set(get() == 1 ? 0 : 1)">@label</button>;
+
+    private RenderFragment Text(string label, Func<string> get, Action<string> set, int maxLength = 50, bool wide = false, string? type = null,
+        bool required = false, string? autocomplete = null, string? placeholder = null, string? cssClass = null) =>
+        @<label class="field@(wide ? " pf-field--wide" : string.Empty)">
+            <span class="field-label">@label</span>
+            <input type="@type" value="@get()" maxlength="@maxLength" required="@required" autocomplete="@autocomplete" placeholder="@placeholder"
+                   class="@cssClass" @oninput="e => set((string)e.Value!)" />
+        </label>;
+
+    // Un pays enregistré mais absent de la liste reste proposé, pour ne pas
+    // être perdu à l'enregistrement.
+    private RenderFragment PaysSelect(string current, Action<string> set)
+    {
+        var choices = current.Length > 0 && !_pays.Any(p => p.ISO == current) ? [new PaysOption("current", current, current), .. _pays] : _pays;
+        return @<select value="@current" @onchange="e => set((string)e.Value!)">
+            <option value="">—</option>
+            @foreach (var p in choices)
+            {
+                <SelectOption @key="p.IDPAYS" Value="@(p.ISO ?? string.Empty)" Current="@current">@p.Nom</SelectOption>
+            }
+        </select>;
+    }
+
+    // Villes du code postal saisi, avec un léger anti-rebond — la table en
+    // compte ~39 000, impossible à charger en une fois.
+    private async Task SetCp(string cp)
+    {
+        _form.CP = cp;
+        _villesDebounce?.Cancel();
+        if (cp.Trim().Length == 0) return;
+        var token = (_villesDebounce = new CancellationTokenSource()).Token;
+        try
+        {
+            await Task.Delay(300, token);
+            _villes = (await Api.GetAsync<VillesResponse>($"villes?cp={Js.EncodeUriComponent(cp.Trim())}")).villes;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            // Recherche remplacée par une plus récente, ou serveur injoignable.
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var a = Initial?.Adresse;
+        _form = new Model
+        {
+            Civilite_Personnel = Initial?.Civilite_Personnel ?? "",
+            Nom_Personnel = Initial?.Nom_Personnel ?? "",
+            Prenom_Personnel = Initial?.Prenom_Personnel ?? "",
+            Telephone_portable = Initial?.Telephone_portable ?? "",
+            Telephone_fixe = Initial?.Telephone_fixe ?? "",
+            Telephone_autre = Initial?.Telephone_autre ?? "",
+            Telephone_professionnel = Initial?.Telephone_professionnel ?? "",
+            Description_telephone = Initial?.Description_telephone ?? "",
+            E_mail = Initial?.E_mail ?? "",
+            E_mail_professionnel = Initial?.E_mail_professionnel ?? "",
+            Num_service_social = Initial?.Num_service_social ?? "",
+            Num_registre_national = Initial?.Num_registre_national ?? "",
+            Date_naissance = FormModel.DateInput(Initial?.Date_naissance),
+            Lieu_naissance = Initial?.Lieu_naissance ?? "",
+            Pays_Naissance = Initial?.Pays_Naissance ?? "",
+            Etat_civil = Initial?.Etat_civil ?? "",
+            Nbr_personne_charge = Initial?.Nbr_personne_charge ?? 0,
+            Iban = Initial?.Iban ?? "",
+            Bic = Initial?.Bic ?? "",
+            Nom_Banque = Initial?.Nom_Banque ?? "",
+            Qualification = Initial?.Qualification ?? "",
+            Routier = Initial?.Routier ?? 0,
+            Manutention = Initial?.Manutention ?? 0,
+            Atelier = Initial?.Atelier ?? 0,
+            Commentaire_Personnel = Initial?.Commentaire_Personnel ?? "",
+            Date_validite_selection_medicale = FormModel.DateInput(Initial?.Date_validite_selection_medicale),
+            Date_validite_carte_chauffeur = FormModel.DateInput(Initial?.Date_validite_carte_chauffeur),
+            Date_validite_CAP = FormModel.DateInput(Initial?.Date_validite_CAP),
+            Date_validite_carte_identite = FormModel.DateInput(Initial?.Date_validite_carte_identite),
+            Date_validite_A1 = FormModel.DateInput(Initial?.Date_validite_A1),
+            Date_validite_SIPSI = FormModel.DateInput(Initial?.Date_validite_SIPSI),
+            Adresse1 = a?.Adresse1 ?? "",
+            Adresse2 = a?.Adresse2 ?? "",
+            Adresse3 = a?.Adresse3 ?? "",
+            CP = a?.CP ?? "",
+            Localite = a?.Localite ?? "",
+            Pays = a?.Pays ?? "",
+            Pays_full_name = a?.Pays_full_name ?? "",
+        };
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+        // Liste des pays : ~240 lignes, chargée une seule fois.
+        try
+        {
+            _pays = (await Api.GetAsync<PaysResponse>("pays")).pays;
+        }
+        catch (Exception)
+        {
+            // Pays enregistrés toujours proposés.
+        }
+        if (_form.CP.Trim().Length > 0) await SetCp(_form.CP);
+    }
+
+    protected override void OnParametersSet() => _guard?.Register(Scope);
+
+    // Le formulaire est recréé à chaque retour sur l'onglet Principal : il
+    // faut alors le suivre à nouveau.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_track || _tab != "principal") return;
+        _track = false;
+        await _guard.TrackAsync(_formRef);
+    }
+
+    private void SetTab(string tab)
+    {
+        if (tab == "principal" && _tab != "principal") _track = true;
+        _tab = tab;
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(FormModel.ToDto<CreatePersonnelDto>(_form));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _villesDebounce?.Cancel();
+        _guard.Dispose();
+    }
+}

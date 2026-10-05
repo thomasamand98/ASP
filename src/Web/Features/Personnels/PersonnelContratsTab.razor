@@ -1,0 +1,237 @@
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Onglet « Contrat » de la fiche personnel : contrats de travail du plus
+   récent au plus ancien, chacun avec ses taux horaires (celui en vigueur mis
+   en avant, les précédents dans l'historique). Un seul contrat modifiable à
+   la fois, directement dans sa carte. *@
+@if (_loading)
+{
+    <p class="muted">Chargement des contrats…</p>
+}
+else if (_error is not null)
+{
+    <div class="pct-empty">
+        <p>Impossible de charger les contrats : @_error</p>
+        <button type="button" class="btn" @onclick="LoadAsync">Réessayer</button>
+    </div>
+}
+else
+{
+    <div class="pct">
+        <div class="pct-toolbar">
+            <h4 class="pct-title">Contrats de travail <span class="pct-count">@_contrats.Count</span></h4>
+            <button type="button" class="btn primary" @onclick="@(() => _editing = NewId)" disabled="@(_editing is not null)">
+                <Icon Name="pageActions.Plus" />
+                Nouveau contrat
+            </button>
+        </div>
+
+        @if (_editing == NewId)
+        {
+            <ContratTravailEditor Initial="null" Defaults="Defaults" OnCancel="StopEditing" OnSubmit="CreateAsync" />
+        }
+
+        @if (_contrats.Count == 0 && _editing != NewId)
+        {
+            <div class="pct-empty">
+                <p>Aucun contrat de travail pour ce personnel.</p>
+                <button type="button" class="btn" @onclick="@(() => _editing = NewId)">Créer le premier contrat</button>
+            </div>
+        }
+
+        @foreach (var c in _contrats)
+        {
+            if (_editing == c.IDCONTRATS_TRAVAIL)
+            {
+                <ContratTravailEditor @key="c.IDCONTRATS_TRAVAIL" Initial="c" Defaults="Defaults" OnCancel="StopEditing"
+                                      OnSubmit="dto => UpdateAsync(c.IDCONTRATS_TRAVAIL, dto)" />
+            }
+            else
+            {
+                @ContratCard(c)
+            }
+        }
+    </div>
+}
+
+@code {
+    private const string NewId = "new";
+
+    // Valeurs de la fiche personnel reprises dans un nouveau contrat.
+    public sealed record ContratDefaults(string Qualification, double Routier, double Manutention, double Atelier);
+
+    private List<ContratTravail> _contrats = [];
+    private bool _loading = true;
+    private string? _error;
+    // Contrat en cours de modification : son id, NewId, ou null.
+    private string? _editing;
+
+    [Parameter, EditorRequired] public string PersonnelId { get; set; } = "";
+    [Parameter, EditorRequired] public ContratDefaults Defaults { get; set; } = default!;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _contrats = (await Api.GetAsync<ContratsTravailResponse>($"personnel/{PersonnelId}/contrats-travail")).contrats;
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task StopEditing()
+    {
+        _editing = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    // Même ordre que l'API : début le plus récent d'abord.
+    private static List<ContratTravail> Sort(IEnumerable<ContratTravail> contrats) =>
+        [.. contrats.OrderByDescending(c => c.Date_debut ?? "", ContratTravailFormat.LocaleComparer)];
+
+    private async Task CreateAsync(ContratTravailDto dto)
+    {
+        var created = (await Api.SendJsonAsync<ContratTravail>(HttpMethod.Post, $"personnel/{PersonnelId}/contrats-travail", dto))!;
+        _contrats = Sort([created, .. _contrats]);
+        _editing = null;
+        StateHasChanged();
+    }
+
+    private async Task UpdateAsync(string id, ContratTravailDto dto)
+    {
+        var updated = (await Api.SendJsonAsync<ContratTravail>(HttpMethod.Patch, $"contrats-travail/{id}", dto))!;
+        _contrats = Sort(_contrats.Select(c => c.IDCONTRATS_TRAVAIL == id ? updated : c));
+        _editing = null;
+        StateHasChanged();
+    }
+
+    private async Task DeleteAsync(ContratTravail c)
+    {
+        var label = FormModel.JoinNonEmpty(" · ", c.TypeContrat, c.Qualification);
+        if (!await Browser.ConfirmAsync($"Supprimer le contrat « {(label.Length > 0 ? label : "ce contrat")} » et ses taux horaires ?")) return;
+        try
+        {
+            await Api.SendAsync(HttpMethod.Delete, $"contrats-travail/{c.IDCONTRATS_TRAVAIL}");
+            _contrats = [.. _contrats.Where(x => x.IDCONTRATS_TRAVAIL != c.IDCONTRATS_TRAVAIL)];
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync(e.Message);
+        }
+    }
+
+    private RenderFragment ContratCard(ContratTravail c) => __builder =>
+    {
+        var (tone, label) = ContratTravailFormat.StatusOf(c.Date_debut, c.Date_fin);
+        var current = ContratTravailFormat.ApplicableRate(c);
+        var history = c.TauxHoraireContratTravails.Where(t => !ReferenceEquals(t, current)).ToList();
+        var activites = ContratTravailFormat.Activites.Where(a => a.Get(c) == 1).ToList();
+        var locked = _editing is not null;
+        <article @key="c.IDCONTRATS_TRAVAIL" class="pct-card pct-card--@tone">
+            <header class="pct-card-head">
+                <span class="pct-type">@(string.IsNullOrEmpty(c.TypeContrat) ? "—" : c.TypeContrat)</span>
+                <div class="pct-card-heading">
+                    <strong>@(string.IsNullOrEmpty(c.Qualification) ? "Qualification non renseignée" : c.Qualification)</strong>
+                    <span class="pct-period">
+                        @ContratFormat.Date(c.Date_debut) → @(ContratTravailFormat.IsOpenEnded(c.Date_fin) ? "indéterminée" : ContratFormat.Date(c.Date_fin))
+                        @if (!string.IsNullOrEmpty(c.Societe?.Nom_societe))
+                        {
+                            @($" · {c.Societe.Nom_societe}")
+                        }
+                    </span>
+                </div>
+                <span class="pct-status pct-status--@tone">@label</span>
+                <div class="page-actions">
+                    <button type="button" class="btn" @onclick="() => _editing = c.IDCONTRATS_TRAVAIL" disabled="@locked">
+                        <Icon Name="pageActions.Pencil" />
+                        Modifier
+                    </button>
+                    <button type="button" class="btn danger" @onclick="() => DeleteAsync(c)" disabled="@locked">
+                        <Icon Name="pageActions.Trash" />
+                        Supprimer
+                    </button>
+                </div>
+            </header>
+
+            @if (activites.Count > 0)
+            {
+                <ul class="pct-tags" aria-label="Activités">
+                    @foreach (var a in activites)
+                    {
+                        <li @key="a.Label">@a.Label</li>
+                    }
+                </ul>
+            }
+
+            @if (current is not null)
+            {
+                <section class="pct-rates" aria-label="Taux en vigueur">
+                    <p class="pct-rates-caption">
+                        @(tone == "past" ? "Derniers taux" : "Taux en vigueur")
+                        @if (!string.IsNullOrEmpty(current.Date_application))
+                        {
+                            @(" depuis le ")<strong>@ContratFormat.Date(current.Date_application)</strong>
+                        }
+                    </p>
+                    <dl class="pct-metrics">
+                        @foreach (var r in ContratTravailFormat.Rates)
+                        {
+                            <div @key="r.Field" class="pct-metric@(r.Field == "Taux_horaire" ? " pct-metric--main" : string.Empty)">
+                                <dt>@r.Label</dt>
+                                <dd>@ContratFormat.Euro(r.Get(current)) <small>@r.Unit</small></dd>
+                            </div>
+                        }
+                    </dl>
+                </section>
+            }
+            else
+            {
+                <p class="muted">Aucun taux horaire applicable.</p>
+            }
+
+            @if (history.Count > 0)
+            {
+                <details class="pct-history">
+                    <summary>Historique des taux (@history.Count)</summary>
+                    <div class="pct-table-wrapper">
+                        <table class="pct-table">
+                            <thead>
+                                <tr>
+                                    <th>À partir du</th>
+                                    @foreach (var r in ContratTravailFormat.Rates)
+                                    {
+                                        <th @key="r.Field" class="pct-num">@r.Label</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in history)
+                                {
+                                    <tr @key="t.IDTAUX_HORAIRE">
+                                        <td>@ContratFormat.Date(t.Date_application)</td>
+                                        @foreach (var r in ContratTravailFormat.Rates)
+                                        {
+                                            <td @key="r.Field" class="pct-num">@ContratFormat.Euro(r.Get(t))</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            }
+        </article>
+    };
+}

@@ -42,3 +42,11 @@
   max-width: min(1100px, 100%);
 }
 
+
+/* Barre d'actions (Components/PageActions.razor), classe reprise telle quelle
+   par d'autres écrans (cartes de contrat de travail, modèles de document) :
+   globale. */
+.page-actions {
+  display: flex;
+  gap: 0.5rem;
+}
