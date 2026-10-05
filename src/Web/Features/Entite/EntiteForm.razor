@@ -1,0 +1,236 @@
+@implements IDisposable
+@inject ApiClient Api
+
+@* Formulaire « Coordonnée entreprise » — pas de bouton de soumission ici, il
+   vit dans l'en-tête de EntitePage (attribut `form`, voir FormId) pour
+   rester visible en haut de page. *@
+<form id="@FormId" class="entite-form" @onsubmit="OnSubmit" @onsubmit:preventDefault="true">
+    @* Zone du logo : le sélecteur de fichier invisible couvre toute la zone
+       (clic et glisser-déposer natifs). *@
+    <div class="entite-logo-drop@(_logoDragOver ? " drag-over" : string.Empty)" role="button" tabindex="0"
+         @ondragenter="() => _logoDragOver = true" @ondragleave="() => _logoDragOver = false" @ondrop="() => _logoDragOver = false">
+        @if (Form.Logo.Length > 0)
+        {
+            <img src="@Form.Logo" alt="Logo de l’entreprise" class="entite-logo-preview" />
+        }
+        else
+        {
+            <span class="entite-logo-placeholder">Glissez une image ici, ou cliquez pour choisir un logo</span>
+        }
+        <InputFile class="entite-logo-file" accept="image/*" OnChange="LogoChosenAsync" />
+        @if (Form.Logo.Length > 0)
+        {
+            <button type="button" class="entite-logo-remove" @onclick="() => Form.Logo = string.Empty" @onclick:stopPropagation="true">Retirer le logo</button>
+        }
+    </div>
+    @if (_logoError is not null)
+    {
+        <p class="entite-logo-error">@_logoError</p>
+    }
+
+    <div class="entite-form-grid">
+        @Text("Nom", () => Form.Nom_societe, v => Form.Nom_societe = v)
+        @Text("Téléphone", () => Form.Num_Telephone, v => Form.Num_Telephone = v)
+        @Text("Nom de la Banque", () => Form.Nom_Banque, v => Form.Nom_Banque = v)
+
+        @Text("Nom court", () => Form.Nom_court, v => Form.Nom_court = v)
+        @Text("Email", () => Form.Email_contact, v => Form.Email_contact = v, type: "email")
+        @Text("IBAN", () => Form.Iban, v => Form.Iban = v)
+
+        @Text("Adresse 1", () => Form.Adresse1, v => Form.Adresse1 = v)
+        @Text("N° TVA", () => Form.Num_TVA, v => Form.Num_TVA = v)
+        @Text("BIC", () => Form.Bic, v => Form.Bic = v)
+
+        @Text("Adresse 2", () => Form.Adresse2, v => Form.Adresse2 = v)
+        @Text("Nom du signataire", () => Form.Signataire, v => Form.Signataire = v)
+        @Text("Numéro UCM", () => Form.numero_ucm, v => Form.numero_ucm = v)
+
+        @Text("Adresse 3", () => Form.Adresse3, v => Form.Adresse3 = v)
+        @Text("Numéro de licence", () => Form.Num_licence, v => Form.Num_licence = v)
+        <label class="field">
+            Valeur faciale chèque repas
+            <input type="number" step="0.01" value="@JsNumber.ToString(Form.Valeur_facial_cheque_repas)"
+                   @oninput="e => Form.Valeur_facial_cheque_repas = JsNumber.Parse((string)e.Value!)" />
+        </label>
+
+        <div class="entite-field-group">
+            <label class="field">
+                Code postal
+                <input value="@Form.CP" @oninput="e => SetCp((string)e.Value!)" />
+            </label>
+            <label class="field">
+                Villes
+                <select value="@Form.Localite" @onchange="e => Form.Localite = (string)e.Value!">
+                    <option value="">—</option>
+                    @foreach (var v in VilleChoices)
+                    {
+                        <SelectOption @key="v.IDVILLES" Value="@(v.Nom_ville ?? string.Empty)" Current="@Form.Localite">@v.Nom_ville</SelectOption>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <label class="field">
+            Pays
+            <select value="@Form.Pays_full_name" @onchange="e => ChangePays((string)e.Value!)">
+                <option value="">—</option>
+                @foreach (var p in _pays)
+                {
+                    <SelectOption @key="p.IDPAYS" Value="@(p.Nom ?? string.Empty)" Current="@Form.Pays_full_name">@p.Nom</SelectOption>
+                }
+            </select>
+        </label>
+    </div>
+
+    <h3 class="entite-section-title">Configuration des paramètres e-mail</h3>
+
+    @* Une colonne par bloc : serveur, puis compte compta et compte planning
+       (e-mail suivi de son mot de passe). *@
+    <div class="entite-form-grid entite-form-grid-email">
+        <div class="entite-email-column">
+            @Text("Serveur :", () => Form.Seveur_SMTP, v => Form.Seveur_SMTP = v)
+            <div class="entite-field-group">
+                <label class="field">
+                    Connexion SMTP :
+                    <select value="@JsNumber.ToString(Form.TypeConnexion_SMTP)" @onchange="e => Form.TypeConnexion_SMTP = JsNumber.Parse((string)e.Value!)">
+                        @foreach (var (value, label) in ConnexionSmtp)
+                        {
+                            <option @key="value" value="@value">@label</option>
+                        }
+                    </select>
+                </label>
+                <label class="field entite-field-narrow">
+                    Port SMTP :
+                    <input type="number" value="@JsNumber.ToString(Form.Port_SMTP)" @oninput="e => Form.Port_SMTP = JsNumber.Parse((string)e.Value!)" />
+                </label>
+            </div>
+        </div>
+
+        <div class="entite-email-column">
+            @Text("E-mail compta :", () => Form.Utilisateur_SMTP, v => Form.Utilisateur_SMTP = v)
+            @Text("Mot de passe compta :", () => Form.MDP_SMTP, v => Form.MDP_SMTP = v, type: "password", placeholder: SmtpPasswordSet ? UnchangedPlaceholder : null, autocomplete: "new-password")
+        </div>
+
+        <div class="entite-email-column">
+            @Text("E-mail planning :", () => Form.Utilisateur_smtp_planning, v => Form.Utilisateur_smtp_planning = v)
+            @Text("Mot de passe planning :", () => Form.MDP_SMTP_Planning, v => Form.MDP_SMTP_Planning = v, type: "password", placeholder: SmtpPlanningPasswordSet ? UnchangedPlaceholder : null, autocomplete: "new-password")
+        </div>
+    </div>
+</form>
+
+@code {
+    // Options de sécurisation de la connexion SMTP — non documentées côté
+    // base (pas de table d'énumération pour ce champ, juste un entier),
+    // déduites de la seule donnée existante (TypeConnexion_SMTP=2 ↔ « Option
+    // Sécurisé TLS » dans la maquette fournie).
+    private static readonly (int Value, string Label)[] ConnexionSmtp = [(0, "Aucune"), (1, "SSL"), (2, "Option Sécurisé TLS")];
+
+    private const string UnchangedPlaceholder = "•••••••• (inchangé)";
+
+    private List<PaysOption> _pays = [];
+    private List<VilleOption> _villes = [];
+    private bool _logoDragOver;
+    private string? _logoError;
+    private CancellationTokenSource? _debounce;
+
+    [Parameter, EditorRequired] public string FormId { get; set; } = "";
+    [Parameter, EditorRequired] public EntiteModel Form { get; set; } = default!;
+
+    // Mots de passe SMTP déjà enregistrés (jamais renvoyés par l'API) : sert
+    // seulement à indiquer « inchangé » dans le champ.
+    [Parameter] public bool SmtpPasswordSet { get; set; }
+    [Parameter] public bool SmtpPlanningPasswordSet { get; set; }
+    [Parameter] public EventCallback OnSubmit { get; set; }
+
+    // La ville actuellement enregistrée peut ne pas (ou plus) figurer dans les
+    // résultats de recherche (code postal pas encore recherché, ville
+    // renommée...) — ajoutée à la liste pour ne pas perdre la valeur affichée.
+    private IEnumerable<VilleOption> VilleChoices =>
+        Form.Localite.Length > 0 && !_villes.Any(v => v.Nom_ville == Form.Localite)
+            ? [new VilleOption("current", Form.Localite), .. _villes]
+            : _villes;
+
+    private RenderFragment Text(string label, Func<string> get, Action<string> set, string? type = null, string? placeholder = null, string? autocomplete = null) =>
+        @<label class="field">
+            @label
+            <input type="@type" value="@get()" placeholder="@placeholder" autocomplete="@autocomplete" @oninput="e => set((string)e.Value!)" />
+        </label>;
+
+    // Liste des pays : ~240 lignes, chargée une seule fois.
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _pays = (await Api.GetAsync<PaysResponse>("pays")).pays;
+        }
+        catch (Exception)
+        {
+            // Liste indisponible.
+        }
+        if (Form.CP.Length > 0) await SearchVillesAsync(Form.CP);
+    }
+
+    // Recherche des villes par code postal, avec un léger anti-rebond — la
+    // table en compte ~39 000, impossible à charger en une fois.
+    private void SetCp(string cp)
+    {
+        Form.CP = cp;
+        _ = SearchVillesAsync(cp);
+    }
+
+    private async Task SearchVillesAsync(string cp)
+    {
+        _debounce?.Cancel();
+        if (cp.Length == 0)
+        {
+            _villes = [];
+            return;
+        }
+        var token = (_debounce = new CancellationTokenSource()).Token;
+        try
+        {
+            await Task.Delay(300, token);
+            _villes = (await Api.GetAsync<VillesResponse>($"villes?cp={Js.EncodeUriComponent(cp)}")).villes;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            // Recherche remplacée par une plus récente, ou serveur injoignable.
+        }
+    }
+
+    private void ChangePays(string nom)
+    {
+        var match = _pays.FirstOrDefault(p => p.Nom == nom);
+        Form.Pays_full_name = nom;
+        Form.Pays = match?.ISO ?? "";
+    }
+
+    // Le logo n'est enregistré qu'au clic sur « Enregistrer » comme le reste
+    // du formulaire — pas d'envoi immédiat, pour rester cohérent avec tous
+    // les autres champs de cette fiche. Converti en data URI base64
+    // (« data:image/png;base64,... »), stockée telle quelle par l'API.
+    private async Task LogoChosenAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (!file.ContentType.StartsWith("image/", StringComparison.Ordinal))
+        {
+            _logoError = "Le logo doit être une image (PNG, JPG...)";
+            return;
+        }
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var bytes = new byte[file.Size];
+            await stream.ReadExactlyAsync(bytes);
+            _logoError = null;
+            Form.Logo = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
+        }
+        catch (Exception)
+        {
+            _logoError = "Lecture du fichier impossible";
+        }
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

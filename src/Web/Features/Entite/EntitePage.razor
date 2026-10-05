@@ -1,2 +1,97 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : EntitePage</p>
+@implements IDisposable
+@inject ApiClient Api
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Page « Société » du groupe Configuration : contrairement aux autres pages,
+   pas de CrudPage/DataTable/Modal — une seule fiche existe (ressource
+   singleton GET/PATCH /entite), affichée directement comme un formulaire de
+   page. Le bouton Enregistrer vit dans l'en-tête (attribut `form`, voir
+   FormId) pour rester visible en haut. *@
+@if (_loading)
+{
+    <p>Chargement des coordonnées de l'entreprise...</p>
+}
+else if (_error is not null)
+{
+    <p>Erreur : @_error</p>
+}
+else if (_form is not null)
+{
+    @* Fermer l'onglet avec des modifications demande « Enregistrer / Annuler
+       les modifications » (voir UnsavedChanges). *@
+    <div @ref="_root">
+        <div class="page-header">
+            <h2>Coordonnée entreprise</h2>
+            <button type="submit" form="@FormId" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+        </div>
+        <EntiteForm FormId="@FormId" Form="_form" SmtpPasswordSet="@(_data?.MDP_SMTP_defini ?? false)"
+                    SmtpPlanningPasswordSet="@(_data?.MDP_SMTP_Planning_defini ?? false)" OnSubmit="SaveAsync" />
+    </div>
+}
+
+@code {
+    private const string FormId = "entite-form";
+
+    private EntiteDetail? _data;
+    private EntiteModel? _form;
+    private bool _loading = true;
+    private string? _error;
+    private bool _submitting;
+    private ElementReference _root;
+    private bool _tracked;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+        try
+        {
+            _data = await Api.GetAsync<EntiteDetail>("entite");
+            _form = EntiteModel.From(_data);
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        _loading = false;
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_tracked && _form is not null)
+        {
+            _tracked = true;
+            await _guard.TrackAsync(_root);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_form is null) return;
+        _submitting = true;
+        StateHasChanged();
+        try
+        {
+            _data = await Api.SendJsonAsync<EntiteDetail>(HttpMethod.Patch, "entite", FormModel.ToDto<UpdateEntiteDto>(_form));
+            // La fiche reste affichée : ce qui vient d'être enregistré (et la
+            // version renvoyée par le serveur) devient la référence.
+            await _guard.MarkCleanAsync();
+        }
+        catch (Exception e)
+        {
+            await Browser.AlertAsync($"Échec de l'enregistrement : {e.Message}");
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}
