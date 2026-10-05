@@ -1,0 +1,105 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+@inject EnumerationLabels Enumerations
+
+@* Fiche d'une condition d'exécution, en création (Initial null) ou en
+   modification (pré-remplie avec la ligne du tableau). Type_Prestation est
+   un code de l'énumération « type_prestation » (1 Routier, 2 Manutention,
+   3 Valorisation) ; CMR_or_FDR un code 0/1. *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+    <FicheSection Title="Condition d'exécution" Class="fiche-section--center">
+        <div class="cond-grid">
+            <label class="fiche-check">
+                <span class="field-label">CMR / Feuille de route</span>
+                <input type="checkbox" checked="@(_form.CMR_or_FDR == 1)" @onchange="e => _form.CMR_or_FDR = e.Value is true ? 1 : 0" />
+            </label>
+            <FicheField Label="Type de prestation">
+                <select value="@JsNumber.ToString(_form.Type_Prestation)" @onchange="e => _form.Type_Prestation = JsNumber.Parse(e.Value as string)">
+                    @* Le code courant reste sélectionnable même s'il n'est pas (encore)
+                       dans l'énumération — chargement en cours, ou 0 hérité de la base. *@
+                    @if (!_types.ContainsKey(JsNumber.ToString(_form.Type_Prestation)))
+                    {
+                        <option value="@JsNumber.ToString(_form.Type_Prestation)">@(_form.Type_Prestation != 0 ? JsNumber.ToString(_form.Type_Prestation) : "")</option>
+                    }
+                    @foreach (var (valeur, libelle) in _types)
+                    {
+                        <option @key="valeur" value="@valeur">@libelle</option>
+                    }
+                </select>
+            </FicheField>
+            <FicheField Label="Libellé" Wide="true">
+                <input value="@_form.Libelle" maxlength="200" @oninput="e => _form.Libelle = e.Value as string ?? string.Empty" />
+            </FicheField>
+        </div>
+    </FicheSection>
+</form>
+
+@code {
+    // Type proposé à la création : Routier.
+    private const double DefaultTypePrestation = 1;
+
+    private sealed class Model
+    {
+        public double Type_Prestation { get; set; }
+        public double CMR_or_FDR { get; set; }
+        public string Libelle { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private IReadOnlyDictionary<string, string> _types = new Dictionary<string, string>();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public Condition? Initial { get; set; }
+    [Parameter] public Func<CreateConditionDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _form = new Model
+        {
+            Type_Prestation = Initial is null ? DefaultTypePrestation : Initial.Type_Prestation ?? 0,
+            CMR_or_FDR = Initial?.CMR_or_FDR ?? 0,
+            Libelle = Initial?.Libelle ?? "",
+        };
+        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
+        // modifications » (voir Components/UnsavedChanges).
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+        _types = await Enumerations.LoadAsync("type_prestation");
+    }
+
+    protected override void OnParametersSet() => _guard?.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmit(new CreateConditionDto
+            {
+                Type_Prestation = _form.Type_Prestation,
+                CMR_or_FDR = _form.CMR_or_FDR,
+                Libelle = _form.Libelle,
+            });
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

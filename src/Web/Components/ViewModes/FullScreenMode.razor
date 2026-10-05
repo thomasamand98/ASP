@@ -1,0 +1,15 @@
+@* Le formulaire recouvre toute la fenêtre, comme une page dédiée avec un
+   bouton « Retour ». *@
+<div class="vm-fullscreen">
+    <div class="vm-fullscreen-header">
+        <button type="button" class="vm-fullscreen-back" @onclick="OnClose">← Retour</button>
+        <h3 class="vm-fullscreen-title">@Title</h3>
+    </div>
+    <div class="vm-fullscreen-body">@Form</div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? Form { get; set; }
+}

@@ -1,0 +1,67 @@
+@inject Browser Browser
+
+@* Barre d'onglets commune à toutes les fiches (Personnel, Société,
+   Contrat...) : libellés simples, onglet actif souligné. Flèches gauche /
+   droite, Début et Fin pour passer d'un onglet à l'autre au clavier. *@
+<div class="fiche-tabs">
+    <div class="fiche-tabs-list" role="tablist" aria-label="@AriaLabel" data-nav-keys @onkeydown="OnKeyDown">
+        @foreach (var tab in Tabs)
+        {
+            var active = tab.Id == Value;
+            <button @key="tab.Id" @ref="_buttons[tab.Id]" type="button" role="tab" data-tab-id="@tab.Id"
+                    aria-selected="@(active ? "true" : "false")" tabindex="@(active ? 0 : -1)"
+                    class="fiche-tab@(active ? " is-active" : string.Empty)" disabled="@tab.Disabled" title="@tab.Title"
+                    @onclick="() => ValueChanged.InvokeAsync(tab.Id)">
+                @tab.Label
+                @if (tab.Count is > 0)
+                {
+                    <span class="fiche-tab-count">@tab.Count</span>
+                }
+            </button>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="fiche-tabs-actions">@Actions</div>
+    }
+</div>
+
+@code {
+    private readonly Dictionary<string, ElementReference> _buttons = [];
+    private string? _focus;
+
+    [Parameter, EditorRequired] public IReadOnlyList<FicheTab> Tabs { get; set; } = [];
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+
+    // Contenu aligné à droite de la barre (ex. bouton « Voir le PDF »).
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        var enabled = Tabs.Where(t => !t.Disabled).ToList();
+        if (enabled.Count == 0) return;
+        var index = enabled.FindIndex(t => t.Id == Value);
+        FicheTab? next = e.Key switch
+        {
+            "ArrowRight" => enabled[(index + 1) % enabled.Count],
+            "ArrowLeft" => enabled[((index - 1) % enabled.Count + enabled.Count) % enabled.Count],
+            "Home" => enabled[0],
+            "End" => enabled[^1],
+            _ => null,
+        };
+        if (next is null) return;
+        _focus = next.Id;
+        await ValueChanged.InvokeAsync(next.Id);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focus is { } id && _buttons.TryGetValue(id, out var button))
+        {
+            _focus = null;
+            await Browser.FocusAsync(button);
+        }
+    }
+}

@@ -1,0 +1,71 @@
+.vm-split {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+}
+
+.vm-split-table {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vm-split-panel {
+  flex: 0 0 360px;
+  width: 360px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  position: sticky;
+  top: 4.5rem;
+  max-height: calc(100dvh - 6rem);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.vm-split-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-bg);
+  position: sticky;
+  top: 0;
+}
+
+.vm-split-title {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 1rem;
+}
+
+.vm-split-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.vm-split-body {
+  padding: 1.1rem;
+}
+
+.vm-split-empty {
+  padding: 1.5rem 1.1rem;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1024px) {
+  .vm-split {
+    flex-direction: column;
+  }
+
+  .vm-split-panel {
+    width: 100%;
+    flex-basis: auto;
+    position: static;
+    max-height: none;
+  }
+}

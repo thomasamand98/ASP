@@ -1,0 +1,125 @@
+@inject ThemeService Theme
+@inject UnsavedChangesService Unsaved
+
+@* Menu latéral : chaque groupe (ex. « Commercial ») est déroulable et liste
+   ses items ; cliquer sur un item le sélectionne via OnSelect, à charge de
+   l'appelant d'afficher le contenu correspondant. Une entrée sans
+   sous-liste (ex. « Tableau de bord ») se sélectionne directement, sans
+   flèche ni déroulé. En dessous de 768px, la sidebar devient un tiroir
+   masqué par défaut (piloté par Open/OnClose) : sélectionner un item la
+   referme automatiquement. *@
+@if (Open)
+{
+    <div class="sidebar-backdrop" @onclick="OnClose"></div>
+}
+<nav class="sidebar@(Open ? " open" : "")">
+    <HorizonLogo Class="sidebar-logo" />
+    @foreach (var node in Nodes)
+    {
+        if (!node.IsGroup)
+        {
+            <button @key="node.Id" type="button" class="sidebar-leaf@(node.Id == ActiveId ? " active" : "")" @onclick="() => SelectAsync(node.Id)">
+                @if (node.Icon is not null)
+                {
+                    <span class="sidebar-icon"><Icon Name="@node.Icon" /></span>
+                }
+                @node.Label
+            </button>
+            continue;
+        }
+
+        var isOpen = _openGroups.Contains(node.Id);
+        <div @key="node.Id" class="sidebar-group">
+            <button type="button" class="sidebar-group-title" @onclick="() => ToggleGroup(node.Id)" aria-expanded="@(isOpen ? "true" : "false")">
+                <span class="sidebar-label">
+                    @if (node.Icon is not null)
+                    {
+                        <span class="sidebar-icon"><Icon Name="@node.Icon" /></span>
+                    }
+                    @node.Label
+                </span>
+                <span class="sidebar-chevron@(isOpen ? " open" : "")">▸</span>
+            </button>
+            @if (isOpen)
+            {
+                <ul class="sidebar-items">
+                    @foreach (var item in node.Items!)
+                    {
+                        <li @key="item.Id">
+                            <button type="button" class="sidebar-item@(item.Id == ActiveId ? " active" : "")" @onclick="() => SelectAsync(item.Id)">
+                                @item.Label
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
+    <div class="sidebar-theme" role="group" aria-label="Thème">
+        <span class="sidebar-theme-label">Thème</span>
+        <div class="sidebar-theme-options">
+            @foreach (var (id, label, title) in Themes)
+            {
+                <button @key="id" type="button" title="@title" aria-pressed="@(Theme.Preference == id ? "true" : "false")"
+                        class="@(Theme.Preference == id ? "active" : null)" @onclick="() => Theme.SetAsync(id)">
+                    @label
+                </button>
+            }
+        </div>
+    </div>
+
+    @* Utilisateur connecté et déconnexion — uniquement quand l'écran de
+       connexion est activé (voir Auth/AuthGate.razor). *@
+    @if (Auth.CanSignOut)
+    {
+        <div class="sidebar-user">
+            <span class="sidebar-user-name" title="@Auth.Login">@Auth.Login</span>
+            <button type="button" class="sidebar-logout" @onclick="SignOutAsync">Se déconnecter</button>
+        </div>
+    }
+</nav>
+
+@code {
+    private static readonly (string Id, string Label, string Title)[] Themes =
+    [
+        ("light", "Clair", "Thème clair"),
+        ("dark", "Sombre", "Thème sombre"),
+        ("system", "Auto", "Suivre le réglage du système"),
+    ];
+
+    private HashSet<string> _openGroups = [];
+
+    [CascadingParameter] public AuthState Auth { get; set; } = default!;
+
+    [Parameter, EditorRequired] public IReadOnlyList<MenuNode> Nodes { get; set; } = [];
+    [Parameter, EditorRequired] public string ActiveId { get; set; } = "";
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    // Tiroir mobile (voir le media query dans Sidebar.razor.css) ; sans effet
+    // en desktop où la sidebar reste toujours visible.
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    // Le groupe contenant l'entrée active est déroulé à l'ouverture.
+    protected override void OnInitialized() =>
+        _openGroups = [.. Nodes.Where(n => n.IsGroup && n.Items!.Any(item => item.Id == ActiveId)).Select(n => n.Id)];
+
+    private void ToggleGroup(string groupId)
+    {
+        if (!_openGroups.Remove(groupId)) _openGroups.Add(groupId);
+    }
+
+    private async Task SelectAsync(string itemId)
+    {
+        await OnSelect.InvokeAsync(itemId);
+        await OnClose.InvokeAsync();
+    }
+
+    // Se déconnecter quitte toutes les saisies ouvertes : la sidebar est hors
+    // des onglets, sa zone est celle de toute l'application.
+    private async Task SignOutAsync()
+    {
+        if (await Unsaved.ConfirmLeaveAsync(Unsaved.Root)) await Auth.SignOutAsync();
+    }
+}

@@ -1,0 +1,17 @@
+@* Contenu d'un onglet de fiche : monté à la première visite, puis seulement
+   masqué quand on change d'onglet. Une saisie en cours dans un onglet (ex.
+   contrat de travail, contact d'une société) n'est ainsi jamais perdue, et
+   fermer la fiche la signale toujours (voir Components/UnsavedChanges). *@
+@if (_visited)
+{
+    <div hidden="@(!Active)">@ChildContent</div>
+}
+
+@code {
+    private bool _visited;
+
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnParametersSet() => _visited |= Active;
+}

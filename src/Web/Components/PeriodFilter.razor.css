@@ -1,0 +1,43 @@
+/* Sélecteur de période des listes — voir PeriodFilter.razor. Mêmes champs
+   date que la période du planning (Planning.css, .pl-date). */
+.period-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.period-filter-date {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+
+/* Jour de la semaine collé à sa date (« ven. 25/09/2026 »). */
+.period-filter-date strong {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.period-filter-date input {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.period-filter-date input:focus-visible {
+  outline: none;
+  border-color: var(--accent-border);
+  box-shadow: var(--focus-ring);
+}
+
+.period-filter .btn[aria-pressed='true'] {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}

@@ -1,0 +1,84 @@
+@implements IAsyncDisposable
+@inject Browser Browser
+
+@* Bouton « Projection » à côté de Nouveau/Modifier/Supprimer (voir
+   CrudPage) : ouvre la liste des tables liées ; en choisir une affiche ses
+   enregistrements liés aux lignes sélectionnées dans un nouvel onglet. Le
+   menu se ferme au clic ailleurs ou à Échap. *@
+<div class="projection" @ref="_root">
+    <button type="button" class="btn" @onclick="ToggleAsync" disabled="@(SelectedCount == 0)" aria-haspopup="menu"
+            aria-expanded="@(_open ? "true" : "false")" title="@(SelectedCount == 0 ? "Sélectionnez au moins une ligne" : null)">
+        <Icon Name="projection.Projection" />
+        Projection
+    </button>
+    @if (_open && SelectedCount > 0)
+    {
+        var plural = SelectedCount > 1 ? "s" : "";
+        <div class="projection-menu" role="menu">
+            <div class="projection-menu-title">@($"{SelectedCount} ligne{plural} sélectionnée{plural}")</div>
+            @foreach (var relation in Items)
+            {
+                <button @key="relation.Target" type="button" role="menuitem" class="projection-menu-item" @onclick="() => SelectAsync(relation.Target)">
+                    @Relations.Entities[relation.Target].Title
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private ElementReference _root;
+    private bool _open;
+    private DotNetObjectReference<ProjectionButton>? _self;
+    private readonly List<int> _listeners = [];
+
+    [Parameter, EditorRequired] public IReadOnlyList<Relation> Items { get; set; } = [];
+
+    // Nombre de lignes sélectionnées — 0 désactive le bouton.
+    [Parameter] public int SelectedCount { get; set; }
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    private async Task ToggleAsync()
+    {
+        _open = !_open;
+        await UnlistenAsync();
+        if (!_open) return;
+        _self ??= DotNetObjectReference.Create(this);
+        _listeners.Add(await Browser.ListenOutsideAsync(_root, _self));
+        _listeners.Add(await Browser.ListenEscapeAsync(_self));
+    }
+
+    private async Task UnlistenAsync()
+    {
+        foreach (var id in _listeners) await Browser.UnlistenAsync(id);
+        _listeners.Clear();
+    }
+
+    [JSInvokable]
+    public async Task OnOutside()
+    {
+        _open = false;
+        await UnlistenAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public bool OnEscape()
+    {
+        _ = OnOutside();
+        return false;
+    }
+
+    private async Task SelectAsync(string target)
+    {
+        _open = false;
+        await UnlistenAsync();
+        await OnSelect.InvokeAsync(target);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await UnlistenAsync();
+        _self?.Dispose();
+    }
+}

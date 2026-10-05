@@ -1,0 +1,27 @@
+@* Ligne + bloc : la création reprend le bloc rétractable en haut de page
+   (comme InlinePanelMode), mais la modification déplie directement la ligne
+   concernée dans le tableau (câblage dans CrudPage, via RowFicheContent). *@
+<div class="vm-rowexpand">
+    <div class="vm-rowexpand-panel@(Open && State == "create" ? " open" : string.Empty)">
+        @if (State == "create")
+        {
+            <div class="vm-rowexpand-panel-inner">
+                <div class="vm-rowexpand-header">
+                    <h3 class="vm-rowexpand-title">@Title</h3>
+                    <button type="button" class="vm-rowexpand-close" @onclick="OnClose" aria-label="Fermer">×</button>
+                </div>
+                <div class="vm-rowexpand-body">@Form</div>
+            </div>
+        }
+    </div>
+    @Table
+</div>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string? State { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? Form { get; set; }
+    [Parameter] public RenderFragment? Table { get; set; }
+}

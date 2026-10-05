@@ -1,0 +1,260 @@
+/* Contrôles partagés par tous les écrans : boutons et champs de formulaire.
+   Les CSS de features ne gèrent que la mise en page (grilles, colonnes) et
+   leurs cas vraiment spécifiques. */
+
+/* ========== Boutons ========== */
+
+/* Bouton texte. Variantes : .primary (couleur de marque), .danger, .ghost
+   (lien sans bordure), .sm (compact, barres d'outils). */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    opacity var(--transition);
+}
+
+.btn svg {
+  flex-shrink: 0;
+  font-size: 1.1em;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--accent-bg);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn.primary {
+  border-color: transparent;
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: var(--brand);
+  opacity: 0.88;
+}
+
+.btn.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--danger-border);
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+
+.btn.ghost:hover:not(:disabled) {
+  background: var(--accent-bg);
+}
+
+.btn.sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.btn.block {
+  width: 100%;
+}
+
+/* Bouton icône carré, transparent par défaut. Variantes : .outlined
+   (bordé, barres d'outils), .primary, .danger (rouge au survol), .sm. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    opacity var(--transition);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.icon-btn.outlined {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 1rem;
+}
+
+.icon-btn.outlined:hover:not(:disabled) {
+  background: var(--accent-bg);
+}
+
+.icon-btn.primary {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.icon-btn.primary:hover:not(:disabled) {
+  background: var(--brand);
+  color: var(--on-brand);
+  opacity: 0.88;
+}
+
+.icon-btn.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.icon-btn.sm {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.icon-btn.is-active {
+  border-color: var(--brand-border);
+  color: var(--brand);
+}
+
+.btn:focus-visible,
+.icon-btn:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}
+
+/* ========== Formulaires ========== */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Boutons Annuler / Enregistrer, en haut à droite des fiches. */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Libellé + contrôle empilés. Le libellé est le texte du <label> lui-même,
+   ou un <span class="field-label"> quand il faut le styler à part. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--text-h);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.field-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.field-hint {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* :where() garde la spécificité au niveau d'une seule classe, pour que
+   chaque écran puisse ajuster un contrôle sans surenchère de sélecteurs. */
+.field :where(input:not([type='checkbox'], [type='radio'], [type='file']), select, textarea),
+.control {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-h);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.field :where(textarea),
+textarea.control {
+  resize: vertical;
+}
+
+.field :where(input, select, textarea):focus-visible,
+.control:focus-visible {
+  outline: none;
+  border-color: var(--accent-border);
+  box-shadow: var(--focus-ring);
+}
+
+.field :where(input:read-only:not([type='checkbox'], [type='radio']), input:disabled, select:disabled, textarea:disabled, textarea:read-only),
+.control:disabled {
+  background: var(--code-bg);
+  color: var(--text);
+  cursor: not-allowed;
+}
+
+/* Case à cocher + libellé sur une ligne. */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-h);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkbox input,
+.field input:where([type='checkbox'], [type='radio']) {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--brand);
+}

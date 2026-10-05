@@ -1,0 +1,21 @@
+@* Icône SVG de IconSet (« module.Nom »). `Size` remplace la taille par
+   défaut (1em, ou celle de l'icône d'origine) ; `Class` est posée sur le
+   <svg>. *@
+@((MarkupString)Markup)
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter] public int? Size { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string Markup
+    {
+        get
+        {
+            var svg = IconSet.All.TryGetValue(Name, out var found) ? found : throw new InvalidOperationException($"Icône inconnue : {Name}");
+            if (Size is { } size) svg = System.Text.RegularExpressions.Regex.Replace(svg, "^<svg (.*?)width=\"[^\"]*\" height=\"[^\"]*\"", $"<svg $1width=\"{size}\" height=\"{size}\"");
+            if (Class is not null) svg = svg.Replace("<svg ", $"<svg class=\"{Class}\" ");
+            return svg;
+        }
+    }
+}

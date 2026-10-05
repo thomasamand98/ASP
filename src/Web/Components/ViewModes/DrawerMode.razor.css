@@ -1,0 +1,69 @@
+.vm-drawer-layout {
+  position: relative;
+}
+
+.vm-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 90;
+}
+
+.vm-drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vm-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100dvh;
+  width: 440px;
+  max-width: 92vw;
+  background: var(--bg);
+  color: var(--text);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.vm-drawer.open {
+  transform: translateX(0);
+}
+
+.vm-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.vm-drawer-title {
+  margin: 0;
+  color: var(--text-h);
+}
+
+.vm-drawer-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.vm-drawer-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}

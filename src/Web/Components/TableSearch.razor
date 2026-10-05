@@ -1,0 +1,59 @@
+@implements IDisposable
+
+@* Champ « Rechercher » au-dessus des tableaux (voir CrudPage) : garde sa
+   propre saisie pour rester fluide et ne transmet OnChange qu'une fois la
+   frappe terminée (300 ms), ou immédiatement à l'effacement (croix, Échap). *@
+<div class="table-search">
+    <Icon Name="table.Search" />
+    <input type="search" value="@_input" @oninput="OnInput" @onkeydown="OnKeyDown"
+           placeholder="Rechercher..." aria-label="Rechercher dans toutes les colonnes" />
+    @if (_input.Length > 0)
+    {
+        <button type="button" class="table-search-clear" @onclick="ClearAsync" aria-label="Effacer la recherche">×</button>
+    }
+</div>
+
+@code {
+    // Délai après la dernière frappe avant de lancer la recherche — évite une
+    // requête serveur par caractère tapé.
+    private const int DebounceMs = 300;
+
+    private string _input = "";
+    private CancellationTokenSource? _debounce;
+
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> OnChange { get; set; }
+
+    protected override void OnInitialized() => _input = Value;
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        _input = e.Value as string ?? "";
+        _debounce?.Cancel();
+        if (_input == Value) return;
+        var token = (_debounce = new CancellationTokenSource()).Token;
+        try
+        {
+            await Task.Delay(DebounceMs, token);
+            await OnChange.InvokeAsync(_input);
+        }
+        catch (TaskCanceledException)
+        {
+            // Nouvelle frappe : la recherche précédente est abandonnée.
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") await ClearAsync();
+    }
+
+    private async Task ClearAsync()
+    {
+        _debounce?.Cancel();
+        _input = "";
+        await OnChange.InvokeAsync("");
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

@@ -1,0 +1,29 @@
+@* Vue divisée façon maître-détail : colonne fixe à droite du tableau,
+   toujours visible (message d'invite quand rien n'est ouvert). *@
+<div class="vm-split">
+    <div class="vm-split-table">@Table</div>
+    <aside class="vm-split-panel">
+        @if (Open)
+        {
+            <div class="vm-split-header">
+                <h3 class="vm-split-title">@Title</h3>
+                <button type="button" class="vm-split-close" @onclick="OnClose" aria-label="Fermer">×</button>
+            </div>
+            <div class="vm-split-body">@Form</div>
+        }
+        else
+        {
+            <div class="vm-split-empty">
+                <p>Sélectionnez une ligne (modification) ou cliquez sur « Nouveau » pour afficher la fiche ici.</p>
+            </div>
+        }
+    </aside>
+</div>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? Form { get; set; }
+    [Parameter] public RenderFragment? Table { get; set; }
+}

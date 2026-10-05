@@ -1,0 +1,60 @@
+@* Sélecteur « Du … au … » posé à côté du champ Rechercher (ToolbarExtra de
+   CrudPage), sur le modèle de la période du planning et de la feuille de
+   pointage : flèches pour passer à la période précédente / suivante (de même
+   durée), « Aujourd'hui » et « Toutes ». Changer une borne décale l'autre si
+   la période devient inversée. *@
+<div class="period-filter" role="group" aria-label="Période">
+    <button type="button" class="icon-btn outlined" @onclick="() => ShiftAsync(-1)" disabled="@(Value is null)" aria-label="Période précédente">
+        <Icon Name="planning.ChevronLeft" />
+    </button>
+    <label class="period-filter-date">
+        <span>Du</span>
+        @if (From is { } from)
+        {
+            <strong>@Format.WeekdayLong(from)</strong>
+        }
+        <input type="date" value="@(Value?.From ?? "")" @onchange="e => ChangeFromAsync(e.Value as string)" />
+    </label>
+    <label class="period-filter-date">
+        <span>au</span>
+        @if (To is { } to)
+        {
+            <strong>@Format.WeekdayLong(to)</strong>
+        }
+        <input type="date" value="@(Value?.To ?? "")" @onchange="e => ChangeToAsync(e.Value as string)" />
+    </label>
+    <button type="button" class="icon-btn outlined" @onclick="() => ShiftAsync(1)" disabled="@(Value is null)" aria-label="Période suivante">
+        <Icon Name="planning.ChevronRight" />
+    </button>
+    <button type="button" class="btn sm" @onclick="() => ValueChanged.InvokeAsync(Period.Today())">Aujourd'hui</button>
+    <button type="button" class="btn sm" @onclick="() => ValueChanged.InvokeAsync(null)" aria-pressed="@(Value is null ? "true" : "false")">Toutes</button>
+</div>
+
+@code {
+    [Parameter] public Period? Value { get; set; }
+    [Parameter] public EventCallback<Period?> ValueChanged { get; set; }
+
+    private DateTime? From => Value is null ? null : DateUtils.FromInputValue(Value.From);
+    private DateTime? To => Value is null ? null : DateUtils.FromInputValue(Value.To);
+
+    private Task ChangeFromAsync(string? raw)
+    {
+        if (DateUtils.FromInputValue(raw) is not { } date) return Task.CompletedTask;
+        return ValueChanged.InvokeAsync(new Period(raw!, To is { } to && to >= date ? Value!.To : raw!));
+    }
+
+    private Task ChangeToAsync(string? raw)
+    {
+        if (DateUtils.FromInputValue(raw) is not { } date) return Task.CompletedTask;
+        return ValueChanged.InvokeAsync(new Period(From is { } from && from <= date ? Value!.From : raw!, raw!));
+    }
+
+    private Task ShiftAsync(int direction)
+    {
+        if (From is not { } from || To is not { } to) return Task.CompletedTask;
+        var length = DateUtils.DaysInRange(from, to).Count;
+        return ValueChanged.InvokeAsync(new Period(
+            DateUtils.ToInputValue(from.AddDays(direction * length)),
+            DateUtils.ToInputValue(to.AddDays(direction * length))));
+    }
+}

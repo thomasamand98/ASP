@@ -1,0 +1,17 @@
+@* Sélecteur du mode de saisie/affichage, pour toutes les pages tableau
+   (masqué tant que ViewModeRegistry.SelectionEnabled vaut false). *@
+<div class="view-mode-selector" role="radiogroup" aria-label="Mode de saisie et d'affichage">
+    @foreach (var mode in ViewModeRegistry.All)
+    {
+        <button @key="mode.Id" type="button" role="radio" aria-checked="@(Value == mode.Id ? "true" : "false")"
+                class="view-mode-selector-button@(Value == mode.Id ? " active" : string.Empty)" @onclick="() => ValueChanged.InvokeAsync(mode.Id)" title="@mode.Description">
+            <Icon Name="@mode.Icon" />
+            <span>@mode.Label</span>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = ViewModeRegistry.Default;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+}

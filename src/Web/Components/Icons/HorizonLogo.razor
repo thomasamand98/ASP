@@ -1,0 +1,49 @@
+@* Logo Horizon. Intégré en SVG plutôt qu'en <img> pour que le nom suive la
+   couleur du texte (`currentColor`) et reste lisible en thème sombre. Les
+   ids des dégradés sont propres à chaque instance : deux logos dans la page
+   ne se marchent pas dessus. viewBox recadrée sur le dessin. *@
+<svg class="@Class" xmlns="http://www.w3.org/2000/svg" viewBox="18 18 426 144" role="img" aria-label="Horizon">
+    <defs>
+        <linearGradient id="@Id("sun")" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFB547" />
+            <stop offset="1" stop-color="#FF5E62" />
+        </linearGradient>
+        <linearGradient id="@Id("sea")" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#3B5BDB" />
+            <stop offset="1" stop-color="#1B2A5E" />
+        </linearGradient>
+        <clipPath id="@Id("badge")">
+            <circle cx="90" cy="90" r="70" />
+        </clipPath>
+        <clipPath id="@Id("sky")">
+            <rect x="0" y="0" width="180" height="96" />
+        </clipPath>
+    </defs>
+
+    @* Emblème *@
+    <g clip-path="url(#@Id("badge"))">
+        <rect x="0" y="0" width="180" height="180" fill="#FFF4E6" />
+        <g clip-path="url(#@Id("sky"))">
+            <circle cx="90" cy="100" r="42" fill="url(#@Id("sun"))" />
+        </g>
+        <rect x="0" y="96" width="180" height="90" fill="url(#@Id("sea"))" />
+        <g fill="#FF8A5B">
+            <rect x="62" y="108" width="56" height="5" rx="2.5" />
+            <rect x="72" y="121" width="36" height="5" rx="2.5" opacity="0.8" />
+            <rect x="81" y="134" width="18" height="5" rx="2.5" opacity="0.6" />
+        </g>
+    </g>
+    <rect x="20" y="94" width="140" height="4" rx="2" fill="#1B2A5E" />
+
+    @* Nom *@
+    <text x="190" y="110" font-family="'Inter','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="72" font-weight="700" letter-spacing="-2" fill="currentColor">horizon</text>
+</svg>
+
+@code {
+    private static int _next;
+    private readonly string _uid = $"logo{++_next}";
+
+    [Parameter] public string? Class { get; set; }
+
+    private string Id(string name) => $"{_uid}-{name}";
+}

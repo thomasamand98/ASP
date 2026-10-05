@@ -1,0 +1,192 @@
+@implements IAsyncDisposable
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Bandeau latéral droit, présent sur tous les écrans : replié en une fine
+   barre avec le nombre de tâches échues (non traitées, date d'alerte
+   atteinte), il se déplie par-dessus le contenu pour les lister. Chaque
+   tâche peut être marquée comme traitée ou reprogrammée à une autre date
+   (elle disparaît alors jusqu'à cette date). *@
+<div class="tasks-backdrop@(_open ? " open" : "")" @onclick="() => _open = false"></div>
+<aside class="tasks-panel@(_open ? " open" : "")" aria-label="Tâches à faire" inert="@(!_open)">
+    <header class="tasks-panel-header">
+        <h3 class="tasks-panel-title">
+            Tâches à faire <span class="tasks-panel-count">@_taches.Count</span>
+        </h3>
+        <button type="button" class="tasks-panel-close" @onclick="() => _open = false" aria-label="Fermer">
+            <Icon Name="layout.Close" />
+        </button>
+    </header>
+    @if (_error is not null)
+    {
+        <p class="tasks-panel-error">@_error</p>
+    }
+    @if (_taches.Count == 0 && _error is null)
+    {
+        <p class="tasks-panel-empty">Aucune tâche à faire.</p>
+    }
+    else
+    {
+        <ul class="tasks-list">
+            @foreach (var tache in _taches)
+            {
+                var busy = _busyId == tache.IDTACHES;
+                var editing = _reprogramming?.Id == tache.IDTACHES;
+                <li @key="tache.IDTACHES" class="tasks-item">
+                    <div class="tasks-item-meta">
+                        <span class="tasks-item-date">@FormatDay(tache.Date_tache)</span>
+                        <span class="tasks-item-type">@TypeLabel(tache.Type)</span>
+                    </div>
+                    <p class="tasks-item-label">@tache.Libelle?.Replace("\t", " ")</p>
+                    @if (editing)
+                    {
+                        <form class="tasks-item-actions" @onsubmit="() => ReprogrammerAsync(tache)" @onsubmit:preventDefault="true">
+                            <input type="date" class="control tasks-item-date-input" value="@_reprogramming!.Value.Date"
+                                   @onchange="e => _reprogramming = (tache.IDTACHES, e.Value as string ?? string.Empty)" required aria-label="Nouvelle date d'alerte" />
+                            <button type="submit" class="btn sm primary" disabled="@(busy || _reprogramming!.Value.Date.Length == 0)">OK</button>
+                            <button type="button" class="btn sm ghost" @onclick="() => _reprogramming = null" disabled="@busy">Annuler</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="tasks-item-actions">
+                            <button type="button" class="btn sm" disabled="@busy" @onclick="() => TraiterAsync(tache)">Traitée</button>
+                            <button type="button" class="btn sm ghost" disabled="@busy" @onclick="() => _reprogramming = (tache.IDTACHES, string.Empty)">Reprogrammer</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</aside>
+<button type="button" class="tasks-rail" @onclick="() => _open = !_open" aria-expanded="@(_open ? "true" : "false")"
+        aria-label="@($"{(_open ? "Fermer" : "Ouvrir")} les tâches à faire ({_taches.Count})")" title="Tâches à faire">
+    <span class="tasks-rail-icon">
+        <Icon Name="layout.Tasks" />
+        @if (_taches.Count > 0)
+        {
+            <span class="tasks-rail-badge">@(_taches.Count > 99 ? "99+" : _taches.Count.ToString(CultureInfo.InvariantCulture))</span>
+        }
+    </span>
+</button>
+
+@code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(60);
+
+    private bool _open;
+    private List<Tache> _taches = [];
+    private string? _error;
+    private string? _busyId;
+    private (string Id, string Date)? _reprogramming;
+    private readonly CancellationTokenSource _stop = new();
+    private DotNetObjectReference<TasksPanel>? _self;
+    private int? _escapeListener;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _ = RefreshLoopAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        _escapeListener = await Browser.ListenEscapeAsync(_self);
+    }
+
+    [JSInvokable]
+    public bool OnEscape()
+    {
+        if (!_open) return false;
+        _open = false;
+        StateHasChanged();
+        return false;
+    }
+
+    private async Task RefreshLoopAsync()
+    {
+        using var timer = new PeriodicTimer(RefreshInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token))
+            {
+                await LoadAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Panneau retiré (déconnexion).
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var data = await Api.GetAsync<TachesResponse>($"taches/a-faire?jusquAu={DateUtils.ToInputValue(DateTime.Now)}");
+            _taches = data.taches;
+            _error = null;
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    // Date DATE renvoyée en minuit UTC : on garde le jour tel quel, sans
+    // conversion de fuseau (qui décalerait d'un jour à l'ouest de Greenwich).
+    private static string FormatDay(string? iso)
+    {
+        if (string.IsNullOrEmpty(iso)) return "";
+        var parts = iso[..Math.Min(10, iso.Length)].Split('-');
+        return parts.Length == 3 ? $"{parts[2]}/{parts[1]}/{parts[0]}" : "";
+    }
+
+    private static string TypeLabel(double? type) => type switch
+    {
+        1 => "Personnel",
+        2 => "Véhicule",
+        _ => "Autre",
+    };
+
+    private async Task RunAsync(string id, Func<Task> action)
+    {
+        _busyId = id;
+        try
+        {
+            await action();
+            _reprogramming = null;
+            await LoadAsync();
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busyId = null;
+        }
+    }
+
+    private async Task TraiterAsync(Tache tache)
+    {
+        var libelle = tache.Libelle?.Replace("\t", " ").Replace("\n", " — ") ?? "";
+        if (!await Browser.ConfirmAsync($"Marquer cette tâche comme traitée ?\n\n{libelle}")) return;
+        await RunAsync(tache.IDTACHES, () => Api.SendAsync(HttpMethod.Patch, $"taches/{tache.IDTACHES}/traiter",
+            new { Date_traitement = DateUtils.ToInputValue(DateTime.Now) }));
+    }
+
+    private Task ReprogrammerAsync(Tache tache) =>
+        RunAsync(tache.IDTACHES, () => Api.SendAsync(HttpMethod.Patch, $"taches/{tache.IDTACHES}/reprogrammer",
+            new { Date_tache = _reprogramming!.Value.Date }));
+
+    public async ValueTask DisposeAsync()
+    {
+        _stop.Cancel();
+        _stop.Dispose();
+        if (_escapeListener is { } id) await Browser.UnlistenAsync(id);
+        _self?.Dispose();
+    }
+}

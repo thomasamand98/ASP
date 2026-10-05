@@ -1,0 +1,188 @@
+/* DataTable responsive : aligné sur le même seuil que le menu burger
+   (voir Sidebar.css / AppLayout.css, 768px) pour ne jamais laisser le
+   tableau dans un entre-deux illisible (ni carte, ni table confortable).
+   Au-dessus de 768px, les colonnes se répartissent sur 100% de la largeur
+   disponible (table-layout: fixed) et le texte retourne à la ligne —
+   pas de scroll horizontal, tout reste visible ; en dessous, chaque
+   ligne devient une carte empilée label/valeur. */
+.data-table {
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+.data-table table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* Colonne "Description" (Contrats) : en table-layout: fixed, la largeur
+   des colonnes est calculée à partir de celle des cellules d'en-tête
+   (min-width y est ignoré, il faut width) — ciblée via data-label (posé
+   sur th et td). */
+.data-table th[data-label="Description"] {
+  width: 300px;
+}
+
+.data-table th {
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  padding: 0.5rem;
+  user-select: none;
+  overflow-wrap: anywhere;
+}
+
+.data-table-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.data-table-sort-label {
+  cursor: pointer;
+}
+
+.data-table-filter-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text);
+}
+
+.data-table-filter-button.active {
+  color: var(--brand);
+}
+
+.data-table-filter-input {
+  margin-top: 0.4rem;
+  width: 100%;
+  font-weight: 400;
+  padding: 0.25rem 0.4rem;
+  box-sizing: border-box;
+}
+
+.data-table-row.clickable {
+  cursor: pointer;
+}
+
+.data-table-row.selected {
+  background: var(--accent-bg);
+}
+
+/* Colonne des cases à cocher (multisélection, voir DataTable.razor) —
+   largeur fixe, sinon table-layout: fixed lui donnerait une part égale
+   aux autres colonnes. */
+.data-table .data-table-select-cell {
+  width: 36px;
+  text-align: center;
+}
+
+.data-table-select-cell input {
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* Ligne "dépliée" insérée sous la ligne concernée — voir RowExpandMode.razor
+   (mode "Ligne + bloc"), sous components/view-modes/. */
+.data-table-expanded-row td {
+  padding: 0;
+  border-bottom: 2px solid var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.data-table .data-table-empty-row td {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  opacity: 0.6;
+}
+
+@media (max-width: 768px) {
+  .data-table tbody .data-table-empty-row td::before {
+    content: none;
+  }
+}
+
+/* Passe à la ligne quand les filtres (période, archivage...) ne tiennent
+   plus à côté de la recherche. */
+.data-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Exporter reste calé à droite, qu'il y ait ou non un contenu à gauche
+   (voir toolbarStart dans DataTable.razor). */
+.data-table-export-button {
+  margin-left: auto;
+  /* Vert Excel, lisible dans les deux thèmes. */
+  color: var(--success);
+}
+
+.data-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.8rem;
+    margin-block-end: 0.6rem;
+  }
+
+  .data-table tbody td {
+    display: block;
+    border-bottom: 1px dashed var(--border) !important;
+    padding: 0.35rem 0 !important;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table tbody tr td:last-child {
+    border-bottom: none !important;
+  }
+
+  .data-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--text-h);
+    margin-bottom: 0.15rem;
+  }
+
+  .data-table tbody tr td:first-child,
+  .data-table tbody tr td.data-table-select-cell + td {
+    font-weight: 700;
+  }
+
+  /* En carte : la case à cocher se place en haut à droite, sans libellé. */
+  .data-table tbody tr {
+    position: relative;
+  }
+
+  .data-table tbody td.data-table-select-cell {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.8rem;
+    width: auto;
+    border-bottom: none !important;
+    padding: 0 !important;
+  }
+
+  .data-table tbody td.data-table-select-cell::before {
+    content: none;
+  }
+}

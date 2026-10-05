@@ -1,0 +1,15 @@
+@* Carte titrée ; `Aside` s'aligne à droite du titre (ex. un interrupteur). *@
+<section class="fiche-section@(Class is null ? string.Empty : " " + Class)">
+    <div class="fiche-section-head">
+        <h4 class="fiche-section-title">@Title</h4>
+        @Aside
+    </div>
+    @ChildContent
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? Aside { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

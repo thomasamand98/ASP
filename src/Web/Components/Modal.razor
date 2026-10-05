@@ -1,0 +1,33 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+
+@* Modale générique (fond + panneau). Fermer par la croix ou le fond demande
+   d'abord quoi faire d'une saisie modifiée dans la modale (voir
+   Components/UnsavedChanges). *@
+<div class="modal-overlay" @onclick="RequestCloseAsync">
+    <div class="modal-panel" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">@Title</h3>
+            <button class="modal-close" @onclick="RequestCloseAsync" aria-label="Fermer">×</button>
+        </div>
+        <GuardBoundary Scope="_scope">@ChildContent</GuardBoundary>
+    </div>
+</div>
+
+@code {
+    private GuardScope _scope = default!;
+
+    [CascadingParameter] public GuardScope? Parent { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => _scope = GuardScopes.CreateChild(Parent, Unsaved);
+
+    private async Task RequestCloseAsync()
+    {
+        if (await Unsaved.ConfirmLeaveAsync(_scope)) await OnClose.InvokeAsync();
+    }
+
+    public void Dispose() => _scope.Detach();
+}

@@ -1,0 +1,52 @@
+/* Dialogue « Modifications non enregistrées » (voir
+   UnsavedChangesService.cs) : au-dessus de tout, y compris des modales et
+   panneaux de fiche. */
+
+.unsaved-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--overlay);
+}
+
+.unsaved-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: 100%;
+  max-width: 460px;
+  padding: 1.25rem 1.35rem;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+.unsaved-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.unsaved-title {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 1.05rem;
+}
+
+.unsaved-text {
+  font-size: 0.9rem;
+}
+
+.unsaved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

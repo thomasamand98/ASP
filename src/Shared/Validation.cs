@@ -14,7 +14,7 @@ namespace Horizon.Shared;
 // non renseignés (Opt non affecté) ne sont pas envoyés (voir JsonConfig).
 
 // Valeur éventuellement absente du corps de la requête.
-public readonly struct Opt<T>
+public readonly struct Opt<T> : IOpt
 {
     private readonly T _value;
 
@@ -35,7 +35,16 @@ public readonly struct Opt<T>
         if (IsSet) assign(_value);
     }
 
+    object? IOpt.BoxedValue => _value;
+
     public static implicit operator Opt<T>(T value) => new(value);
+}
+
+// Accès non générique à un Opt<T> (sérialisation JSON, voir JsonConfig).
+public interface IOpt
+{
+    bool IsSet { get; }
+    object? BoxedValue { get; }
 }
 
 // ---------- Types de champs ----------

@@ -1,0 +1,21 @@
+@* Panneau latéral (« fiche ») qui glisse depuis la droite sur toute la
+   hauteur, au-dessus du tableau (qui reste visible en arrière-plan assombri). *@
+<div class="vm-drawer-layout">
+    @Table
+    <div class="vm-drawer-backdrop@(Open ? " open" : string.Empty)" @onclick="OnClose" aria-hidden="true"></div>
+    <aside class="vm-drawer@(Open ? " open" : string.Empty)" aria-hidden="@(Open ? "false" : "true")">
+        <div class="vm-drawer-header">
+            <h3 class="vm-drawer-title">@Title</h3>
+            <button type="button" class="vm-drawer-close" @onclick="OnClose" aria-label="Fermer">×</button>
+        </div>
+        <div class="vm-drawer-body">@Form</div>
+    </aside>
+</div>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? Form { get; set; }
+    [Parameter] public RenderFragment? Table { get; set; }
+}

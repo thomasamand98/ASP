@@ -1,0 +1,52 @@
+@* Écran de connexion affiché par AuthGate tant que l'utilisateur n'est pas
+   identifié. Les messages d'erreur (identifiants manquants, trop de
+   tentatives...) sont ceux du serveur, affichés tels quels. *@
+<div class="login-page">
+    <form class="login-card" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+        <HorizonLogo Class="login-logo" />
+        <h1 class="login-title">Connexion</h1>
+        <p class="login-subtitle">Identifiez-vous pour accéder à l’application.</p>
+
+        <label class="field login-field">
+            Identifiant
+            <input @bind="_login" @bind:event="oninput" autocomplete="username" autofocus required />
+        </label>
+        <label class="field login-field">
+            Mot de passe
+            <input type="password" @bind="_password" @bind:event="oninput" autocomplete="current-password" required />
+        </label>
+
+        @if (_error is not null)
+        {
+            <p class="alert-error" role="alert">@_error</p>
+        }
+
+        <button type="submit" class="btn primary login-button" disabled="@_submitting">
+            @(_submitting ? "Connexion..." : "Se connecter")
+        </button>
+    </form>
+</div>
+
+@code {
+    private string _login = "";
+    private string _password = "";
+    private string? _error;
+    private bool _submitting;
+
+    [Parameter] public EventCallback<(string Login, string Password)> OnLogin { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        _submitting = true;
+        _error = null;
+        try
+        {
+            await OnLogin.InvokeAsync((_login, _password));
+        }
+        catch (Exception e)
+        {
+            _error = e is ApiException ? e.Message : "Connexion impossible";
+            _submitting = false;
+        }
+    }
+}

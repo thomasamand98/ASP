@@ -1,0 +1,29 @@
+@implements IDisposable
+@inject UnsavedChangesService Service
+
+@* Délimite une zone (onglet, fiche, modale...) : les saisies affichées à
+   l'intérieur y sont rattachées. `Scope` est fourni quand le parent doit
+   pouvoir la vérifier (voir GuardScopes.CreateChild) ; sinon une zone propre
+   est créée. *@
+<CascadingValue Value="CurrentScope">@ChildContent</CascadingValue>
+
+@code {
+    private GuardScope? _own;
+
+    [CascadingParameter] public GuardScope? Parent { get; set; }
+
+    [Parameter] public GuardScope? Scope { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private GuardScope CurrentScope => Scope ?? (_own ??= CreateOwn());
+
+    private GuardScope CreateOwn()
+    {
+        var scope = new GuardScope(Parent ?? Service.Root);
+        scope.Attach();
+        return scope;
+    }
+
+    public void Dispose() => _own?.Detach();
+}

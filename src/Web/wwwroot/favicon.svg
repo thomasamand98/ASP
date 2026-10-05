@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 20 140 140" width="48" height="48">
+  <!-- Emblème du logo Horizon (voir src/components/HorizonLogo.tsx) -->
+  <defs>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFB547"/>
+      <stop offset="1" stop-color="#FF5E62"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B5BDB"/>
+      <stop offset="1" stop-color="#1B2A5E"/>
+    </linearGradient>
+    <clipPath id="badge">
+      <circle cx="90" cy="90" r="70"/>
+    </clipPath>
+    <clipPath id="sky">
+      <rect x="0" y="0" width="180" height="96"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#badge)">
+    <rect x="0" y="0" width="180" height="180" fill="#FFF4E6"/>
+    <g clip-path="url(#sky)">
+      <circle cx="90" cy="100" r="42" fill="url(#sun)"/>
+    </g>
+    <rect x="0" y="96" width="180" height="90" fill="url(#sea)"/>
+    <g fill="#FF8A5B">
+      <rect x="62" y="108" width="56" height="5" rx="2.5"/>
+      <rect x="72" y="121" width="36" height="5" rx="2.5" opacity="0.8"/>
+      <rect x="81" y="134" width="18" height="5" rx="2.5" opacity="0.6"/>
+    </g>
+  </g>
+  <rect x="20" y="94" width="140" height="4" rx="2" fill="#1B2A5E"/>
+</svg>

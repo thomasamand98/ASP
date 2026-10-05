@@ -1,0 +1,31 @@
+/* Fiche affichée dans la ligne dépliée du tableau (édition) — voir
+   RowFicheContent.razor. */
+.vm-rowexpand-fiche {
+  padding: 1rem 1.25rem;
+}
+
+.vm-rowexpand-fiche-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.vm-rowexpand-fiche-title {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 0.95rem;
+}
+
+.vm-rowexpand-fiche-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.vm-rowexpand-fiche-body {
+  max-width: 480px;
+}

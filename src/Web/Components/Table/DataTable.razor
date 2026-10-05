@@ -1,0 +1,242 @@
+@typeparam T
+@inject Browser Browser
+
+@* Tableau générique : tri au clic sur le libellé, filtre par colonne via
+   l'icône entonnoir, multisélection, export Excel. Reprend exactement les
+   règles de TanStack Table utilisées par le front d'origine (voir
+   TableModel.cs). Sous 768px (voir DataTable.razor.css, aligné sur le seuil
+   du menu burger), chaque ligne bascule en carte empilée label/valeur. *@
+<div class="data-table">
+    <div class="data-table-toolbar">
+        @ToolbarStart
+        <button type="button" class="btn sm data-table-export-button" @onclick="ExportAsync">
+            <Icon Name="table.Excel" />
+            Exporter
+        </button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                @if (Selectable)
+                {
+                    <th class="data-table-select-cell">
+                        <input type="checkbox" @ref="_selectAll" checked="@AllVisibleSelected" @onchange="ToggleAllVisible"
+                               disabled="@(_visibleIds.Count == 0)" aria-label="Tout sélectionner" />
+                    </th>
+                }
+                @foreach (var column in Columns)
+                {
+                    var sorted = _model.SortDirection(column.Id);
+                    var isFilterOpen = _openFilterId == column.Id;
+                    var hasFilter = !string.IsNullOrEmpty(_model.FilterValue(column.Id));
+                    <th @key="column.Id" data-label="@column.Header">
+                        <div class="data-table-header-row">
+                            <span class="data-table-sort-label" @onclick="e => _model.ToggleSort(column, e.ShiftKey)">
+                                @column.Header@(sorted == SortDirection.Asc ? " ▲" : sorted == SortDirection.Desc ? " ▼" : "")
+                            </span>
+                            <button class="data-table-filter-button@(hasFilter ? " active" : "")"
+                                    @onclick="() => ToggleFilter(column.Id)" aria-label="Filtrer la colonne @column.Id">
+                                <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                    <path d="M1 2h14l-5.5 6.2V14l-3-1.5V8.2z" />
+                                </svg>
+                            </button>
+                        </div>
+                        @if (isFilterOpen)
+                        {
+                            <input @ref="_filterInput" class="data-table-filter-input" value="@_model.FilterValue(column.Id)"
+                                   @oninput="e => _model.SetFilter(column.Id, e.Value as string)" placeholder="Filtrer..." />
+                        }
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _rows)
+            {
+                var id = GetRowId?.Invoke(row.Item);
+                var isSelected = id is not null && Selection.Contains(id);
+                var isClickable = Selectable || OnRowDoubleClick.HasDelegate;
+                var isExpanded = id is not null && id == ExpandedRowId;
+                var rowClass = "data-table-row" + (isClickable ? " clickable" : "") + (isSelected ? " selected" : "");
+                <tr @key="row.Index" class="@rowClass"
+                    data-shift-select="@(Selectable ? "true" : null)"
+                    @onclick="e => HandleRowClick(e, id)" @ondblclick="() => OnRowDoubleClick.InvokeAsync(row.Item)">
+                    @if (Selectable && id is not null)
+                    {
+                        <td class="data-table-select-cell" @onclick:stopPropagation="true" @ondblclick:stopPropagation="true">
+                            <input type="checkbox" checked="@isSelected" @onchange="() => ToggleRow(id)" aria-label="Sélectionner la ligne" />
+                        </td>
+                    }
+                    @foreach (var column in Columns)
+                    {
+                        <td data-label="@column.Header">@RenderCell(column, row.Item)</td>
+                    }
+                </tr>
+                @if (isExpanded && RenderExpandedRow is not null)
+                {
+                    <tr class="data-table-expanded-row">
+                        <td colspan="@(Columns.Count + (Selectable ? 1 : 0))">@RenderExpandedRow</td>
+                    </tr>
+                }
+            }
+            @if (_rows.Count == 0)
+            {
+                <tr class="data-table-empty-row">
+                    <td colspan="@(Columns.Count + (Selectable ? 1 : 0))">Aucun résultat</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private readonly TableModel<T> _model = new();
+    private List<TableRow<T>> _rows = [];
+    private List<string> _visibleIds = [];
+    private string? _openFilterId;
+    private bool _focusFilter;
+    // Dernière ligne cliquée sans Maj — point de départ du Maj+clic.
+    private string? _anchorId;
+    private ElementReference _selectAll;
+    private ElementReference _filterInput;
+
+    [Parameter, EditorRequired] public IReadOnlyList<T> Data { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<Column<T>> Columns { get; set; } = [];
+
+    // Identifiant unique de chaque ligne — requis pour la sélection.
+    [Parameter] public Func<T, string>? GetRowId { get; set; }
+
+    // Multisélection — fournir les deux active la colonne de cases à cocher.
+    // Simple clic : sélectionne uniquement cette ligne, sans rien ouvrir.
+    // Ctrl/Cmd+clic ou case à cocher : ajoute/retire la ligne. Maj+clic :
+    // sélectionne la plage depuis la dernière ligne cliquée, dans l'ordre
+    // affiché (donc après tri et filtres).
+    [Parameter] public IReadOnlySet<string>? SelectedRowIds { get; set; }
+    [Parameter] public EventCallback<HashSet<string>> OnSelectionChange { get; set; }
+
+    // Double clic : ouvre la fiche (voir CrudPage).
+    [Parameter] public EventCallback<T> OnRowDoubleClick { get; set; }
+
+    // Nom du fichier généré par le bouton Exporter (sans l'extension .xlsx).
+    [Parameter] public string? ExportFileName { get; set; }
+
+    // Contenu placé à gauche du bouton Exporter (ex. le champ Rechercher).
+    [Parameter] public RenderFragment? ToolbarStart { get; set; }
+
+    // Ligne « dépliée » : une ligne supplémentaire s'insère juste en dessous
+    // avec RenderExpandedRow (voir le mode de vue « Ligne + bloc »).
+    [Parameter] public string? ExpandedRowId { get; set; }
+    [Parameter] public RenderFragment? RenderExpandedRow { get; set; }
+
+    private bool Selectable => GetRowId is not null && SelectedRowIds is not null && OnSelectionChange.HasDelegate;
+
+    private IReadOnlySet<string> Selection => SelectedRowIds ?? new HashSet<string>();
+
+    private int SelectedVisibleCount => _visibleIds.Count(Selection.Contains);
+
+    private bool AllVisibleSelected => _visibleIds.Count > 0 && SelectedVisibleCount == _visibleIds.Count;
+
+    protected override void OnInitialized() => _model.Changed += () =>
+    {
+        Refresh();
+        StateHasChanged();
+    };
+
+    protected override void OnParametersSet()
+    {
+        _model.Columns = Columns;
+        _model.Data = Data;
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        _rows = _model.Rows();
+        _visibleIds = GetRowId is null ? [] : [.. _rows.Select(row => GetRowId(row.Item))];
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Selectable) await Browser.SetIndeterminateAsync(_selectAll, SelectedVisibleCount > 0 && !AllVisibleSelected);
+        if (_focusFilter)
+        {
+            _focusFilter = false;
+            await Browser.FocusAsync(_filterInput);
+        }
+    }
+
+    private RenderFragment RenderCell(Column<T> column, T item) => builder =>
+    {
+        if (column.Template is not null) builder.AddContent(0, column.Template(item));
+        else if (column.Text is not null) builder.AddContent(1, column.Text(item));
+        else builder.AddContent(2, JsValue.Display(column.Value(item)));
+    };
+
+    private void ToggleFilter(string columnId)
+    {
+        _openFilterId = _openFilterId == columnId ? null : columnId;
+        _focusFilter = _openFilterId is not null;
+    }
+
+    private Task ToggleRow(string id)
+    {
+        var next = new HashSet<string>(Selection);
+        if (!next.Remove(id)) next.Add(id);
+        _anchorId = id;
+        return OnSelectionChange.InvokeAsync(next);
+    }
+
+    private Task HandleRowClick(MouseEventArgs e, string? id)
+    {
+        if (!Selectable || id is null) return Task.CompletedTask;
+        if (e.ShiftKey && _anchorId is not null && _visibleIds.Contains(_anchorId))
+        {
+            var bounds = new[] { _visibleIds.IndexOf(_anchorId), _visibleIds.IndexOf(id) }.Order().ToArray();
+            var range = _visibleIds.GetRange(bounds[0], bounds[1] - bounds[0] + 1);
+            // Maj+Ctrl ajoute la plage à la sélection existante, Maj seul la remplace.
+            return OnSelectionChange.InvokeAsync(e.CtrlKey || e.MetaKey ? [.. Selection, .. range] : [.. range]);
+        }
+        if (e.CtrlKey || e.MetaKey) return ToggleRow(id);
+        _anchorId = id;
+        return OnSelectionChange.InvokeAsync([id]);
+    }
+
+    // Case d'en-tête : coche/décoche toutes les lignes affichées (après
+    // filtres), sans toucher aux lignes sélectionnées masquées par un filtre.
+    private Task ToggleAllVisible()
+    {
+        var next = new HashSet<string>(Selection);
+        var allSelected = AllVisibleSelected;
+        foreach (var id in _visibleIds)
+        {
+            if (allSelected) next.Remove(id);
+            else next.Add(id);
+        }
+        return OnSelectionChange.InvokeAsync(next);
+    }
+
+    // Exporte les lignes telles qu'affichées (triées/filtrées) plutôt que les
+    // données brutes, avec les libellés de colonne de l'affichage. Deux
+    // colonnes de même libellé n'en font qu'une (la dernière l'emporte),
+    // comme les clés d'un objet JavaScript.
+    private async Task ExportAsync()
+    {
+        var headers = new List<string>();
+        var indexByHeader = new Dictionary<string, int>();
+        foreach (var column in Columns)
+        {
+            if (indexByHeader.TryAdd(column.Header, headers.Count)) headers.Add(column.Header);
+        }
+        var displayed = _model.Rows();
+        // Aucune ligne : feuille vide, sans en-tête (comme json_to_sheet).
+        if (displayed.Count == 0) headers.Clear();
+        var rows = displayed.Select(row =>
+        {
+            var values = new object?[headers.Count];
+            foreach (var column in Columns) values[indexByHeader[column.Header]] = column.Value(row.Item);
+            return (IReadOnlyList<object?>)values;
+        });
+        var bytes = Xlsx.Write("Données", headers, rows);
+        await Browser.DownloadAsync($"{ExportFileName ?? "export"}.xlsx", bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}

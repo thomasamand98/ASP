@@ -1,0 +1,73 @@
+@implements IDisposable
+@inject UnsavedChangesService Service
+@inject Browser Browser
+
+@* Dialogue « Modifications non enregistrées » : demandé par
+   UnsavedChangesService.ConfirmLeaveAsync quand on quitte une zone
+   modifiée. Échap ou clic sur le fond : on reste sur la saisie. *@
+@if (Service.IsAsking)
+{
+    <div class="unsaved-overlay" @onclick="() => { if (!Service.Saving) Service.Finish(false); }">
+        <div class="unsaved-dialog" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" aria-describedby="unsaved-text"
+             @onclick:stopPropagation="true">
+            <div class="unsaved-header">
+                <h3 id="unsaved-title" class="unsaved-title">Modifications non enregistrées</h3>
+                <button type="button" class="icon-btn sm" @onclick="() => Service.Finish(false)" disabled="@Service.Saving" aria-label="Continuer la saisie">×</button>
+            </div>
+            <p id="unsaved-text" class="unsaved-text">
+                Cet élément a été modifié. Que voulez-vous faire des modifications avant de le quitter ?
+            </p>
+            <div class="unsaved-actions">
+                <button type="button" class="btn" @onclick="Service.Discard" disabled="@Service.Saving">Annuler les modifications</button>
+                @* Focus initial : Entrée enregistre, le choix le plus sûr. *@
+                <button type="button" class="btn primary" @ref="_saveButton" @onclick="Service.SaveAsync" disabled="@Service.Saving">
+                    @(Service.Saving ? "Enregistrement..." : "Enregistrer les modifications")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference _saveButton;
+    private DotNetObjectReference<UnsavedChangesDialog>? _self;
+    private int? _escapeListener;
+    private bool _focusPending;
+
+    protected override void OnInitialized() => Service.Changed += OnChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _escapeListener = await Browser.ListenEscapeAsync(_self, capture: true);
+        }
+        if (_focusPending && Service.IsAsking)
+        {
+            _focusPending = false;
+            await Browser.FocusAsync(_saveButton);
+        }
+    }
+
+    private void OnChanged()
+    {
+        if (Service.IsAsking && !Service.Saving) _focusPending = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public bool OnEscape()
+    {
+        if (!Service.IsAsking || Service.Saving) return false;
+        Service.Finish(false);
+        return true;
+    }
+
+    public void Dispose()
+    {
+        Service.Changed -= OnChanged;
+        if (_escapeListener is { } id) _ = Browser.UnlistenAsync(id);
+        _self?.Dispose();
+    }
+}

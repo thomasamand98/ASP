@@ -1,0 +1,46 @@
+.vm-inline-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+  margin-bottom: 0;
+}
+
+.vm-inline-panel.open {
+  grid-template-rows: 1fr;
+  margin-bottom: 1rem;
+}
+
+.vm-inline-panel-inner {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  min-height: 0;
+}
+
+.vm-inline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-bg);
+}
+
+.vm-inline-title {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 1rem;
+}
+
+.vm-inline-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.vm-inline-body {
+  padding: 1.1rem;
+}

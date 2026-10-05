@@ -1,0 +1,13 @@
+@* Sélecteur « Non archivés / Archivés / Tous » posé à côté du champ
+   Rechercher (paramètre ToolbarExtra de CrudPage). Valeur du paramètre
+   ?archive= de l'API : "0" non archivés, "1" archivés, "" tous. *@
+<select class="archive-filter" value="@Value" @onchange="e => ValueChanged.InvokeAsync(e.Value as string ?? string.Empty)" aria-label="Filtrer sur l'archivage">
+    <option value="0">Non archivés</option>
+    <option value="1">Archivés</option>
+    <option value="">Tous</option>
+</select>
+
+@code {
+    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+}

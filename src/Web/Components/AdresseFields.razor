@@ -1,0 +1,98 @@
+@implements IDisposable
+@inject ApiClient Api
+
+@* Champs d'adresse d'une fiche (dans une grille .fiche-grid) : villes
+   proposées selon le code postal, pays choisi dans la liste de la table
+   `pays` (le nom complet est gardé avec le code ISO). *@
+<div class="fiche-grid">
+    <FicheField Label="Adresse" Wide="true"><input value="@Value.Adresse1" maxlength="250" autocomplete="address-line1" @oninput="e => Patch(Value with { Adresse1 = Text(e) })" /></FicheField>
+    <FicheField Label="Complément" Wide="true"><input value="@Value.Adresse2" maxlength="250" autocomplete="address-line2" @oninput="e => Patch(Value with { Adresse2 = Text(e) })" /></FicheField>
+    <FicheField Label="Complément 2" Wide="true"><input value="@Value.Adresse3" maxlength="250" autocomplete="address-line3" @oninput="e => Patch(Value with { Adresse3 = Text(e) })" /></FicheField>
+    <FicheField Label="Code postal"><input value="@Value.CP" maxlength="50" autocomplete="postal-code" @oninput="e => Patch(Value with { CP = Text(e) })" /></FicheField>
+    <FicheField Label="Ville">
+        <input value="@Value.Localite" maxlength="50" list="@_villesId" autocomplete="address-level2" @oninput="e => Patch(Value with { Localite = Text(e) })" />
+        <datalist id="@_villesId">
+            @foreach (var v in Villes)
+            {
+                <option @key="v.IDVILLES" value="@(v.Nom_ville ?? string.Empty)"></option>
+            }
+        </datalist>
+    </FicheField>
+    <FicheField Label="Pays" Wide="true">
+        <select value="@Value.Pays" @onchange="ChangePays">
+            <option value="">—</option>
+            @foreach (var p in PaysChoices)
+            {
+                <option @key="p.IDPAYS" value="@(p.ISO ?? string.Empty)">@p.Nom</option>
+            }
+        </select>
+    </FicheField>
+</div>
+
+@code {
+    private static int _next;
+    private readonly string _villesId = $"villes-{++_next}";
+    private List<PaysOption> _pays = [];
+    private List<VilleOption> _villes = [];
+    private string? _cpLoaded;
+    private CancellationTokenSource? _debounce;
+
+    [Parameter, EditorRequired] public AdresseValues Value { get; set; } = AdresseValues.Empty;
+    [Parameter] public EventCallback<AdresseValues> OnChange { get; set; }
+
+    private static string Text(ChangeEventArgs e) => e.Value as string ?? "";
+
+    private Task Patch(AdresseValues next) => OnChange.InvokeAsync(next);
+
+    // Un pays enregistré mais absent de la liste reste proposé, pour ne pas
+    // être perdu à l'enregistrement.
+    private IEnumerable<PaysOption> PaysChoices =>
+        Value.Pays.Length > 0 && !_pays.Any(p => p.ISO == Value.Pays)
+            ? [new PaysOption("current", Value.Pays, Value.Pays_full_name.Length > 0 ? Value.Pays_full_name : Value.Pays), .. _pays]
+            : _pays;
+
+    private IEnumerable<VilleOption> Villes => Value.CP.Trim().Length > 0 ? _villes : [];
+
+    // Liste des pays : ~240 lignes, chargée une seule fois.
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _pays = (await Api.GetAsync<PaysResponse>("pays")).pays;
+        }
+        catch (Exception)
+        {
+            // Liste indisponible : le pays enregistré reste affiché.
+        }
+    }
+
+    // Villes du code postal saisi, avec un léger anti-rebond — la table en
+    // compte ~39 000, impossible à charger en une fois.
+    protected override async Task OnParametersSetAsync()
+    {
+        var cp = Value.CP.Trim();
+        if (cp == _cpLoaded) return;
+        _cpLoaded = cp;
+        _debounce?.Cancel();
+        if (cp.Length == 0) return;
+        var token = (_debounce = new CancellationTokenSource()).Token;
+        try
+        {
+            await Task.Delay(300, token);
+            _villes = (await Api.GetAsync<VillesResponse>($"villes?cp={Uri.EscapeDataString(cp)}")).villes;
+        }
+        catch (Exception)
+        {
+            // Recherche remplacée par une plus récente, ou serveur injoignable.
+        }
+    }
+
+    private Task ChangePays(ChangeEventArgs e)
+    {
+        var iso = Text(e);
+        var match = _pays.FirstOrDefault(p => p.ISO == iso);
+        return Patch(Value with { Pays = iso, Pays_full_name = match?.Nom ?? "" });
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

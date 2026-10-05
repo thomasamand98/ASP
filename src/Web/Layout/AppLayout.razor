@@ -1,0 +1,235 @@
+@implements IDisposable
+@inject Browser Browser
+@inject UnsavedChangesService Unsaved
+
+<CascadingValue Value="_tabs" IsFixed="true">
+    <ProjectionProvider>
+        <div class="app-layout">
+            <button type="button" class="app-layout-menu-toggle" @onclick="ToggleMobileAsync"
+                    aria-label="@(_mobileOpen ? "Fermer le menu" : "Ouvrir le menu")" aria-expanded="@(_mobileOpen ? "true" : "false")">
+                <Icon Name="@(_mobileOpen ? "layout.Close" : "layout.Menu")" />
+            </button>
+            <Sidebar Nodes="Menu" ActiveId="@_activeId" OnSelect="Select" Open="_mobileOpen" OnClose="CloseMobileAsync" />
+            <div class="app-content">
+                <TabBar Tabs="OpenTabs" ActiveId="@_activeId" OnSelect="Activate" OnClose="id => CloseTabAsync(id, false)" OnReorder="Reorder" />
+                <div class="app-content-page">
+                    @foreach (var id in _openTabIds)
+                    {
+                        @* Chaque page ouverte reste montée en arrière-plan (juste
+                           masquée) pour conserver son état (filtres, pagination,
+                           ligne sélectionnée...) au changement d'onglet. *@
+                        <div @key="id" hidden="@(id != _activeId)">
+                            <GuardBoundary Scope="ScopeOf(id)">@ContentOf(id)</GuardBoundary>
+                        </div>
+                    }
+                </div>
+            </div>
+            <TasksPanel />
+        </div>
+    </ProjectionProvider>
+</CascadingValue>
+
+@code {
+    private const string ActiveMenuStorageKey = "mvc-template:activeMenuId";
+    private const string OpenTabsStorageKey = "mvc-template:openTabs";
+    private const string DefaultTabId = "dashboard";
+
+    // Menu de navigation : une entrée sans Items (ex. « Tableau de bord ») est
+    // directement sélectionnable. Pour ajouter un thème, ajouter un groupe ;
+    // pour ajouter une table à un thème existant, ajouter un item à ses Items.
+    private static readonly IReadOnlyList<MenuNode> Menu =
+    [
+        new("dashboard", "Tableau de bord", "layout.Dashboard", @<DashboardPage />),
+        new("commercial", "Commercial", "layout.Commercial", Items:
+        [
+            new("societes", "Société", Page: @<SocietesPage />),
+            new("contrats", "Contrats / Offre de prix", Page: @<ContratsPage />),
+            new("contacts", "Contacts", Page: @<ContactsPage />),
+            new("point", "Point", Page: @<PointsPage />),
+            new("conditions", "Conditions d'exécution", Page: @<ConditionsPage />),
+            new("marchandises", "Marchandises", Page: @<MarchandisesPage />),
+        ]),
+        new("attelage", "Gestion attelage", "layout.Attelage", Items:
+        [
+            new("chauffeurs", "Chauffeurs", Page: @<ChauffeursPage />),
+            new("vehicules", "Véhicules", Page: @<VehiculesPage />),
+            new("attelages", "Attelages", Page: @<AttelagesPage />),
+        ]),
+        new("production", "Production", "layout.Production", Items:
+        [
+            new("commandes", "Commandes", Page: @<CommandesPage />),
+            new("planning", "Planning", Page: @<PlanningPage />),
+            new("executions", "Exécutions", Page: @<Dev />),
+        ]),
+        new("personnel", "Gestion personnel", "layout.Personnel", Items:
+        [
+            new("personnel", "Personnel", Page: @<PersonnelPage />),
+            new("pointage", "Pointage", Page: @<PointagePage />),
+        ]),
+        new("documentaire", "Gestion documentaire", "layout.Documentaire", @<DocumentTemplatesPage />),
+        new("configuration", "Configuration", "layout.Configuration", Items:
+        [
+            new("general", "Général", Page: @<Dev />),
+            new("societe", "Société", Page: @<EntitePage />),
+            new("bdd", "Base de données", Page: @<Dev />),
+            new("comptabilite", "Comptabilité", Page: @<Dev />),
+            new("enumerations", "Enumérations", Page: @<EnumerationsPage />),
+            new("outils", "Outils", Page: @<Dev />),
+            new("ocr", "Test OCR", Page: @<OcrPage />),
+            new("performance", "Performance", Page: @<PerformancePage />),
+            new("donnees", "Données brutes", Page: @<Dev />),
+            new("import-export", "Import/Export", Page: @<Dev />),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<MenuNode> MenuItems = [.. Menu.SelectMany(node => node.Items ?? [node])];
+
+    // Onglets ouverts façon navigateur : cliquer sur une entrée du menu déjà
+    // ouverte l'active simplement, sinon un nouvel onglet est ajouté à la suite.
+    private List<string> _openTabIds = [];
+    private string _activeId = DefaultTabId;
+    private bool _mobileOpen;
+
+    // Onglets ouverts dynamiquement (fiche en mode « Onglet », projection) :
+    // ne survivent pas à un rechargement — seuls les ids d'entrées du menu
+    // sont relus au démarrage.
+    private readonly Dictionary<string, (string Label, RenderFragment Content)> _dynamicTabs = [];
+
+    // Zone de saisie de chaque onglet (voir Components/UnsavedChanges) :
+    // fermer l'onglet vérifie d'abord les fiches modifiées qu'il contient.
+    private readonly Dictionary<string, GuardScope> _tabScopes = [];
+
+    private TabsContext _tabs = default!;
+
+    private IReadOnlyList<TabInfo> OpenTabs => [.. _openTabIds.Select(id => new TabInfo(id, LabelOf(id)))];
+
+    protected override void OnInitialized()
+    {
+        _tabs = new TabsContext(OpenOrActivateTab, CloseTabAsync);
+        _openTabIds = InitialOpenTabIds();
+        var stored = Browser.GetItem(ActiveMenuStorageKey);
+        _activeId = stored is not null && _openTabIds.Contains(stored) ? stored : _openTabIds[0];
+    }
+
+    // Onglets ouverts lors du dernier passage — filtrés sur les entrées de
+    // menu qui existent toujours, jamais vide (retombe sur le Tableau de bord).
+    private List<string> InitialOpenTabIds()
+    {
+        try
+        {
+            var stored = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(Browser.GetItem(OpenTabsStorageKey) ?? "null");
+            var valid = stored.ValueKind == System.Text.Json.JsonValueKind.Array
+                ? stored.EnumerateArray()
+                    .Where(e => e.ValueKind == System.Text.Json.JsonValueKind.String && MenuItems.Any(item => item.Id == e.GetString()))
+                    .Select(e => e.GetString()!)
+                    .ToList()
+                : [];
+            return valid.Count > 0 ? valid : [DefaultTabId];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [DefaultTabId];
+        }
+    }
+
+    private void Persist()
+    {
+        _ = Browser.SetItemAsync(OpenTabsStorageKey, System.Text.Json.JsonSerializer.Serialize(_openTabIds));
+        _ = Browser.SetItemAsync(ActiveMenuStorageKey, _activeId);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) Persist();
+    }
+
+    private GuardScope ScopeOf(string id)
+    {
+        if (!_tabScopes.TryGetValue(id, out var scope)) _tabScopes[id] = scope = GuardScopes.CreateChild(Unsaved.Root, Unsaved);
+        return scope;
+    }
+
+    private string LabelOf(string id) =>
+        _dynamicTabs.TryGetValue(id, out var tab) ? tab.Label : MenuItems.FirstOrDefault(item => item.Id == id)?.Label ?? id;
+
+    private RenderFragment? ContentOf(string id) =>
+        _dynamicTabs.TryGetValue(id, out var tab) ? tab.Content : MenuItems.FirstOrDefault(item => item.Id == id)?.Page;
+
+    // Bloque le défilement de la page pendant que le tiroir mobile est ouvert.
+    private async Task ToggleMobileAsync()
+    {
+        _mobileOpen = !_mobileOpen;
+        await Browser.LockScrollAsync(_mobileOpen);
+    }
+
+    private async Task CloseMobileAsync()
+    {
+        _mobileOpen = false;
+        await Browser.LockScrollAsync(false);
+    }
+
+    // Sélection depuis le menu : ajoute l'onglet s'il n'est pas déjà ouvert,
+    // puis l'active dans tous les cas (jamais de doublon).
+    private void Select(string itemId)
+    {
+        if (!_openTabIds.Contains(itemId)) _openTabIds.Add(itemId);
+        _activeId = itemId;
+        Persist();
+    }
+
+    private void Activate(string id)
+    {
+        _activeId = id;
+        Persist();
+    }
+
+    // Glisser-déposer d'un onglet : remplace l'ordre, l'onglet actif ne change pas.
+    private void Reorder(List<string> ids)
+    {
+        _openTabIds = ids;
+        Persist();
+    }
+
+    // Ferme un onglet (de menu ou dynamique) : si ce n'était pas l'onglet
+    // actif, rien d'autre à faire. Sinon, bascule sur son voisin (précédent,
+    // sinon suivant) ou, s'il ne reste plus rien, rouvre le Tableau de bord.
+    // Une saisie modifiée dans l'onglet déclenche d'abord « Enregistrer /
+    // Annuler les modifications », sauf avec `force`.
+    private async Task CloseTabAsync(string itemId, bool force)
+    {
+        if (!force && _tabScopes.TryGetValue(itemId, out var scope) && !await Unsaved.ConfirmLeaveAsync(scope)) return;
+        var index = _openTabIds.IndexOf(itemId);
+        if (index < 0 && !_dynamicTabs.ContainsKey(itemId)) return;
+        var remaining = _openTabIds.Where(id => id != itemId).ToList();
+        if (itemId == _activeId)
+        {
+            var fallback = index - 1 >= 0 && index - 1 < remaining.Count ? remaining[index - 1]
+                : index >= 0 && index < remaining.Count ? remaining[index]
+                : DefaultTabId;
+            _activeId = fallback;
+            if (!remaining.Contains(fallback)) remaining.Add(fallback);
+        }
+        _openTabIds = remaining;
+        _dynamicTabs.Remove(itemId);
+        if (_tabScopes.Remove(itemId, out var closed)) closed.Detach();
+        Persist();
+        StateHasChanged();
+    }
+
+    // Ouvre la fiche d'un enregistrement dans son propre onglet, ou réactive
+    // celui déjà ouvert pour cet id sans toucher à son contenu (pour ne pas
+    // perdre la saisie en cours si on redouble-clique la même ligne).
+    private void OpenOrActivateTab(string id, string label, RenderFragment content)
+    {
+        _dynamicTabs.TryAdd(id, (label, content));
+        if (!_openTabIds.Contains(id)) _openTabIds.Add(id);
+        _activeId = id;
+        Persist();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        foreach (var scope in _tabScopes.Values) scope.Detach();
+    }
+}

@@ -1,0 +1,42 @@
+@* Ouvre le résultat d'une projection (bouton Projection de CrudPage) dans un
+   onglet de l'application : la page standard de la table cible, filtrée
+   côté serveur sur les lignes d'origine. Même sélection → même onglet
+   (réactivé plutôt que dupliqué). *@
+<CascadingValue Value="_context" IsFixed="true">@ChildContent</CascadingValue>
+
+@code {
+    private ProjectionContext _context = default!;
+
+    [CascadingParameter] public TabsContext Tabs { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => _context = new ProjectionContext(Open);
+
+    private void Open(string source, string target, IReadOnlyList<string> ids, string? singleLabel)
+    {
+        var origin = ids.Count == 1 && singleLabel is not null ? singleLabel : $"{ids.Count} {Relations.Entities[source].Plural}";
+        var heading = $"{Relations.Entities[target].Title} de {origin}";
+        var defaultField = Relations.Of[source].FirstOrDefault(r => r.Target == target)?.DefaultField;
+        var view = new ProjectionView(source, ids, heading,
+            ids.Count == 1 && defaultField is not null ? new Dictionary<string, string> { [defaultField] = ids[0] } : new Dictionary<string, string>());
+        var sortedIds = string.Join(',', ids.Order(StringComparer.Ordinal));
+        Tabs.OpenOrActivateTab($"projection:{source}:{target}:{sortedIds}", heading, Page(target, view));
+    }
+
+    // Page à afficher dans l'onglet résultat, par table cible.
+    private static RenderFragment Page(string target, ProjectionView view) => target switch
+    {
+        "societes" => @<SocietesPage Projection="view" />,
+        "contrats" => @<ContratsPage Projection="view" />,
+        "commandes" => @<CommandesPage Projection="view" />,
+        "contacts" => @<ContactsPage Projection="view" />,
+        "chauffeurs" => @<ChauffeursPage Projection="view" />,
+        "personnel" => @<PersonnelPage Projection="view" />,
+        "vehicules" => @<VehiculesPage Projection="view" />,
+        "attelages" => @<AttelagesPage Projection="view" />,
+        "pointage" => @<PointagePage Projection="view" />,
+        "points" => @<PointsPage Projection="view" />,
+        "marchandises" => @<MarchandisesPage Projection="view" />,
+        _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
+    };
+}

@@ -1,0 +1,102 @@
+/* Styles de base : typographie, conteneurs racine, en-tête de page. */
+
+:root {
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  /* Contrôles natifs (barres de défilement, sélecteurs de date...) du
+     thème clair ; tokens.css passe à `dark` avec le thème sombre. */
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  margin: 1rem;
+  min-height: calc(100svh - 2rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Conteneur principal (voir App.tsx). */
+.app-shell {
+  width: 100%;
+  max-width: 1700px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  box-sizing: border-box;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  letter-spacing: -0.24px;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--text-h);
+}
+
+/* En-tête de chaque <Entite>Page.tsx (titre + PageActions) : reste
+   collé en haut au scroll pour garder "Nouveau"/"Supprimer" toujours
+   accessibles, même avec un long tableau en dessous. Décalé sous la barre
+   d'onglets ; sous 768px, décalé en plus sous le bouton burger fixe. */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  position: sticky;
+  top: var(--tabbar-h);
+  z-index: 5;
+  background: var(--bg);
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    top: calc(var(--burger-h) + var(--tabbar-h));
+  }
+}

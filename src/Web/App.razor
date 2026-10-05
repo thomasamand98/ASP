@@ -1,0 +1,31 @@
+@inject ThemeService Theme
+@inject Browser Browser
+@inject UnsavedChangesService Unsaved
+
+@* Point d'entrée visuel de l'application. AuthGate affiche l'écran de
+   connexion tant que l'utilisateur n'est pas identifié, puis l'application.
+   UnsavedChangesDialog demande « Enregistrer / Annuler les modifications »
+   dès qu'on quitte une saisie modifiée, partout dans l'application. *@
+<main class="app-shell">
+    <AuthGate>
+        <CascadingValue Value="Unsaved.Root" IsFixed="true">
+            <AppLayout />
+        </CascadingValue>
+    </AuthGate>
+    <UnsavedChangesDialog />
+</main>
+
+@code {
+    private DotNetObjectReference<UnsavedChangesService>? _unsaved;
+
+    protected override void OnInitialized() => Theme.Load();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Theme.ApplyAsync();
+        // Fermeture ou rechargement de la page avec une saisie modifiée.
+        _unsaved = DotNetObjectReference.Create(Unsaved);
+        await Browser.GuardUnloadAsync(_unsaved);
+    }
+}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Horizon</title>
+    <base href="/" />
+    <script>
+      // Thème appliqué avant le premier rendu (voir Services/ThemeService.cs).
+      try {
+        var t = localStorage.getItem('theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = t
+      } catch (e) {}
+    </script>
+    <link rel="preload" id="webassembly" />
+    <!-- Styles globaux : les jetons d'abord, puis la base, puis les
+         composants partagés ; les styles isolés des composants (Web.styles.css)
+         viennent après et peuvent donc surcharger à spécificité égale. -->
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/controls.css" />
+    <link rel="stylesheet" href="css/utilities.css" />
+    <!-- Fiches en cartes (classes .fiche-*), utilisées directement par les
+         formulaires de tous les écrans : globales, pas isolées. -->
+    <link rel="stylesheet" href="css/fiche.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="Web.styles.css" />
+    <script type="importmap"></script>
+  </head>
+  <body>
+    <div id="root"><p style="text-align: center; margin-top: 3rem">Chargement...</p></div>
+    <div id="blazor-error-ui" hidden>
+      Une erreur inattendue s'est produite.
+      <a href="." class="reload">Recharger</a>
+    </div>
+    <script src="js/interop.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+  </body>
+</html>

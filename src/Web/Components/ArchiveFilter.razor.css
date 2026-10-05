@@ -1,0 +1,19 @@
+/* Même hauteur et même arrondi que le champ Rechercher (TableSearch.css). */
+.archive-filter {
+  width: auto;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.archive-filter:focus-visible {
+  border-color: var(--accent-border);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}

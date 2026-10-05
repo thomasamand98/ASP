@@ -1,0 +1,8 @@
+.color-swatch {
+  display: inline-block;
+  width: 1.6rem;
+  height: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--text-h) 40%, transparent);
+  border-radius: 3px;
+  vertical-align: middle;
+}

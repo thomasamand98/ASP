@@ -1,0 +1,21 @@
+@* Panneau qui glisse depuis le bas de l'écran, façon application mobile. *@
+<div class="vm-sheet-layout">
+    @Table
+    <div class="vm-sheet-backdrop@(Open ? " open" : string.Empty)" @onclick="OnClose" aria-hidden="true"></div>
+    <div class="vm-sheet@(Open ? " open" : string.Empty)" aria-hidden="@(Open ? "false" : "true")">
+        <div class="vm-sheet-handle" aria-hidden="true"></div>
+        <div class="vm-sheet-header">
+            <h3 class="vm-sheet-title">@Title</h3>
+            <button type="button" class="vm-sheet-close" @onclick="OnClose" aria-label="Fermer">×</button>
+        </div>
+        <div class="vm-sheet-body">@Form</div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? Form { get; set; }
+    [Parameter] public RenderFragment? Table { get; set; }
+}

@@ -1,0 +1,11 @@
+@* Champ libellé ; `Wide` occupe toute la ligne de la grille .fiche-grid. *@
+<label class="field@(Wide ? " fiche-field--wide" : string.Empty)">
+    <span class="field-label">@Label</span>
+    @ChildContent
+</label>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public bool Wide { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

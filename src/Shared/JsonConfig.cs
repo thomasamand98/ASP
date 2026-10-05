@@ -2,11 +2,12 @@ using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Horizon.Shared;
 
 // Sérialisation JSON identique à celle du backend NestJS/Prisma, dont dépend
-// le frontend :
+// le front :
 //   - noms de champs tels quels (IDSOCIETES, Nom_societe, accessToken...) —
 //     aucune conversion en camelCase ;
 //   - BigInt (long) → chaîne ;
@@ -27,7 +28,45 @@ public static class JsonConfig
         options.Converters.Add(new DecimalConverter());
         options.Converters.Add(new IsoDateTimeConverter());
         options.Converters.Add(new TimeConverter());
+        // DTO envoyés par le front : un Opt<T> non affecté est omis (comme un
+        // champ undefined en JavaScript), sinon sa valeur est écrite telle quelle.
+        options.Converters.Add(new OptConverterFactory());
+        options.TypeInfoResolver = (options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver()).WithAddedModifier(SkipUnsetOpt);
         return options;
+    }
+
+    private static void SkipUnsetOpt(JsonTypeInfo typeInfo)
+    {
+        foreach (var property in typeInfo.Properties)
+        {
+            if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(Opt<>))
+            {
+                property.ShouldSerialize = (_, value) => value is IOpt { IsSet: true };
+            }
+        }
+    }
+
+    private sealed class OptConverterFactory : JsonConverterFactory
+    {
+        public override bool CanConvert(Type typeToConvert) =>
+            typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(Opt<>);
+
+        public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
+            (JsonConverter)Activator.CreateInstance(typeof(OptConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]))!;
+    }
+
+    private sealed class OptConverter<T> : JsonConverter<Opt<T>>
+    {
+        public override Opt<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            new(JsonSerializer.Deserialize<T>(ref reader, options)!);
+
+        public override void Write(Utf8JsonWriter writer, Opt<T> value, JsonSerializerOptions options)
+        {
+            // Opt<object> (montants) : la valeur est écrite selon son type réel.
+            var boxed = ((IOpt)value).BoxedValue;
+            if (boxed is null) writer.WriteNullValue();
+            else JsonSerializer.Serialize(writer, boxed, boxed.GetType(), options);
+        }
     }
 
     public static string FormatDecimal(decimal value) => value.ToString("0.#############################", CultureInfo.InvariantCulture);

@@ -1,0 +1,40 @@
+@inject ApiClient Api
+@inject EnumerationLabels Enumerations
+
+<CrudPage T="Condition" TDto="CreateConditionDto" TDetail="Condition"
+          Title="Conditions d'exécution" LoadingLabel="Chargement des conditions..."
+          Source="_list" Columns="_columns" GetRowId="c => c.IDCONDITIONS_EXECUTION"
+          Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" Searchable="true"
+          DeleteConfirmMessage="Supprimer cette condition d'exécution ?"
+          CreateModalTitle="Nouvelle condition" EditModalTitle="Modifier la condition">
+    <RenderForm Context="form">
+        <ConditionForm Initial="form.Initial" OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+    </RenderForm>
+</CrudPage>
+
+@code {
+    private ApiList<Condition> _list = default!;
+    private CrudApi<CreateConditionDto, Condition, Condition> _api = default!;
+    private IReadOnlyList<Column<Condition>> _columns = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new ApiList<Condition>(Api, "conditions") { Paginated = true };
+        _api = new CrudApi<CreateConditionDto, Condition, Condition>(Api, "conditions");
+        _columns = MakeColumns(new Dictionary<string, string>());
+        var loading = _list.RefetchAsync();
+        // Libellés de l'énumération « type_prestation » indexés par code — le
+        // code brut s'affiche tant qu'ils ne sont pas chargés.
+        _columns = MakeColumns(await Enumerations.LoadAsync("type_prestation"));
+        await loading;
+    }
+
+    private static IReadOnlyList<Column<Condition>> MakeColumns(IReadOnlyDictionary<string, string> typesPrestation) =>
+    [
+        Col.Of<Condition>("Type_Prestation", "Type de prestation",
+            c => c.Type_Prestation is { } type ? typesPrestation.GetValueOrDefault(JsNumber.ToString(type)) ?? JsNumber.ToString(type) : ""),
+        Col.Key<Condition>("Libelle", "Libellé", c => c.Libelle),
+        // Booléen 0/1 affiché « Oui » / « Non ».
+        Col.Key<Condition>("CMR_or_FDR", "CMR / FDR", c => c.CMR_or_FDR, c => c.CMR_or_FDR is { } v && v != 0 ? "Oui" : "Non"),
+    ];
+}

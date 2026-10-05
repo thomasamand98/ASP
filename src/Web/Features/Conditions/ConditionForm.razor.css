@@ -1,0 +1,18 @@
+/* Fiche condition d'exécution : titre centré, ligne « CMR / Feuille de
+   route » + « Type de prestation », puis le libellé sur toute la largeur. */
+.cond-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 0.6rem 1rem;
+}
+
+.cond-grid ::deep .fiche-field--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 480px) {
+  .cond-grid {
+    grid-template-columns: 1fr;
+  }
+}

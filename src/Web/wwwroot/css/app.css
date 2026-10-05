@@ -1,0 +1,25 @@
+/* Styles globaux propres à Blazor (pas d'équivalent dans le front React). */
+
+/* Erreur inattendue de l'application (voir index.html). */
+#blazor-error-ui {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 1000;
+  padding: 0.6rem 1.25rem;
+  background: var(--bg);
+  border-top: 2px solid var(--danger);
+  color: var(--danger);
+}
+
+#blazor-error-ui .reload {
+  margin-left: 0.5rem;
+  color: inherit;
+}
+
+/* Bandeau « Tâches à faire » (voir Layout/TasksPanel.razor) : réserve la
+   place de la barre, seulement quand elle est affichée (pas sur l'écran de
+   connexion). Règle sur un ancêtre du composant : elle ne peut pas être
+   isolée dans TasksPanel.razor.css. */
+#root:has(.tasks-rail) {
+  margin-right: calc(1rem + var(--tasks-rail-w));
+}

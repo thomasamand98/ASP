@@ -1,0 +1,26 @@
+@* Barre d'actions « Nouveau » / « Modifier » / « Supprimer » en haut de
+   chaque page tableau, à côté du titre. SelectedCount : 0 désactive
+   Supprimer, plus de 1 l'affiche sur le bouton (multisélection) et
+   désactive Modifier, actif seulement pour une seule ligne. *@
+<div class="page-actions">
+    <button type="button" class="btn primary" @onclick="OnCreate">
+        <Icon Name="pageActions.Plus" />
+        Nouveau
+    </button>
+    <button type="button" class="btn" @onclick="OnEdit" disabled="@(SelectedCount != 1)"
+            title="@(SelectedCount > 1 ? "Sélectionnez une seule ligne pour la modifier" : null)">
+        <Icon Name="pageActions.Pencil" />
+        Modifier
+    </button>
+    <button type="button" class="btn danger" @onclick="OnDelete" disabled="@(SelectedCount == 0)">
+        <Icon Name="pageActions.Trash" />
+        Supprimer@(SelectedCount > 1 ? $" ({SelectedCount})" : "")
+    </button>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnCreate { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+    [Parameter] public int SelectedCount { get; set; }
+}

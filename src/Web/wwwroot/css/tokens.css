@@ -1,0 +1,103 @@
+/* Jetons de design globaux : toute couleur, rayon ou ombre utilisé par un
+   écran doit venir d'ici (pas de valeur en dur dans les CSS de features).
+   Le thème sombre ne redéfinit que les jetons, jamais les composants. */
+
+:root {
+  /* ---------- Texte et fonds ---------- */
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  /* Fond légèrement teinté (lignes de week-end, cartes secondaires...). */
+  --surface: color-mix(in srgb, var(--text-h) 3.5%, var(--bg));
+  /* Filet plus discret que --border (séparateurs internes des tableaux). */
+  --line: color-mix(in srgb, var(--border) 65%, transparent);
+  --on-brand: #fff;
+  --overlay: rgba(0, 0, 0, 0.4);
+
+  /* ---------- Marque : actions principales, onglet actif, sélection ---------- */
+  --brand: #03c1ec;
+  --brand-bg: color-mix(in srgb, var(--brand) 12%, transparent);
+  --brand-border: color-mix(in srgb, var(--brand) 45%, transparent);
+
+  /* ---------- Accent : liens, survols, anneau de focus ---------- */
+  --accent: #2563eb;
+  --accent-bg: rgba(37, 99, 235, 0.1);
+  --accent-border: rgba(37, 99, 235, 0.5);
+
+  /* ---------- Statuts ---------- */
+  --danger: #e5484d;
+  --danger-bg: rgba(229, 72, 77, 0.1);
+  --danger-border: rgba(229, 72, 77, 0.5);
+  --success-solid: #16a34a;
+  --success: #15803d;
+  --success-bg: color-mix(in srgb, var(--success-solid) 14%, transparent);
+  --warning-solid: #d97706;
+  --warning: #b45309;
+  --warning-bg: color-mix(in srgb, var(--warning-solid) 16%, transparent);
+  --neutral-solid: #94a3b8;
+
+  /* ---------- Séries de graphiques (identité, ordre fixe) ----------
+     Ordre validé daltonisme (paires voisines) en clair comme en sombre :
+     ne pas réordonner. Les séries 3 et 4 sont sous 3:1 sur fond clair, d'où
+     la vue Tableau à côté de chaque graphique. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+
+  /* ---------- Formes ---------- */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  /* ---------- Interaction ---------- */
+  --focus-outline: 2px solid var(--accent);
+  --focus-ring: 0 0 0 3px var(--accent-bg);
+  --transition: 0.15s ease;
+  --control-h: 2.25rem;
+
+  /* ---------- Typographie ---------- */
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  /* ---------- Mise en page ---------- */
+  /* Hauteur de la barre d'onglets (layout/TabBar.css) et du bouton burger
+     mobile (layout/AppLayout.css) : les en-têtes collants se placent dessous. */
+  --tabbar-h: 2.8rem;
+  --burger-h: 3.25rem;
+  /* Barre repliée du bandeau « Tâches à faire » (layout/TasksPanel.css). */
+  --tasks-rail-w: 2.75rem;
+}
+
+/* Thème sombre : choisi par l'utilisateur dans la sidebar, ou par le
+   système en mode « Auto » (voir lib/theme.ts, qui pose data-theme). */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --accent: #60a5fa;
+  --accent-bg: rgba(96, 165, 250, 0.15);
+  --accent-border: rgba(96, 165, 250, 0.5);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.15);
+  --danger-border: rgba(248, 113, 113, 0.5);
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+}

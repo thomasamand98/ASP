@@ -1,0 +1,20 @@
+@* En-tête d'une fiche en cartes : pastille (initiales, icône), titre,
+   sous-titre, actions à droite. Classes .fiche-* : wwwroot/css/fiche.css. *@
+<header class="fiche-hero">
+    @Badge
+    <div class="fiche-hero-text">
+        <strong>@Title</strong>
+        <span>@Subtitle</span>
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="fiche-quick">@Actions</div>
+    }
+</header>
+
+@code {
+    [Parameter] public RenderFragment? Badge { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Subtitle { get; set; } = "";
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

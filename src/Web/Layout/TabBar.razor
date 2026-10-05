@@ -1,0 +1,65 @@
+@* Barre d'onglets façon navigateur, au-dessus de la page active (voir
+   AppLayout) — un onglet par page ouverte depuis le menu latéral. Cliquer
+   sur son libellé l'active, la croix le ferme, on peut les réordonner par
+   glisser-déposer (glisser-déposer natif du navigateur). Toujours affichée,
+   même avec un seul onglet ouvert. *@
+<div class="tab-bar" role="tablist">
+    @foreach (var tab in Tabs)
+    {
+        var classes = "tab-bar-tab"
+            + (tab.Id == ActiveId ? " active" : "")
+            + (tab.Id == _draggedId ? " dragging" : "")
+            + (tab.Id == _dragOverId && tab.Id != _draggedId ? " drag-over" : "");
+        <div @key="tab.Id" class="@classes" role="tab" data-drag-move aria-selected="@(tab.Id == ActiveId ? "true" : "false")" draggable="true"
+             @ondragstart="() => _draggedId = tab.Id"
+             @ondragend="EndDrag"
+             @ondragover="() => { if (_draggedId is not null && _draggedId != tab.Id) _dragOverId = tab.Id; }"
+             @ondragover:preventDefault="true"
+             @ondragleave="() => { if (_dragOverId == tab.Id) _dragOverId = null; }"
+             @ondrop="() => DropAsync(tab.Id)"
+             @ondrop:preventDefault="true">
+            <button type="button" class="tab-bar-tab-label" @onclick="() => OnSelect.InvokeAsync(tab.Id)">@tab.Label</button>
+            <button type="button" class="tab-bar-tab-close" @onclick="() => OnClose.InvokeAsync(tab.Id)" @onclick:stopPropagation="true"
+                    aria-label="Fermer l'onglet @tab.Label">×</button>
+        </div>
+    }
+</div>
+
+@code {
+    // Onglet en cours de glissement, et celui actuellement survolé (pour
+    // l'indicateur visuel de dépôt) — sans lien avec l'onglet actif.
+    private string? _draggedId;
+    private string? _dragOverId;
+
+    [Parameter, EditorRequired] public IReadOnlyList<TabInfo> Tabs { get; set; } = [];
+    [Parameter, EditorRequired] public string ActiveId { get; set; } = "";
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+    [Parameter] public EventCallback<string> OnClose { get; set; }
+
+    // Nouvel ordre des ids après un glisser-déposer.
+    [Parameter] public EventCallback<List<string>> OnReorder { get; set; }
+
+    private void EndDrag()
+    {
+        _draggedId = null;
+        _dragOverId = null;
+    }
+
+    private async Task DropAsync(string targetId)
+    {
+        if (_draggedId is not null && _draggedId != targetId)
+        {
+            var ids = Tabs.Select(t => t.Id).ToList();
+            var from = ids.IndexOf(_draggedId);
+            var to = ids.IndexOf(targetId);
+            if (from != -1 && to != -1)
+            {
+                var moved = ids[from];
+                ids.RemoveAt(from);
+                ids.Insert(to, moved);
+                await OnReorder.InvokeAsync(ids);
+            }
+        }
+        EndDrag();
+    }
+}

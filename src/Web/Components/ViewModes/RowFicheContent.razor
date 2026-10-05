@@ -1,0 +1,17 @@
+@* Habillage (titre + bouton fermer) de la fiche affichée directement dans
+   la ligne dépliée du tableau — voir CrudPage, qui le passe au DataTable
+   seulement quand le mode « Ligne + bloc » est actif et qu'une ligne est en
+   cours de modification. *@
+<div class="vm-rowexpand-fiche">
+    <div class="vm-rowexpand-fiche-header">
+        <h4 class="vm-rowexpand-fiche-title">@Title</h4>
+        <button type="button" class="vm-rowexpand-fiche-close" @onclick="OnClose" aria-label="Fermer">×</button>
+    </div>
+    <div class="vm-rowexpand-fiche-body">@ChildContent</div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

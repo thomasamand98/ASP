@@ -1,0 +1,50 @@
+@* Place le tableau et la fiche ouverte selon le mode choisi. *@
+@switch (Mode)
+{
+    case "drawer":
+        <DrawerMode Open="Open" Title="@Title" OnClose="OnClose" Form="Form" Table="Table" />
+        break;
+    case "inline":
+        <InlinePanelMode Open="Open" Title="@Title" OnClose="OnClose" Form="Form" Table="Table" />
+        break;
+    case "split":
+        <SplitViewMode Open="Open" Title="@Title" OnClose="OnClose" Form="Form" Table="Table" />
+        break;
+    case "sheet":
+        <BottomSheetMode Open="Open" Title="@Title" OnClose="OnClose" Form="Form" Table="Table" />
+        break;
+    case "fullscreen":
+        @Table
+        @if (Open)
+        {
+            <FullScreenMode Title="@Title" OnClose="OnClose" Form="Form" />
+        }
+        break;
+    case ViewModeRegistry.RowExpand:
+        <RowExpandMode Open="Open" State="State" Title="@Title" OnClose="OnClose" Form="Form" Table="Table" />
+        break;
+    case ViewModeRegistry.Tab:
+        @Table
+        break;
+    default:
+        @Table
+        @if (Open)
+        {
+            <Modal Title="@Title" OnClose="OnClose">@Form</Modal>
+        }
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public string Mode { get; set; } = ViewModeRegistry.Default;
+
+    // true dès qu'un formulaire doit être visible (création ou édition).
+    [Parameter] public bool Open { get; set; }
+
+    // "create", "edit" ou null.
+    [Parameter] public string? State { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? Form { get; set; }
+    [Parameter] public RenderFragment? Table { get; set; }
+}
