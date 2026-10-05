@@ -1,0 +1,495 @@
+@implements IDisposable
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Feuille de pointage (menu Gestion personnel → Pointage) : un salarié, une
+   période (un mois par défaut), une ligne par jour. Choisir un mois cale la
+   période sur ce mois ; choisir une période affiche le mois de sa date de
+   début. Cliquer sur un jour ouvre la saisie du pointage de ce jour. *@
+<div class="pt">
+    <header class="pt-toolbar">
+        <h2 class="pt-title">Pointage</h2>
+
+        <label class="pt-field pt-field--salarie">
+            <span class="pt-field-label">Salarié</span>
+            <select value="@_personnelId" @onchange="e => SelectPersonnelAsync((string)e.Value!)" class="@(_personnelId.Length > 0 ? "" : "is-empty")">
+                <option value="">@(_personnelLoading ? "Chargement…" : "Choisir un salarié…")</option>
+                @foreach (var p in Salaries)
+                {
+                    var name = FormModel.JoinNonEmpty(" ", p.Nom_Personnel, p.Prenom_Personnel);
+                    <SelectOption @key="p.IDPERSONNELS" Value="@p.IDPERSONNELS" Current="@_personnelId">@(name.Length > 0 ? name : $"Salarié {p.IDPERSONNELS}")</SelectOption>
+                }
+            </select>
+        </label>
+
+        <div class="pt-field">
+            <span class="pt-field-label">Mois</span>
+            <div class="pt-month">
+                <button type="button" class="icon-btn outlined" @onclick="() => SelectMonthAsync(new DateTime(_from.Year, _from.Month, 1).AddMonths(-1))" aria-label="Mois précédent">
+                    <Icon Name="planning.ChevronLeft" />
+                </button>
+                <input type="month" value="@MonthValue" @onchange="e => ChangeMonthAsync((string)e.Value!)" aria-label="@($"Mois : {Format.MonthYear(_from)}")" />
+                <button type="button" class="icon-btn outlined" @onclick="() => SelectMonthAsync(new DateTime(_from.Year, _from.Month, 1).AddMonths(1))" aria-label="Mois suivant">
+                    <Icon Name="planning.ChevronRight" />
+                </button>
+            </div>
+        </div>
+
+        <div class="pt-field">
+            <span class="pt-field-label">Période</span>
+            <div class="pt-period">
+                <label class="pt-date">
+                    <span>Du</span>
+                    <strong>@Format.WeekdayLong(_from)</strong>
+                    <input type="date" value="@DateUtils.ToInputValue(_from)" @onchange="e => ChangeFromAsync((string)e.Value!)" />
+                </label>
+                <label class="pt-date">
+                    <span>au</span>
+                    <strong>@Format.WeekdayLong(_to)</strong>
+                    <input type="date" value="@DateUtils.ToInputValue(_to)" @onchange="e => ChangeToAsync((string)e.Value!)" />
+                </label>
+            </div>
+        </div>
+    </header>
+
+    @if (_personnelId.Length == 0 || !SelectedKnown)
+    {
+        <div class="pt-empty">
+            <div class="pt-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21a8 8 0 0 1 16 0" />
+                </svg>
+            </div>
+            <h3>Sélectionnez un salarié</h3>
+            <p>Choisissez un salarié dans la liste ci-dessus pour afficher son pointage sur la période.</p>
+        </div>
+    }
+    else
+    {
+        var days = Days;
+        var totals = FeuilleCalc.ComputeTotals(days);
+        <div class="pt-body@(_loading ? " is-loading" : string.Empty)" aria-busy="@(_loading ? "true" : "false")">
+            <section class="pt-sheet" aria-label="Feuille de pointage">
+                @if (_error is not null)
+                {
+                    <div class="pt-alert" role="alert">
+                        @_error
+                        <button type="button" class="btn sm" @onclick="LoadAsync">Réessayer</button>
+                    </div>
+                }
+                <div class="pt-table-scroll">
+                    <table class="pt-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="pt-col-date">Date</th>
+                                <th scope="col">Début</th>
+                                <th scope="col">Fin</th>
+                                <th scope="col">Coupure</th>
+                                <th scope="col">Total</th>
+                                <th scope="col">Travaillé</th>
+                                <th scope="col">Nuit</th>
+                                <th scope="col">Liaison</th>
+                                <th scope="col">Standby</th>
+                                <th scope="col" class="pt-col-text">Statut</th>
+                                <th scope="col">Nuitée</th>
+                                <th scope="col" class="pt-col-text pt-col-remark">Remarque</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var day in days)
+                            {
+                                @DayRows(day)
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th scope="row" class="pt-col-date">Total</th>
+                                <td></td>
+                                <td></td>
+                                <td>@FeuilleCalc.FormatDuration(totals.Coupure, true)</td>
+                                <td>@FeuilleCalc.FormatDuration(totals.Total, true)</td>
+                                <td class="pt-strong">@FeuilleCalc.FormatDuration(totals.Worked, true)</td>
+                                <td>@FeuilleCalc.FormatDuration(totals.Nuit, true)</td>
+                                <td>@FeuilleCalc.FormatDuration(totals.Liaison, true)</td>
+                                <td>@FeuilleCalc.FormatDuration(totals.Standby, true)</td>
+                                <td class="pt-col-text"></td>
+                                <td>@totals.Nuitees</td>
+                                <td class="pt-col-text pt-col-remark"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+
+            @Summary(totals)
+        </div>
+    }
+
+    @if (_editing is not null)
+    {
+        var editing = _editing;
+        <Modal Title="@EditorTitle(editing)" OnClose="CloseEditorAsync">
+            @if (_saveError is not null)
+            {
+                <div class="pt-alert" role="alert">@_saveError</div>
+            }
+            <PointageForm Initial="editing.Detail" Defaults="@(new Dictionary<string, string> { ["IDPERSONNELS"] = _personnelId, ["Date_application"] = editing.Date })"
+                          Personnel="_personnel" Statuts="_statuts" OnSubmit="SaveAsync" OnCancel="CloseEditorAsync" />
+        </Modal>
+    }
+</div>
+
+@code {
+    // Au-delà, la feuille devient illisible (l'API refuse aussi).
+    private const int MaxDays = 93;
+    private const string PersonnelStorageKey = "mvc-template:pointagePersonnel";
+
+    // Pointage en cours de saisie : celui du jour cliqué (null = nouveau), avec
+    // sa fiche complète (la feuille la contient déjà).
+    private sealed record Editing(PointageFeuille? Pointage, string Date)
+    {
+        public PointageDetail? Detail => Pointage is null ? null : new PointageDetail
+        {
+            IDPOINTAGES = Pointage.IDPOINTAGES,
+            Date_application = Pointage.Date_application,
+            IDPERSONNELS = Pointage.IDPERSONNELS,
+            Personnel = Pointage.Personnel,
+            Date_heure_debut = Pointage.Date_heure_debut,
+            Date_heure_fin = Pointage.Date_heure_fin,
+            Heure_coupure = Pointage.Heure_coupure,
+            Heure_nuit = Pointage.Heure_nuit,
+            Heure_liaison = Pointage.Heure_liaison,
+            Heure_Stanby = Pointage.Heure_Stanby ?? "",
+            IDType_Statut = Pointage.IDType_Statut,
+            TypeStatut = Pointage.TypeStatut is null ? null : new StatutLibelle(Pointage.TypeStatut.Libelle_generique),
+            Nuitee = Pointage.Nuitee,
+            Remarque = Pointage.Remarque,
+            Debut_pause = Pointage.Debut_pause,
+            Fin_Pause = Pointage.Fin_Pause,
+            Heure_jour = Pointage.Heure_jour,
+        };
+    }
+
+    private string _personnelId = "";
+    private DateTime _from;
+    private DateTime _to;
+    private Editing? _editing;
+    private string? _saveError;
+    private List<Personnel> _personnel = [];
+    private bool _personnelLoading = true;
+    private List<TypeStatut> _statuts = [];
+    private Feuille? _feuille;
+    private string? _error;
+    private bool _loading;
+    private string? _loadedKey;
+    private int _request;
+
+    private string RequestKey => $"{_personnelId}|{DateUtils.ToInputValue(_from)}|{DateUtils.ToInputValue(_to)}";
+
+    private string MonthValue => DateUtils.ToInputValue(_from)[..7];
+
+    private IEnumerable<Personnel> Salaries => _personnel.OrderBy(p => $"{p.Nom_Personnel ?? ""} {p.Prenom_Personnel ?? ""}", FormModel.French);
+
+    // Un salarié retenu d'une session précédente mais supprimé depuis.
+    private bool SelectedKnown => _personnelId.Length == 0 || _personnelLoading || _personnel.Any(p => p.IDPERSONNELS == _personnelId);
+
+    private List<SheetDay> Days => FeuilleCalc.BuildDays(DateUtils.DaysInRange(_from, _to), _feuille?.pointages ?? []);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _personnelId = Browser.GetItem(PersonnelStorageKey) ?? "";
+        _from = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        _to = _from.AddMonths(1).AddDays(-1);
+        await Task.WhenAll(LoadPersonnelAsync(), LoadStatutsAsync(), LoadAsync());
+    }
+
+    private async Task LoadPersonnelAsync()
+    {
+        try
+        {
+            _personnel = (await Api.GetAsync<PersonnelListResponse>("personnel")).personnel;
+        }
+        catch (Exception)
+        {
+            // Liste vide : seul le salarié retenu reste sélectionné.
+        }
+        _personnelLoading = false;
+    }
+
+    private async Task LoadStatutsAsync()
+    {
+        try
+        {
+            _statuts = (await Api.GetAsync<TypesStatutResponse>("pointage/statuts")).statuts;
+        }
+        catch (Exception)
+        {
+            // Sélecteur Statut vide.
+        }
+    }
+
+    // Rien n'est chargé tant qu'aucun salarié n'est choisi. Une réponse
+    // arrivée après un changement de salarié ou de période est ignorée.
+    private async Task LoadAsync()
+    {
+        if (_personnelId.Length == 0)
+        {
+            _feuille = null;
+            _loading = false;
+            return;
+        }
+        var key = _loadedKey = RequestKey;
+        var request = ++_request;
+        _loading = true;
+        _feuille = null;
+        _error = null;
+        StateHasChanged();
+        try
+        {
+            var query = $"personnelId={Js.EncodeUriComponent(_personnelId)}&from={DateUtils.ToInputValue(_from)}&to={DateUtils.ToInputValue(_to)}";
+            var feuille = await Api.GetAsync<Feuille>($"pointage/feuille?{query}");
+            if (request != _request || key != _loadedKey) return;
+            _feuille = feuille;
+        }
+        catch (Exception e)
+        {
+            if (request != _request) return;
+            _error = e is ApiException ? e.Message : "Erreur de chargement du pointage";
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SelectPersonnelAsync(string id)
+    {
+        _personnelId = id;
+        await Browser.SetItemAsync(PersonnelStorageKey, id);
+        await LoadAsync();
+    }
+
+    // --- Période -----------------------------------------------------------
+
+    private Task SelectMonthAsync(DateTime date)
+    {
+        _from = new DateTime(date.Year, date.Month, 1);
+        _to = _from.AddMonths(1).AddDays(-1);
+        return LoadAsync();
+    }
+
+    private Task ChangeMonthAsync(string value)
+    {
+        var parts = value.Split('-');
+        return parts.Length == 2 && int.TryParse(parts[0], out var y) && int.TryParse(parts[1], out var m) && y > 0 && m > 0
+            ? SelectMonthAsync(new DateTime(y, m, 1))
+            : Task.CompletedTask;
+    }
+
+    private Task ChangeFromAsync(string value)
+    {
+        if (DateUtils.FromInputValue(value) is not { } date) return Task.CompletedTask;
+        _from = date;
+        if (date > _to) _to = date;
+        else if (DateUtils.DaysInRange(date, _to).Count > MaxDays) _to = date.AddDays(MaxDays - 1);
+        return LoadAsync();
+    }
+
+    private Task ChangeToAsync(string value)
+    {
+        if (DateUtils.FromInputValue(value) is not { } date) return Task.CompletedTask;
+        _to = date;
+        if (date < _from) _from = date;
+        else if (DateUtils.DaysInRange(_from, date).Count > MaxDays) _from = date.AddDays(-(MaxDays - 1));
+        return LoadAsync();
+    }
+
+    // --- Saisie ------------------------------------------------------------
+
+    private void OpenDay(string date, PointageFeuille? pointage)
+    {
+        _saveError = null;
+        _editing = new Editing(pointage, date);
+    }
+
+    private void KeyDown(KeyboardEventArgs e, string date, PointageFeuille? pointage)
+    {
+        if (e.Key is "Enter" or " ") OpenDay(date, pointage);
+    }
+
+    private Task CloseEditorAsync()
+    {
+        _editing = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync(CreatePointageDto dto)
+    {
+        if (_editing is not { } editing) return;
+        try
+        {
+            if (editing.Pointage is not null) await Api.SendJsonAsync<Pointage>(HttpMethod.Patch, $"pointage/{editing.Pointage.IDPOINTAGES}", dto);
+            else await Api.SendJsonAsync<Pointage>(HttpMethod.Post, "pointage", dto);
+            _editing = null;
+            StateHasChanged();
+            await LoadAsync();
+        }
+        catch (Exception e)
+        {
+            _saveError = e is ApiException ? e.Message : "L'enregistrement a échoué.";
+            StateHasChanged();
+        }
+    }
+
+    private RenderFragment DayRows(SheetDay day) => __builder =>
+    {
+        var rows = RowsOf(day);
+        var rowClass = (DateUtils.IsWeekend(day.Date) ? " is-weekend" : "") + (DateUtils.IsSameDay(day.Date, DateTime.Now) ? " is-today" : "");
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var p = rows[index];
+            var first = index == 0;
+            var key = p?.IDPOINTAGES ?? day.Key;
+            var cssClass = "pt-row" + (p is null ? " is-blank" : "") + rowClass + (first ? "" : " is-continuation");
+            <tr @key="key" class="@cssClass" tabindex="0" aria-label="@RowLabel(day.Date, p)"
+                @onclick="() => OpenDay(day.Key, p)" @onkeydown="e => KeyDown(e, day.Key, p)" data-activate-keys>
+                <td class="pt-col-date">
+                    @if (first)
+                    {
+                        <span class="pt-weekday">@Format.WeekdayLong(day.Date)</span><span class="pt-daynum">@day.Date.Day</span>
+                    }
+                </td>
+                @if (p is not null)
+                {
+                    @PointageCells(p)
+                }
+                else
+                {
+                    <td colspan="10" class="pt-blank"></td>
+                    <td class="pt-col-text pt-col-remark"><span class="pt-add">+ Saisir</span></td>
+                }
+            </tr>
+        }
+    };
+
+    private static string RowLabel(DateTime date, PointageFeuille? p) =>
+        (p is not null ? "Modifier" : "Saisir") + " le pointage du " + Format.WeekdayLong(date) + " " + Format.Date(date);
+
+    // Une ligne par pointage du jour, ou une ligne vide à saisir.
+    private static List<PointageFeuille?> RowsOf(SheetDay day) => day.Pointages.Count > 0 ? [.. day.Pointages] : [null];
+
+    private static string EditorTitle(Editing editing) =>
+        (editing.Pointage is not null ? "Modifier" : "Saisir") + " le pointage du " + Format.Date(DateUtils.FromInputValue(editing.Date) ?? DateTime.Now);
+
+    // --- Rendu -------------------------------------------------------------
+
+    private static RenderFragment Duration(double minutes) =>
+        minutes > 0 ? @<text>@FeuilleCalc.FormatDuration(minutes)</text> : @<span class="pt-zero">—</span>;
+
+    private static RenderFragment PointageCells(PointageFeuille p) => __builder =>
+    {
+        var color = WindevColor.ToHex(p.TypeStatut?.CouleurStatut);
+        // Fin le lendemain du début (travail de nuit).
+        var nextDay = !string.IsNullOrEmpty(p.Date_heure_debut) && !string.IsNullOrEmpty(p.Date_heure_fin)
+            && !DateUtils.IsSameDay(Clock.ToLocal(Clock.Parse(p.Date_heure_debut)), Clock.ToLocal(Clock.Parse(p.Date_heure_fin)));
+        var debut = FeuilleCalc.ClockTime(p.Date_heure_debut);
+        var fin = FeuilleCalc.ClockTime(p.Date_heure_fin);
+        <td>@if (debut.Length > 0) { @debut } else { <span class="pt-zero">—</span> }</td>
+        <td>
+            @if (fin.Length > 0) { @fin } else { <span class="pt-zero">—</span> }
+            @if (nextDay)
+            {
+                <sup class="pt-next-day" title="Le lendemain">+1</sup>
+            }
+        </td>
+        <td>@Duration(FeuilleCalc.TimeMinutes(p.Heure_coupure))</td>
+        <td>@Duration(FeuilleCalc.TotalMinutes(p))</td>
+        <td class="pt-strong">@Duration(FeuilleCalc.WorkedMinutes(p))</td>
+        <td>@Duration(FeuilleCalc.TimeMinutes(p.Heure_nuit))</td>
+        <td>@Duration(FeuilleCalc.TimeMinutes(p.Heure_liaison))</td>
+        <td>@Duration(FeuilleCalc.TimeMinutes(p.Heure_Stanby))</td>
+        <td class="pt-col-text">
+            @if (!string.IsNullOrEmpty(p.TypeStatut?.Libelle_generique))
+            {
+                <span class="pt-status" style="@(color is null ? null : $"--status: {color}")">@p.TypeStatut.Libelle_generique</span>
+            }
+        </td>
+        <td>
+            @if (p.Nuitee == 1)
+            {
+                <span class="pt-check" aria-label="Nuitée">✓</span>
+            }
+        </td>
+        <td class="pt-col-text pt-col-remark" title="@p.Remarque">@p.Remarque</td>
+    };
+
+    private RenderFragment Summary(SheetTotals totals) => __builder =>
+    {
+        var taux = _feuille?.taux;
+        var amounts = FeuilleCalc.ComputeAmounts(totals, taux);
+        string Money(string? value) => Format.Money(FeuilleCalc.Rate(value));
+        <aside class="pt-summary" aria-label="Récapitulatif de la période">
+            <section class="pt-card">
+                <h3 class="pt-card-title">Période</h3>
+                <div class="pt-hero">
+                    <span>Heures travaillées</span>
+                    <strong>@FeuilleCalc.FormatDuration(totals.Worked, true)</strong>
+                </div>
+                <dl class="pt-stats">
+                    @Stat("Jours prestés", totals.JoursPrestes.ToString(CultureInfo.InvariantCulture))
+                    @Stat("Nuitées", totals.Nuitees.ToString(CultureInfo.InvariantCulture))
+                    @Stat("Samedis", totals.Samedis.ToString(CultureInfo.InvariantCulture))
+                    @Stat("Heures dimanche", FeuilleCalc.FormatDuration(totals.HeuresDimanche, true))
+                    @Stat("Heures de nuit", FeuilleCalc.FormatDuration(totals.Nuit, true))
+                    @Stat("Standby", FeuilleCalc.FormatDuration(totals.Standby, true))
+                </dl>
+            </section>
+
+            <section class="pt-card">
+                <h3 class="pt-card-title">Montants</h3>
+                @if (amounts is not null)
+                {
+                    <dl class="pt-lines">
+                        @Line("Chèques repas", Format.Money(amounts.ChequeRepas))
+                        @Line("Nuitées", Format.Money(amounts.Nuitees))
+                        @Line("Heures de nuit", Format.Money(amounts.HeuresNuit))
+                        @Line("Samedis", Format.Money(amounts.Samedis))
+                        @Line("Standby", Format.Money(amounts.Standby))
+                    </dl>
+                }
+                else
+                {
+                    <p class="muted">@(_feuille is not null ? "Aucun taux horaire : renseignez-les dans le contrat de travail du salarié." : "…")</p>
+                }
+            </section>
+
+            @if (taux is not null)
+            {
+                <section class="pt-card">
+                    <h3 class="pt-card-title">
+                        Taux du salarié
+                        @if (!string.IsNullOrEmpty(taux.Date_application))
+                        {
+                            <span class="pt-card-sub">depuis le @Format.Date(Clock.ToLocal(Clock.Parse(taux.Date_application)))</span>
+                        }
+                    </h3>
+                    <dl class="pt-lines">
+                        @Line("Taux horaire", Money(taux.Taux_horaire))
+                        @Line("Heure supp.", Money(taux.Taux_horaire_supplementaire))
+                        @Line("Heure de nuit", Money(taux.Taux_horaire_nuitee))
+                        @Line("Nuitée", Money(taux.Taux_nuitee))
+                        @Line("Forfait samedi", Money(taux.Taux_samedi))
+                        @Line("Chèque repas", Money(taux.Taux_cheque_repas))
+                        @Line("Standby", Money(taux.Taux_stanby))
+                    </dl>
+                </section>
+            }
+        </aside>
+    };
+
+    private static RenderFragment Stat(string label, string value) => @<div class="pt-stat"><dt>@label</dt><dd>@value</dd></div>;
+
+    private static RenderFragment Line(string label, string value) => @<div class="pt-line"><dt>@label</dt><dd>@value</dd></div>;
+
+    public void Dispose() => _request++;
+}

@@ -1,0 +1,119 @@
+@inject ApiClient Api
+
+@* Onglet Pointage du menu : feuille de pointage d'un salarié (voir
+   PointageSheet). `Projection` : page ouverte en résultat d'une projection —
+   reste la liste filtrée sur les lignes d'origine, avec son propre en-tête. *@
+@if (Projection is null)
+{
+    <PointageSheet />
+}
+else
+{
+    <CrudPage T="Pointage" TDto="CreatePointageDto" TDetail="PointageDetail"
+              Title="Pointage" LoadingLabel="Chargement du pointage..."
+              Source="_list" Columns="Columns" GetRowId="p => p.IDPOINTAGES"
+              Create="_api.CreateAsync" Update="_api.UpdateAsync" Remove="_api.RemoveAsync" GetDetail="_api.GetAsync" Searchable="true"
+              DeleteConfirmMessage="Supprimer ce pointage ?" CreateModalTitle="Nouveau pointage" EditModalTitle="Modifier le pointage"
+              Entity="pointage" Heading="@Projection.Heading" NewRecordScope="@($"projection:{Projection.Source}:{string.Join(',', Projection.Ids)}")">
+        <RenderForm Context="form">
+            <PointageForm Initial="form.Initial" Defaults="Projection.Defaults" Personnel="_personnel.Data" Statuts="_statuts"
+                          OnSubmit="form.OnSubmit" OnCancel="form.OnCancel" />
+        </RenderForm>
+    </CrudPage>
+}
+
+@code {
+    // Extrait « HH:MM » d'un horodatage ISO — les champs Heure_* sont des TIME
+    // côté MySQL, renvoyés comme un datetime sur une date arbitraire (souvent
+    // 1970-01-01) : on ignore la partie date pour éviter tout décalage de
+    // fuseau horaire.
+    private static string Time(string? value) => string.IsNullOrEmpty(value) ? "" : value.Length > 11 ? value[11..Math.Min(16, value.Length)] : "";
+
+    // Convertit un « HH:MM » en heures décimales.
+    private static double ParseHours(string hhmm)
+    {
+        var parts = hhmm.Split(':');
+        var h = JsNumber.Parse(parts[0]);
+        var m = parts.Length > 1 ? JsNumber.Parse(parts[1]) : 0;
+        return (double.IsNaN(h) || h == 0 ? 0 : h) + (double.IsNaN(m) || m == 0 ? 0 : m) / 60;
+    }
+
+    // Différence en heures décimales entre deux horodatages ISO.
+    private static double? DiffHours(string? start, string? end)
+    {
+        if (string.IsNullOrEmpty(start) || string.IsNullOrEmpty(end)) return null;
+        var ms = Clock.Parse(end) - Clock.Parse(start);
+        return ms >= 0 ? ms / 3_600_000 : null;
+    }
+
+    // Formate un nombre d'heures décimal en « HhMM ».
+    private static string FormatHours(double? hours)
+    {
+        if (hours is not { } value) return "";
+        var h = Math.Floor(value);
+        var m = DateUtils.JsRound((value - h) * 60);
+        return $"{JsNumber.ToString(h)}h{JsNumber.ToString(m).PadLeft(2, '0')}";
+    }
+
+    // H. total / H. travaillé ne sont pas des champs stockés — calculés ici à
+    // titre d'estimation (total = fin − début ; travaillé = total − coupure,
+    // sans tenir compte des pauses). À ajuster si la vraie règle métier diffère.
+    private static double? Total(Pointage row) => DiffHours(row.Date_heure_debut, row.Date_heure_fin);
+
+    private static double? Travaille(Pointage row)
+    {
+        if (Total(row) is not { } total) return null;
+        var coupure = string.IsNullOrEmpty(row.Heure_coupure) ? 0 : ParseHours(Time(row.Heure_coupure));
+        return Math.Max(total - coupure, 0);
+    }
+
+    private static readonly IReadOnlyList<Column<Pointage>> Columns =
+    [
+        Col.Date<Pointage>("Date_application", "Date", p => p.Date_application),
+        Col.Of<Pointage>("personnel", "Personnel", p => FormModel.JoinNonEmpty(" ", p.Personnel?.Nom_Personnel, p.Personnel?.Prenom_Personnel)),
+        Col.Key<Pointage>("Date_heure_debut", "H. début", p => p.Date_heure_debut, p => Time(p.Date_heure_debut)),
+        Col.Key<Pointage>("Date_heure_fin", "H. fin", p => p.Date_heure_fin, p => Time(p.Date_heure_fin)),
+        Col.Key<Pointage>("Heure_coupure", "H. coupure", p => p.Heure_coupure, p => Time(p.Heure_coupure)),
+        Col.Of<Pointage>("h_total", "H. total", p => FormatHours(Total(p))),
+        Col.Of<Pointage>("h_travaille", "H. travaillé", p => FormatHours(Travaille(p))),
+        Col.Key<Pointage>("Heure_nuit", "H. nuit", p => p.Heure_nuit, p => Time(p.Heure_nuit)),
+        Col.Key<Pointage>("Heure_liaison", "H. liaison", p => p.Heure_liaison, p => Time(p.Heure_liaison)),
+        Col.Key<Pointage>("Heure_Stanby", "H. standby", p => p.Heure_Stanby, p => Time(p.Heure_Stanby)),
+        Col.Of<Pointage>("statut", "Statut", p => p.TypeStatut?.Libelle_generique ?? ""),
+        Col.Of<Pointage>("nuitee", "Nuitée", p => p.Nuitee is { } n && n != 0 ? "Oui" : "Non"),
+        Col.Key<Pointage>("Remarque", "Remarque", p => p.Remarque),
+    ];
+
+    private ApiList<Pointage> _list = default!;
+    private CrudApi<CreatePointageDto, Pointage, PointageDetail> _api = default!;
+    // Listes des sélecteurs Personnel et Statut, chargées une fois tant que
+    // l'onglet reste ouvert.
+    private ApiList<Personnel> _personnel = default!;
+    private List<TypeStatut> _statuts = [];
+
+    [Parameter] public ProjectionView? Projection { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Projection is null) return;
+        _list = new ApiList<Pointage>(Api, "pointage") { Paginated = true };
+        _list.Configure(1, 25, "", ProjectionView.Filters(Projection));
+        _api = new CrudApi<CreatePointageDto, Pointage, PointageDetail>(Api, "pointage");
+        _personnel = new ApiList<Personnel>(Api, "personnel");
+        _personnel.Changed += StateHasChanged;
+        var statuts = LoadStatutsAsync();
+        await Task.WhenAll(_list.RefetchAsync(), _personnel.RefetchAsync(), statuts);
+    }
+
+    private async Task LoadStatutsAsync()
+    {
+        try
+        {
+            _statuts = (await Api.GetAsync<TypesStatutResponse>("pointage/statuts")).statuts;
+        }
+        catch (Exception)
+        {
+            // Sélecteur Statut vide.
+        }
+    }
+}

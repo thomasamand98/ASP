@@ -1,0 +1,196 @@
+@implements IDisposable
+@inject UnsavedChangesService Unsaved
+@inject Browser Browser
+
+@* Fiche d'un pointage, en création (Initial null) ou en modification (fiche
+   complète). H. début / H. fin : seule l'heure est saisie, la date est celle
+   du pointage ; en base ce sont des instants complets, reconstruits à
+   l'enregistrement (une fin égale ou antérieure au début tombe le
+   lendemain). Les champs Heure_* sont des TIME envoyés comme
+   « 1970-01-01THH:MM:00.000Z ». *@
+<form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form">
+    <label class="field">
+        Date
+        @* Nécessaire pour dater les heures de début et de fin. *@
+        <input type="date" required="@(_form.Date_heure_debut.Length > 0 || _form.Date_heure_fin.Length > 0)" value="@_form.Date_application"
+               @oninput="e => _form.Date_application = (string)e.Value!" />
+    </label>
+    <label class="field">
+        Personnel
+        <select value="@_form.IDPERSONNELS" @onchange="e => _form.IDPERSONNELS = (string)e.Value!">
+            <option value="">—</option>
+            @foreach (var p in Personnel)
+            {
+                <SelectOption @key="p.IDPERSONNELS" Value="@p.IDPERSONNELS" Current="@_form.IDPERSONNELS">@FormModel.JoinNonEmpty(" ", p.Nom_Personnel, p.Prenom_Personnel)</SelectOption>
+            }
+        </select>
+    </label>
+    <label class="field">
+        H. début
+        <input type="time" value="@_form.Date_heure_debut" @oninput="e => _form.Date_heure_debut = (string)e.Value!" />
+    </label>
+    <label class="field">
+        <span>
+            H. fin
+            @if (NextDay)
+            {
+                <span style="color: var(--accent); font-weight: 600"> (le lendemain)</span>
+            }
+        </span>
+        <input type="time" value="@_form.Date_heure_fin" @oninput="e => _form.Date_heure_fin = (string)e.Value!" />
+    </label>
+    @TimeField("H. coupure", () => _form.Heure_coupure, v => _form.Heure_coupure = v)
+    @TimeField("H. nuit", () => _form.Heure_nuit, v => _form.Heure_nuit = v)
+    @TimeField("H. liaison", () => _form.Heure_liaison, v => _form.Heure_liaison = v)
+    @TimeField("H. standby", () => _form.Heure_Stanby, v => _form.Heure_Stanby = v.Length > 0 ? v : ZeroTime)
+    @TimeField("Début pause", () => _form.Debut_pause, v => _form.Debut_pause = v)
+    @TimeField("Fin pause", () => _form.Fin_Pause, v => _form.Fin_Pause = v)
+    <label class="field">
+        Statut
+        <select value="@_form.IDType_Statut" @onchange="e => _form.IDType_Statut = (string)e.Value!">
+            <option value="">@(Statuts.Count == 0 ? "Aucun statut (table types_statut vide)" : "—")</option>
+            @* Les statuts archivés ne sont plus proposés, sauf celui déjà porté
+               par ce pointage (sinon il serait perdu à l'enregistrement). *@
+            @foreach (var s in Statuts.Where(s => s.Archive != 1 || s.IDType_Statut == _form.IDType_Statut))
+            {
+                <SelectOption @key="s.IDType_Statut" Value="@s.IDType_Statut" Current="@_form.IDType_Statut">
+                    @(string.IsNullOrEmpty(s.Libelle_generique) ? $"Statut {s.IDType_Statut}" : s.Libelle_generique)@(s.Archive == 1 ? " (archivé)" : "")
+                </SelectOption>
+            }
+        </select>
+    </label>
+    <label class="field">
+        Nuitée
+        <select value="@JsNumber.ToString(_form.Nuitee)" @onchange="e => _form.Nuitee = JsNumber.Parse((string)e.Value!)">
+            <option value="0">Non</option>
+            <option value="1">Oui</option>
+        </select>
+    </label>
+    <label class="field">
+        Remarque
+        <textarea rows="3" value="@_form.Remarque" @oninput="e => _form.Remarque = (string)e.Value!"></textarea>
+    </label>
+    @* Boutons en bas, après tous les champs. *@
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
+        <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
+    </div>
+</form>
+
+@code {
+    private const string ZeroTime = "1970-01-01T00:00:00.000Z";
+
+    // Champs du formulaire (CreatePointageDto) : Date_heure_* en « HH:MM »
+    // (convertis en instants à l'enregistrement), Heure_* en TIME ISO.
+    private sealed class Model
+    {
+        public string IDPERSONNELS { get; set; } = "";
+        public string IDType_Statut { get; set; } = "";
+        public string Date_application { get; set; } = "";
+        public string Date_heure_debut { get; set; } = "";
+        public string Date_heure_fin { get; set; } = "";
+        public string Heure_coupure { get; set; } = "";
+        public string Heure_liaison { get; set; } = "";
+        public string Heure_nuit { get; set; } = "";
+        public string Heure_Stanby { get; set; } = "";
+        public string Debut_pause { get; set; } = "";
+        public string Fin_Pause { get; set; } = "";
+        public double Nuitee { get; set; }
+        public string Remarque { get; set; } = "";
+    }
+
+    private Model _form = new();
+    private bool _submitting;
+    private ElementReference _formRef;
+    private UnsavedForm _guard = default!;
+
+    [CascadingParameter] public GuardScope? Scope { get; set; }
+    [Parameter] public PointageDetail? Initial { get; set; }
+
+    // Valeurs préremplies en création (projection, ou jour cliqué de la
+    // feuille) — ignorées en modification.
+    [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
+
+    // Listes des sélecteurs, chargées par la page.
+    [Parameter] public IReadOnlyList<Personnel> Personnel { get; set; } = [];
+    [Parameter] public IReadOnlyList<TypeStatut> Statuts { get; set; } = [];
+    [Parameter] public Func<CreatePointageDto, Task> OnSubmit { get; set; } = default!;
+    [Parameter] public Func<Task> OnCancel { get; set; } = default!;
+
+    // Une fin égale ou antérieure au début tombe le lendemain.
+    private static bool EndsNextDay(string debut, string fin) => debut.Length > 0 && fin.Length > 0 && string.CompareOrdinal(fin, debut) <= 0;
+
+    private bool NextDay => EndsNextDay(_form.Date_heure_debut, _form.Date_heure_fin);
+
+    // « HH:MM » d'un champ TIME (« 1970-01-01THH:MM… »).
+    private static string TimeInput(string? value) => string.IsNullOrEmpty(value) ? "" : value.Length > 11 ? value[11..Math.Min(16, value.Length)] : "";
+
+    private static string FromTimeInput(string value) => value.Length > 0 ? $"1970-01-01T{value}:00.000Z" : "";
+
+    // Heure locale « HH:MM » d'un instant.
+    private static string ClockInput(string? value) => Format.ParseLocal(value) is { } d ? d.ToString("HH':'mm", CultureInfo.InvariantCulture) : "";
+
+    // Jour « AAAA-MM-JJ » + heure « HH:MM » (heure locale) → instant ISO ;
+    // nextDay : fin le lendemain (travail de nuit).
+    private static string ToInstant(string day, string time, bool nextDay = false)
+    {
+        if (day.Length == 0 || time.Length == 0) return "";
+        var date = DateUtils.FromInputValue(day)!.Value.AddDays(nextDay ? 1 : 0);
+        var parts = time.Split(':');
+        return Clock.ToIso(Clock.ToMs(date.AddHours(JsNumber.Parse(parts[0])).AddMinutes(JsNumber.Parse(parts[1]))));
+    }
+
+    private RenderFragment TimeField(string label, Func<string> get, Action<string> set) =>
+        @<label class="field">
+            @label
+            <input type="time" value="@TimeInput(get())" @oninput="e => set(FromTimeInput((string)e.Value!))" />
+        </label>;
+
+    protected override void OnInitialized()
+    {
+        _form = new Model
+        {
+            IDPERSONNELS = Initial?.IDPERSONNELS ?? "",
+            IDType_Statut = Initial?.IDType_Statut ?? "",
+            Date_application = FormModel.DateInput(Initial?.Date_application),
+            Date_heure_debut = ClockInput(Initial?.Date_heure_debut),
+            Date_heure_fin = ClockInput(Initial?.Date_heure_fin),
+            Heure_coupure = FromTimeInput(TimeInput(Initial?.Heure_coupure)),
+            Heure_liaison = FromTimeInput(TimeInput(Initial?.Heure_liaison)),
+            Heure_nuit = FromTimeInput(TimeInput(Initial?.Heure_nuit)),
+            Heure_Stanby = FromTimeInput(TimeInput(Initial?.Heure_Stanby)) is { Length: > 0 } stanby ? stanby : ZeroTime,
+            Debut_pause = FromTimeInput(TimeInput(Initial?.Debut_pause)),
+            Fin_Pause = FromTimeInput(TimeInput(Initial?.Fin_Pause)),
+            Nuitee = Initial?.Nuitee ?? 0,
+            Remarque = Initial?.Remarque ?? "",
+        };
+        if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
+        _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
+        _guard.Register(Scope);
+    }
+
+    protected override void OnParametersSet() => _guard.Register(Scope);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _guard.TrackAsync(_formRef);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            var dto = FormModel.ToDto<CreatePointageDto>(_form);
+            dto.Date_heure_debut = ToInstant(_form.Date_application, _form.Date_heure_debut);
+            dto.Date_heure_fin = ToInstant(_form.Date_application, _form.Date_heure_fin, NextDay);
+            await OnSubmit(dto);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    public void Dispose() => _guard.Dispose();
+}

@@ -67,3 +67,5 @@ public sealed record ContratTravail
 }
 
 public sealed record ContratsTravailResponse(List<ContratTravail> contrats);
+
+public sealed record PersonnelListResponse(List<Personnel> personnel);
