@@ -45,6 +45,7 @@ nom :
 | `01_init.sql` | Tables héritées de WinDev (62 tables, index, clés étrangères) |
 | `02_document_templates.sql` | Table des modèles de document |
 | `03_document_template_header_footer.sql` | En-tête et pied de page des modèles |
+| `04_ef_baseline.sql` | Inscrit la migration `Baseline` dans `__EFMigrationsHistory` |
 
 1. Créer la base, en `utf8mb4` :
    ```sql
@@ -54,7 +55,14 @@ nom :
    ```bash
    for f in db/schema/*.sql; do mysql -u root -p horizon < "$f"; done
    ```
-3. Renseigner `DATABASE_URL`, puis appliquer `Baseline` comme ci-dessus.
+3. Renseigner `DATABASE_URL`. Inutile d'appliquer `Baseline` ici :
+   `04_ef_baseline.sql` l'a déjà inscrite, `dotnet ef database update` n'a donc
+   plus rien à appliquer (la commande reste sans effet si elle est lancée).
+
+`04_ef_baseline.sql` recopie le `MigrationId` et le `ProductVersion` de la
+migration de référence. Si celle-ci change de nom, ou si EF Core est mis à
+jour, mettre le script à jour en même temps : sinon une base créée par ces
+scripts rejouerait `Baseline`, ou la croirait appliquée à tort.
 
 Avec `docker compose up` (voir le README), le conteneur MySQL exécute
 lui-même ces scripts au premier démarrage, sur un volume vide.

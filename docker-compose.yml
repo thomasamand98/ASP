@@ -1,0 +1,69 @@
+# Application complète en local : base MySQL, API et front.
+#   docker compose up --build
+# puis ouvrir http://localhost:8080 (API sur http://localhost:3000).
+#
+# Au premier démarrage, MySQL crée une base vide avec les scripts de
+# db/schema (voir docs/base-de-donnees.md). Les données restent dans le volume
+# `db-data` ; `docker compose down -v` repart d'une base vide.
+#
+# Valeurs surchargeables dans un fichier .env à côté de ce fichier (ou dans
+# l'environnement) : MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, JWT_SECRET,
+# MISTRAL_API_KEY, LOGIN_SCREEN, et API_URL / CORS_ORIGIN pour atteindre la
+# pile autrement que par http://localhost:8080 (127.0.0.1, IP du poste sur le
+# réseau local) — les deux vont de pair.
+
+services:
+  db:
+    image: mysql:8.4
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: horizon
+      MYSQL_USER: horizon
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-horizon}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-horizon-root}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./db/schema:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-horizon-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Api/Dockerfile
+    environment:
+      DATABASE_URL: mysql://horizon:${MYSQL_PASSWORD:-horizon}@db:3306/horizon
+      PORT: "3000"
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      # Vide : un secret temporaire est généré, les sessions sont perdues à
+      # chaque redémarrage de l'API.
+      JWT_SECRET: ${JWT_SECRET:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+    volumes:
+      - storage:/app/storage
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Web/Dockerfile
+    environment:
+      API_URL: ${API_URL:-http://localhost:3000}
+      LOGIN_SCREEN: ${LOGIN_SCREEN:-false}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+
+volumes:
+  db-data:
+  storage:

@@ -19,6 +19,6 @@ appliqué.
 
 | Zone | Constat | Piste |
 |---|---|---|
-| Configuration › Performance, transfert | La durée mesurée inclut l'analyse du JSON par .NET dans le navigateur (≈ 100 ms pour 200 Ko en build Debug, contre ≈ 5 ms avec `JSON.parse` dans React). C'est le coût réel pour une application Blazor, qui exploite les données côté .NET. | Mesurer en build Release (image Docker) ; pour les grosses listes, paginer côté API plutôt que tout charger. |
+| Configuration › Performance, transfert | La durée mesurée inclut l'analyse du JSON par .NET dans le navigateur : ≈ 20 ms pour 200 Ko en build Release (≈ 130 ms en Debug), contre ≈ 5 ms avec `JSON.parse` dans React. C'est le coût réel pour une application Blazor, qui exploite ensuite les données côté .NET. | Pour les grosses listes, paginer côté API plutôt que tout charger. |
 | Toutes les pages tableau, sur mobile | À 390 px de large, l'en-tête (titre + boutons Nouveau / Modifier / Supprimer / Projection) déborde : la page défile horizontalement (≈ 490 px). Même comportement dans le front React. | Faire passer les boutons à la ligne sous le titre en dessous de 480 px. |
 | Gestion documentaire | L'éditeur s'appuie sur `document.execCommand`, déprécié (mais toujours pris en charge par les navigateurs). | À remplacer si l'éditeur doit évoluer. |

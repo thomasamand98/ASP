@@ -173,7 +173,10 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
         var launched = await Puppeteer.LaunchAsync(new LaunchOptions
         {
             Headless = true,
-            Args = ["--no-sandbox", "--disable-setuid-sandbox"],
+            // --disable-dev-shm-usage : Docker plafonne /dev/shm à 64 Mo, ce
+            // qui fait tomber le rendu sur un gros lot (impression de tous les
+            // contrats) ; Chromium passe alors par /tmp.
+            Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
             ExecutablePath = await FindChromiumAsync(),
         });
         var wrapper = new ChromiumBrowser(launched);

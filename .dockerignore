@@ -1,0 +1,11 @@
+# Contexte de construction des images (racine du dépôt) : seuls
+# Directory.Build.props et src/ sont utiles.
+.git
+**/bin
+**/obj
+**/.env
+**/storage
+.vs
+tests
+docs
+db
