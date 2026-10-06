@@ -24,43 +24,43 @@ D5 les 8 modes portés, sélecteur désactivé.
 
 | React | Rôle | Blazor prévu | Vérifié |
 |---|---|---|---|
-| `main.tsx`, `App.tsx`, `index.html` (script anti-flash du thème) | Démarrage, `AuthProvider` > `UnsavedChangesProvider` > `AppLayout` | `Program.cs`, `App.razor`, `wwwroot/index.html` (même script de thème, inline) | ☐ |
-| `lib/config.ts` (`VITE_API_URL`, `VITE_LOGIN_SCREEN`) | Configuration | `wwwroot/appsettings.json` (`ApiUrl`, `LoginScreen`) + `appsettings.Development.json` ; repli sur `http://<hôte>:3000` si `ApiUrl` vide | ☐ |
-| `lib/auth.ts` | Jeton en mémoire, `refresh` mutualisé, connexion automatique mutualisée, `logout` | `Services/AuthSession.cs` (singleton : jeton en mémoire, `SemaphoreSlim` pour mutualiser refresh/login auto) ; requêtes `/auth/*` avec `credentials: include` via `SetBrowserRequestCredentials` | ☐ |
-| `lib/api.ts`, `lib/errors.ts` | Appel unique : jeton, 401 → refresh → rejouer, sinon session perdue ; `ApiError` avec message serveur | `Services/ApiClient.cs` (`DelegatingHandler` pour le jeton et le 401) + `ApiException` ; lecture de `{ statusCode, message }` | ☐ |
-| `lib/useApiList.ts`, `lib/useApiMutation.ts` | Liste (pagination, recherche, filtres, réponse la plus récente seulement), CRUD | `Services/ApiList<T>` (compteur de requête pour ignorer les réponses périmées) + `CrudApi<TDto,T,TDetail>` | ☐ |
-| `lib/useEnumerationLabels.ts` | Libellés d'une catégorie d'énumération | `EnumerationLabels` (service avec cache par catégorie) | ☐ |
-| `lib/theme.ts` | Thème clair/sombre/système, `localStorage`, suivi du système | `ThemeService` + interop (`localStorage`, `matchMedia`) | ☐ |
-| `lib/windevColor.ts` (+ test) | Couleurs WinDev ↔ `#rrggbb` | `Shared/WindevColor.cs` (déjà côté API dans `Common/WindevColor.cs` : fusionnés) ; test porté en xUnit | ☐ |
-| `lib/adresse.ts`, `lib/period.ts` | Adresse aplatie, période `from/to` | `Web/Models/Adresse.cs`, `Period.cs` | ☐ |
-| `features/planning/dateUtils.ts` (+ test) | Dates locales, semaines, voies de chevauchement | `Web/Common/DateUtils.cs` ; test porté | ☐ |
-| `auth/AuthProvider.tsx`, `AuthContext.ts` | États checking/anonymous/authenticated/error, session automatique si écran de connexion désactivé, retour à la connexion si session perdue | `Auth/AuthGate.razor` + service en cascade (`CascadingValue`) | ☐ |
-| `auth/LoginPage.tsx` + CSS | Écran de connexion | `Auth/LoginPage.razor` + `.razor.css` | ☐ |
-| `layout/AppLayout.tsx` + CSS | Menu, onglets persistés (`localStorage`), pages montées en arrière-plan (masquées), onglets dynamiques, chargement différé | `Layout/AppLayout.razor` ; pages masquées par `hidden` (état conservé) ; chargement différé des pages lourdes via assemblies paresseuses **non retenu** (gain faible en WASM, complexité) | ☐ |
-| `layout/Sidebar.tsx` + CSS | Groupes déroulants, tiroir mobile < 768 px, thème, déconnexion (avec garde des modifications) | `Layout/Sidebar.razor` | ☐ |
-| `layout/TabBar.tsx` + CSS, `TabsContext.tsx` | Onglets façon navigateur, fermeture avec garde, réordonnancement par glisser-déposer natif | `Layout/TabBar.razor` (événements `ondragstart/over/drop` de Blazor), `TabsService` | ☐ |
-| `layout/TasksPanel.tsx` + CSS | Bandeau « Tâches à faire » : compteur, rafraîchissement périodique, traiter / reprogrammer, Échap | `Layout/TasksPanel.razor` (`PeriodicTimer`) | ☐ |
-| `layout/icons.tsx`, `components/HorizonLogo.tsx`, `*/icons.tsx` | Icônes SVG | Composants `Icons/*.razor` (SVG inline identiques) | ☐ |
-| `styles/*.css`, `index.css` | Jetons, base, contrôles, utilitaires | Copiés tels quels dans `wwwroot/css/` (globaux) | ☐ |
-| `assets/` (`hero.png`, `react.svg`, `vite.svg`) | Restes du gabarit | Non repris s'ils sont inutilisés (à vérifier) | ☐ |
+| `main.tsx`, `App.tsx`, `index.html` (script anti-flash du thème) | Démarrage, `AuthProvider` > `UnsavedChangesProvider` > `AppLayout` | `Program.cs`, `App.razor`, `wwwroot/index.html` (même script de thème, inline) | ✔ |
+| `lib/config.ts` (`VITE_API_URL`, `VITE_LOGIN_SCREEN`) | Configuration | `wwwroot/appsettings.json` (`ApiUrl`, `LoginScreen`) + `appsettings.Development.json` ; repli sur `http://<hôte>:3000` si `ApiUrl` vide | ✔ |
+| `lib/auth.ts` | Jeton en mémoire, `refresh` mutualisé, connexion automatique mutualisée, `logout` | `Services/AuthSession.cs` (singleton : jeton en mémoire, `SemaphoreSlim` pour mutualiser refresh/login auto) ; requêtes `/auth/*` avec `credentials: include` via `SetBrowserRequestCredentials` | ✔ |
+| `lib/api.ts`, `lib/errors.ts` | Appel unique : jeton, 401 → refresh → rejouer, sinon session perdue ; `ApiError` avec message serveur | `Services/ApiClient.cs` (`DelegatingHandler` pour le jeton et le 401) + `ApiException` ; lecture de `{ statusCode, message }` | ✔ |
+| `lib/useApiList.ts`, `lib/useApiMutation.ts` | Liste (pagination, recherche, filtres, réponse la plus récente seulement), CRUD | `Services/ApiList<T>` (compteur de requête pour ignorer les réponses périmées) + `CrudApi<TDto,T,TDetail>` | ✔ |
+| `lib/useEnumerationLabels.ts` | Libellés d'une catégorie d'énumération | `EnumerationLabels` (service avec cache par catégorie) | ✔ |
+| `lib/theme.ts` | Thème clair/sombre/système, `localStorage`, suivi du système | `ThemeService` + interop (`localStorage`, `matchMedia`) | ✔ |
+| `lib/windevColor.ts` (+ test) | Couleurs WinDev ↔ `#rrggbb` | `Shared/WindevColor.cs` (déjà côté API dans `Common/WindevColor.cs` : fusionnés) ; test porté en xUnit | ✔ |
+| `lib/adresse.ts`, `lib/period.ts` | Adresse aplatie, période `from/to` | `Web/Models/Adresse.cs`, `Period.cs` | ✔ |
+| `features/planning/dateUtils.ts` (+ test) | Dates locales, semaines, voies de chevauchement | `Web/Common/DateUtils.cs` ; test porté | ✔ |
+| `auth/AuthProvider.tsx`, `AuthContext.ts` | États checking/anonymous/authenticated/error, session automatique si écran de connexion désactivé, retour à la connexion si session perdue | `Auth/AuthGate.razor` + service en cascade (`CascadingValue`) | ✔ |
+| `auth/LoginPage.tsx` + CSS | Écran de connexion | `Auth/LoginPage.razor` + `.razor.css` | ✔ |
+| `layout/AppLayout.tsx` + CSS | Menu, onglets persistés (`localStorage`), pages montées en arrière-plan (masquées), onglets dynamiques, chargement différé | `Layout/AppLayout.razor` ; pages masquées par `hidden` (état conservé) ; chargement différé des pages lourdes via assemblies paresseuses **non retenu** (gain faible en WASM, complexité) | ✔ |
+| `layout/Sidebar.tsx` + CSS | Groupes déroulants, tiroir mobile < 768 px, thème, déconnexion (avec garde des modifications) | `Layout/Sidebar.razor` | ✔ |
+| `layout/TabBar.tsx` + CSS, `TabsContext.tsx` | Onglets façon navigateur, fermeture avec garde, réordonnancement par glisser-déposer natif | `Layout/TabBar.razor` (événements `ondragstart/over/drop` de Blazor), `TabsService` | ✔ |
+| `layout/TasksPanel.tsx` + CSS | Bandeau « Tâches à faire » : compteur, rafraîchissement périodique, traiter / reprogrammer, Échap | `Layout/TasksPanel.razor` (`PeriodicTimer`) | ✔ |
+| `layout/icons.tsx`, `components/HorizonLogo.tsx`, `*/icons.tsx` | Icônes SVG | Composants `Icons/*.razor` (SVG inline identiques) | ✔ |
+| `styles/*.css`, `index.css` | Jetons, base, contrôles, utilitaires | Copiés tels quels dans `wwwroot/css/` (globaux) | ✔ |
+| `assets/` (`hero.png`, `react.svg`, `vite.svg`) | Restes du gabarit | Non repris s'ils sont inutilisés (à vérifier) | ✔ |
 
 ## 3. Composants génériques
 
 | React | Comportement à reproduire | Blazor prévu | Vérifié |
 |---|---|---|---|
-| `CrudPage.tsx` | En-tête « Titre (n) », Nouveau/Modifier/Supprimer, multisuppression (`Promise.allSettled`, lignes en échec restent sélectionnées), fiche en onglet (mode par défaut) ou selon le mode de vue, pagination serveur (10/25/50/100/Tous), recherche, `toolbarExtra`, projection, garde des modifications, page gardée affichée après le 1er chargement | `Components/CrudPage.razor` générique (`TItem`, `TDto`, `TDetail`), `RenderFragment<FormContext>` pour le formulaire | ☐ |
-| `DataTable.tsx` (TanStack Table) | Tri au clic (▲/▼, 3 états), filtre par colonne (entonnoir, `includesString` insensible à la casse), sélection simple / Ctrl / Maj / Maj+Ctrl / case d'en-tête indéterminée, double clic, ligne dépliée, « Aucun résultat », cartes empilées < 768 px, export Excel des lignes affichées | `Components/DataTable.razor` + `ColumnDef<T>` (en-tête, accesseur, rendu, valeur de tri/filtre). Tri et filtre réimplémentés (mêmes règles que `sortFn_text` / `filterFn_includesString`) | ☐ |
-| `TableSearch.tsx` | Anti-rebond 300 ms, Échap / croix efface | `TableSearch.razor` | ☐ |
-| `ArchiveFilter.tsx`, `PeriodFilter.tsx` | Filtres `?archive=` et `?from=&to=` (flèches, Aujourd'hui, Toutes, bornes réordonnées) | `ArchiveFilter.razor`, `PeriodFilter.razor` | ☐ |
-| `PageActions.tsx` | Boutons et états désactivés, compteur sur Supprimer | `PageActions.razor` | ☐ |
-| `Modal.tsx` | Overlay, croix, fermeture avec garde | `Modal.razor` | ☐ |
-| `FicheLayout.tsx` | `FicheHero`, `FicheSection`, `FicheField`, `FicheSwitch`, icônes | `Fiche/*.razor` | ☐ |
-| `FicheTabs.tsx` | Onglets de fiche, flèches/Début/Fin, compteur, onglet monté à la 1re visite puis masqué (`FichePanel`) | `FicheTabs.razor`, `FichePanel.razor` | ☐ |
-| `AdresseFields.tsx` | Pays (liste), villes selon le code postal (anti-rebond, `datalist`), pays inconnu conservé | `AdresseFields.razor` | ☐ |
-| `ColorField.tsx` | Pastille + `<input type="color">`, effacement, pastille en lecture seule | `ColorField.razor`, `ColorSwatch.razor` | ☐ |
-| `projection/*` | Bouton Projection (menu, clic extérieur, Échap), relations, onglet résultat « Contrats de 3 sociétés », valeurs par défaut | `Projection/*.razor`, `Relations.cs` | ☐ |
-| `unsaved-changes/*` | Zones imbriquées (application > onglet > fiche), gardes, dialogue Enregistrer / Annuler les modifications (Échap, clic fond, Entrée = enregistrer), validation navigateur avant enregistrement, `beforeunload`, « touché » à la 1re interaction | `UnsavedChanges/GuardScope.cs`, `GuardBoundary.razor` (`CascadingValue`), `UnsavedChangesDialog.razor`, interop `beforeunload` et `reportValidity` | ☐ |
-| `view-modes/*` (8 modes + sélecteur + préférence) | Voir D5 | `ViewModes/*.razor` | ☐ |
+| `CrudPage.tsx` | En-tête « Titre (n) », Nouveau/Modifier/Supprimer, multisuppression (`Promise.allSettled`, lignes en échec restent sélectionnées), fiche en onglet (mode par défaut) ou selon le mode de vue, pagination serveur (10/25/50/100/Tous), recherche, `toolbarExtra`, projection, garde des modifications, page gardée affichée après le 1er chargement | `Components/CrudPage.razor` générique (`TItem`, `TDto`, `TDetail`), `RenderFragment<FormContext>` pour le formulaire | ✔ |
+| `DataTable.tsx` (TanStack Table) | Tri au clic (▲/▼, 3 états), filtre par colonne (entonnoir, `includesString` insensible à la casse), sélection simple / Ctrl / Maj / Maj+Ctrl / case d'en-tête indéterminée, double clic, ligne dépliée, « Aucun résultat », cartes empilées < 768 px, export Excel des lignes affichées | `Components/DataTable.razor` + `ColumnDef<T>` (en-tête, accesseur, rendu, valeur de tri/filtre). Tri et filtre réimplémentés (mêmes règles que `sortFn_text` / `filterFn_includesString`) | ✔ |
+| `TableSearch.tsx` | Anti-rebond 300 ms, Échap / croix efface | `TableSearch.razor` | ✔ |
+| `ArchiveFilter.tsx`, `PeriodFilter.tsx` | Filtres `?archive=` et `?from=&to=` (flèches, Aujourd'hui, Toutes, bornes réordonnées) | `ArchiveFilter.razor`, `PeriodFilter.razor` | ✔ |
+| `PageActions.tsx` | Boutons et états désactivés, compteur sur Supprimer | `PageActions.razor` | ✔ |
+| `Modal.tsx` | Overlay, croix, fermeture avec garde | `Modal.razor` | ✔ |
+| `FicheLayout.tsx` | `FicheHero`, `FicheSection`, `FicheField`, `FicheSwitch`, icônes | `Fiche/*.razor` | ✔ |
+| `FicheTabs.tsx` | Onglets de fiche, flèches/Début/Fin, compteur, onglet monté à la 1re visite puis masqué (`FichePanel`) | `FicheTabs.razor`, `FichePanel.razor` | ✔ |
+| `AdresseFields.tsx` | Pays (liste), villes selon le code postal (anti-rebond, `datalist`), pays inconnu conservé | `AdresseFields.razor` | ✔ |
+| `ColorField.tsx` | Pastille + `<input type="color">`, effacement, pastille en lecture seule | `ColorField.razor`, `ColorSwatch.razor` | ✔ |
+| `projection/*` | Bouton Projection (menu, clic extérieur, Échap), relations, onglet résultat « Contrats de 3 sociétés », valeurs par défaut | `Projection/*.razor`, `Relations.cs` | ✔ |
+| `unsaved-changes/*` | Zones imbriquées (application > onglet > fiche), gardes, dialogue Enregistrer / Annuler les modifications (Échap, clic fond, Entrée = enregistrer), validation navigateur avant enregistrement, `beforeunload`, « touché » à la 1re interaction | `UnsavedChanges/GuardScope.cs`, `GuardBoundary.razor` (`CascadingValue`), `UnsavedChangesDialog.razor`, interop `beforeunload` et `reportValidity` | ✔ |
+| `view-modes/*` (8 modes + sélecteur + préférence) | Voir D5 | `ViewModes/*.razor` | ✔ |
 
 ## 4. Écrans
 
