@@ -30,9 +30,8 @@ public static class LegacyEnvironment
         var values = new Dictionary<string, string?>();
         // Les variables du fichier .env ne remplacent jamais celles déjà
         // définies dans l'environnement (comme dotenv).
-        // Fichier cherché dans le projet, puis à la racine du dépôt,
-        // puis dans le backend NestJS voisin (le temps de la migration).
-        string[] candidates = [".env", "../../.env", "../../backend/.env"];
+        // Fichier cherché dans le projet, puis à la racine du dépôt.
+        string[] candidates = [".env", "../../.env"];
         var file = ReadDotEnv(candidates.Select(path => Path.GetFullPath(Path.Combine(contentRoot, path))).FirstOrDefault(File.Exists) ?? "");
         foreach (var (name, key) in Mapping)
         {

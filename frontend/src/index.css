@@ -1,8 +1,0 @@
-/* Styles globaux, chargés une fois par main.tsx. L'ordre compte : les
-   jetons d'abord, puis la base, puis les composants partagés. Les CSS de
-   features (importés par leurs composants) viennent après et peuvent donc
-   surcharger à spécificité égale. */
-@import './styles/tokens.css';
-@import './styles/base.css';
-@import './styles/controls.css';
-@import './styles/utilities.css';
