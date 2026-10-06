@@ -1,0 +1,263 @@
+.perf-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Même carte que le tableau de bord (dashboard/ChiffreAffairesCard.css). */
+.perf-page ::deep .perf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem 1.25rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+.perf-page ::deep .perf-card-title {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 1.05rem;
+}
+
+.perf-page ::deep .perf-help {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.perf-page ::deep .perf-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.perf-page ::deep .perf-legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
+  color: var(--text-h);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.perf-page ::deep .perf-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.perf-page ::deep .perf-mode.active {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.perf-page ::deep .perf-modes:disabled .perf-mode {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.perf-page ::deep .perf-mode input {
+  margin-top: 0.2rem;
+}
+
+.perf-page ::deep .perf-mode strong {
+  display: block;
+  color: var(--text-h);
+  font-size: 0.9rem;
+}
+
+.perf-page ::deep .perf-mode-description {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.perf-page ::deep .perf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.perf-page ::deep .perf-chrono {
+  color: var(--text-h);
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-page ::deep .perf-progress {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.perf-page ::deep .perf-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 0.2s linear;
+}
+
+.perf-page ::deep .perf-message {
+  margin: 0;
+}
+
+.perf-page ::deep .perf-message-error {
+  color: var(--danger);
+}
+
+.perf-page ::deep .perf-result {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.perf-page ::deep .perf-result > div {
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.perf-page ::deep .perf-result dt {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.perf-page ::deep .perf-result dd {
+  margin: 0.15rem 0 0;
+  color: var(--text-h);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-page ::deep .perf-pings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.perf-page ::deep .perf-ping {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-page ::deep .perf-ping-heure {
+  color: var(--text);
+}
+
+.perf-page ::deep .perf-badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+
+.perf-page ::deep .perf-badge-ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.perf-page ::deep .perf-badge-lent {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.perf-page ::deep .perf-badge-attente {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.perf-page ::deep .perf-select {
+  width: auto;
+  min-width: 12rem;
+}
+
+.perf-page ::deep .perf-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-h);
+  font-size: 0.85rem;
+}
+
+.perf-page ::deep .perf-exemplaires {
+  width: 5rem;
+}
+
+.perf-page ::deep .perf-path {
+  overflow-wrap: anywhere;
+  color: var(--text-h);
+}
+
+.perf-page ::deep .perf-echecs {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.perf-page ::deep .perf-details summary {
+  color: var(--text-h);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.perf-page ::deep .perf-table {
+  width: 100%;
+  max-width: 28rem;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-page ::deep .perf-table th,
+.perf-page ::deep .perf-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.perf-page ::deep .perf-table th {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.perf-page ::deep .perf-taille {
+  width: 7rem;
+}
+
+/* Tableau des mesures de transfert : plus de colonnes que le tableau des
+   contrats, défile horizontalement dans un conteneur étroit. */
+.perf-page ::deep .perf-table-scroll {
+  overflow-x: auto;
+}
+
+.perf-page ::deep .perf-table-scroll .perf-table {
+  max-width: none;
+  white-space: nowrap;
+}

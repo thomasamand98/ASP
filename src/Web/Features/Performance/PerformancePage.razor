@@ -1,2 +1,623 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : PerformancePage</p>
+@implements IDisposable
+@using System.Diagnostics
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@inject ApiClient Api
+
+@* Page de test (Configuration > Performance) : lance un traitement long côté
+   API — fictif (60 s) ou réel (impression de tous les contrats en PDF,
+   enregistrés sur le serveur) — et vérifie qu'on peut continuer à travailler
+   pendant ce temps. Le chronomètre prouve que le navigateur reste libre,
+   les pings mesurent si le serveur répond encore. La page reste montée
+   quand on change d'onglet : le traitement continue en arrière-plan. *@
+<div class="perf-page">
+    <div class="page-header">
+        <h2>Performance</h2>
+    </div>
+
+    <section class="perf-card" aria-labelledby="perf-title">
+        <h3 id="perf-title" class="perf-card-title">Traitement long (@DureeS s)</h3>
+        <p class="perf-help">
+            Lance le traitement, puis continue à utiliser l’application (autres onglets, fiches, recherches) pour vérifier qu’elle reste utilisable.
+        </p>
+
+        <fieldset class="perf-modes" disabled="@EnCours">
+            <legend class="perf-legend">Type de traitement</legend>
+            @foreach (var option in Modes)
+            {
+                <label @key="option.Id" class="perf-mode@(_mode == option.Id ? " active" : "")">
+                    <input type="radio" name="perf-mode" value="@option.Id" checked="@(_mode == option.Id)" @onchange="() => _mode = option.Id" />
+                    <span>
+                        <strong>@option.Label</strong>
+                        <span class="perf-mode-description">@option.Description</span>
+                    </span>
+                </label>
+            }
+        </fieldset>
+
+        <div class="perf-actions">
+            <button type="button" class="btn primary" @onclick="LancerAsync" disabled="@EnCours">
+                @(TraitementEnCours ? "Traitement en cours..." : "Lancer le traitement")
+            </button>
+            @if (TraitementEnCours)
+            {
+                <span class="perf-chrono" aria-live="off">@ToFixed1(EcouleS) s / @DureeS s</span>
+            }
+        </div>
+
+        @if (TraitementEnCours)
+        {
+            <div class="perf-progress" role="progressbar" aria-label="Avancement du traitement" aria-valuemin="0" aria-valuemax="@DureeS" aria-valuenow="@DateUtils.JsRound(EcouleS)">
+                <div class="perf-progress-bar" style="width: @(JsNumber.ToString(EcouleS / DureeS * 100))%"></div>
+            </div>
+        }
+
+        @if (_error is not null)
+        {
+            <p class="perf-message perf-message-error">@_error</p>
+        }
+
+        @if (_resultat is { } resultat)
+        {
+            <dl class="perf-result">
+                <div>
+                    <dt>Mode</dt>
+                    <dd>@Modes.FirstOrDefault(m => m.Id == resultat.mode)?.Label</dd>
+                </div>
+                <div>
+                    <dt>Durée réelle</dt>
+                    <dd>@ToFixed1(resultat.dureeReelleMs / 1000) s</dd>
+                </div>
+                <div>
+                    <dt>Début / fin (serveur)</dt>
+                    <dd>@Heure(resultat.debut) → @Heure(resultat.fin)</dd>
+                </div>
+                @if (resultat.iterations is { } iterations)
+                {
+                    <div>
+                        <dt>Itérations de calcul</dt>
+                        <dd>@Format.Number(iterations)</dd>
+                    </div>
+                }
+            </dl>
+        }
+    </section>
+
+    <section class="perf-card" aria-labelledby="perf-impression-title">
+        <h3 id="perf-impression-title" class="perf-card-title">Impression de tous les contrats</h3>
+        <p class="perf-help">
+            Génère le PDF de chaque contrat, l’un après l’autre, autant de fois que d’exemplaires demandés, et l’enregistre sur le serveur. La demande ne répond qu’une fois tous les PDF
+            enregistrés : la durée totale est le temps pendant lequel vous attendez le résultat.
+        </p>
+
+        <div class="perf-actions">
+            @if (_templates.Count > 1)
+            {
+                <select class="control perf-select" value="@ModeleChoisi" @onchange="e => _templateId = (string)e.Value!" disabled="@EnCours" aria-label="Modèle de document">
+                    @foreach (var t in _templates)
+                    {
+                        <SelectOption @key="t.IDDOCUMENT_TEMPLATES" Value="@t.IDDOCUMENT_TEMPLATES" Current="@ModeleChoisi">@t.Nom</SelectOption>
+                    }
+                </select>
+            }
+            <label class="perf-field">
+                Exemplaires par contrat
+                <input type="number" class="control perf-exemplaires" min="1" max="@ExemplairesMax" step="1" value="@_exemplaires"
+                       @onchange="e => _exemplaires = Borne((string?)e.Value, ExemplairesMax)" disabled="@EnCours" />
+            </label>
+            <button type="button" class="btn primary" @onclick="LancerImpressionAsync" disabled="@(EnCours || ModeleChoisi.Length == 0)">
+                @(ImpressionEnCours ? "Impression en cours..." : "Imprimer tous les contrats")
+            </button>
+            @if (ImpressionEnCours)
+            {
+                <span class="perf-chrono" aria-live="off">@Secondes(EcouleMs)@(_avancement is { } a ? $" — {a.faits} / {a.total} PDF" : "")</span>
+            }
+        </div>
+
+        @if (!_chargementModeles && _erreurModeles is null && _templates.Count == 0)
+        {
+            <p class="perf-help">Créez d’abord un modèle de contrat dans Gestion documentaire.</p>
+        }
+        @if (_erreurModeles is not null)
+        {
+            <p class="perf-message perf-message-error">@_erreurModeles</p>
+        }
+
+        @if (ImpressionEnCours && _avancement is { } avancement)
+        {
+            <div class="perf-progress" role="progressbar" aria-label="Avancement de l’impression" aria-valuemin="0" aria-valuemax="@avancement.total" aria-valuenow="@avancement.faits">
+                <div class="perf-progress-bar" style="width: @(JsNumber.ToString(avancement.total != 0 ? avancement.faits / avancement.total * 100 : 0))%"></div>
+            </div>
+        }
+
+        @if (_erreurImpression is not null)
+        {
+            <p class="perf-message perf-message-error">@_erreurImpression</p>
+        }
+
+        @if (_impression is { } impression)
+        {
+            <dl class="perf-result">
+                <div>
+                    <dt>Durée totale (attente)</dt>
+                    <dd>@Secondes(impression.dureeTotaleMs)</dd>
+                </div>
+                <div>
+                    <dt>Contrats imprimés</dt>
+                    <dd>@impression.contrats.Count / @JsNumber.ToString(impression.total)</dd>
+                </div>
+                <div>
+                    <dt>PDF enregistrés</dt>
+                    <dd>@JsNumber.ToString(impression.impressions) / @JsNumber.ToString(impression.total * impression.exemplaires)</dd>
+                </div>
+                <div>
+                    <dt>Durée moyenne par PDF</dt>
+                    <dd>@(impression.dureeMoyenneMs is { } moyenne ? Secondes(moyenne, 2) : "—")</dd>
+                </div>
+                <div>
+                    <dt>Plus rapide / plus lent</dt>
+                    <dd>@(impression.dureeMinMs is { } min && impression.dureeMaxMs is { } max ? $"{Secondes(min, 2)} / {Secondes(max, 2)}" : "—")</dd>
+                </div>
+                <div>
+                    <dt>Latence max. du serveur</dt>
+                    <dd>@(_latenceMax is { } latence ? $"{JsNumber.ToString(latence)} ms" : "—")</dd>
+                </div>
+                <div>
+                    <dt>Taille totale</dt>
+                    <dd>@Format.Number(impression.octetsTotal / 1_048_576, 0, 1) Mo</dd>
+                </div>
+            </dl>
+            <p class="perf-help">
+                PDF enregistrés sur le serveur dans <code class="perf-path">@impression.dossier</code>
+            </p>
+
+            @if (impression.echecs.Count > 0)
+            {
+                <div class="perf-message perf-message-error">
+                    @impression.echecs.Count contrat(s) non imprimé(s) :
+                    <ul class="perf-echecs">
+                        @foreach (var echec in impression.echecs)
+                        {
+                            <li @key="echec.id">Contrat @(echec.numero ?? echec.id) : @echec.message</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (impression.contrats.Count > 0)
+            {
+                <details class="perf-details">
+                    <summary>Durée par contrat@(impression.exemplaires > 1 ? $" (cumul de {JsNumber.ToString(impression.exemplaires)} exemplaires)" : "")</summary>
+                    <table class="perf-table">
+                        <thead>
+                            <tr>
+                                <th>N° contrat</th>
+                                <th>Durée</th>
+                                <th>Taille</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var contrat in impression.contrats)
+                            {
+                                <tr @key="contrat.id">
+                                    <td>@(contrat.numero ?? contrat.id)</td>
+                                    <td>@Secondes(contrat.dureeMs, 2)</td>
+                                    <td>@Format.Number(DateUtils.JsRound(contrat.octets / 1024)) Ko</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </details>
+            }
+        }
+    </section>
+
+    <section class="perf-card" aria-labelledby="perf-transfert-title">
+        <h3 id="perf-transfert-title" class="perf-card-title">Transfert de données : avec ou sans compression</h3>
+        <p class="perf-help">
+            Le serveur renvoie un JSON de la taille choisie, tel quel ou compressé (gzip). La durée est celle constatée par le navigateur, de l’envoi de la demande aux données
+            prêtes à l’emploi (préparation, transfert, décompression, lecture du JSON), hors génération des données de test. Chaque mesure est la médiane des répétitions.
+            Le résultat dépend du débit : à mesurer depuis le réseau des utilisateurs, pas seulement en local.
+        </p>
+
+        <div class="perf-actions">
+            <label class="perf-field">
+                Taille (Ko)
+                <input type="number" class="control perf-taille" min="1" max="@TailleMaxKo" step="1" value="@_tailleKo"
+                       @onchange="e => _tailleKo = Borne((string?)e.Value, TailleMaxKo)" disabled="@(_transfertEnCours is not null)" />
+            </label>
+            <label class="perf-field">
+                Répétitions
+                <input type="number" class="control perf-exemplaires" min="1" max="@RepetitionsMax" step="1" value="@_repetitions"
+                       @onchange="e => _repetitions = Borne((string?)e.Value, RepetitionsMax)" disabled="@(_transfertEnCours is not null)" />
+            </label>
+            <button type="button" class="btn primary" @onclick="() => MesurerTransfertAsync(false)" disabled="@(EnCours || _transfertEnCours is not null)">
+                @(_transfertEnCours == false ? "Mesure en cours..." : "Sans compression")
+            </button>
+            <button type="button" class="btn primary" @onclick="() => MesurerTransfertAsync(true)" disabled="@(EnCours || _transfertEnCours is not null)">
+                @(_transfertEnCours == true ? "Mesure en cours..." : "Avec compression")
+            </button>
+            @if (_mesures.Count > 0)
+            {
+                <button type="button" class="btn" @onclick="() => _mesures = []" disabled="@(_transfertEnCours is not null)">Effacer</button>
+            }
+        </div>
+
+        @if (_erreurTransfert is not null)
+        {
+            <p class="perf-message perf-message-error">@_erreurTransfert</p>
+        }
+
+        @if (_mesures.Count > 0)
+        {
+            <div class="perf-table-scroll">
+                <table class="perf-table">
+                    <thead>
+                        <tr>
+                            <th>Taille</th>
+                            <th>Mode</th>
+                            <th>Octets envoyés</th>
+                            <th>Durée totale</th>
+                            <th>dont JSON (serveur)</th>
+                            <th>dont compression (serveur)</th>
+                            <th>Plus rapide / plus lent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var mesure in _mesures)
+                        {
+                            <tr @key="mesure.Cle">
+                                <td>@Format.Number(mesure.TailleKo) Ko</td>
+                                <td>@(mesure.Compression ? "Avec compression" : "Sans compression")</td>
+                                <td>@Ko(mesure.OctetsEnvoyes)@(mesure.Compression ? $" ({JsNumber.ToString(DateUtils.JsRound(mesure.OctetsEnvoyes / mesure.OctetsJson * 100))} %)" : "")</td>
+                                <td><strong>@Millisecondes(mesure.TotalMs)</strong></td>
+                                <td>@Millisecondes(mesure.JsonMs)</td>
+                                <td>@(mesure.Compression ? Millisecondes(mesure.CompressionMs) : "—")</td>
+                                <td>@Millisecondes(mesure.MinMs) / @Millisecondes(mesure.MaxMs)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (_pings.Count > 0)
+    {
+        <section class="perf-card" aria-labelledby="perf-pings-title">
+            <h3 id="perf-pings-title" class="perf-card-title">Réactivité du serveur</h3>
+            <p class="perf-help">
+                Un ping est envoyé toutes les @(IntervallePingMs / 1000) s (dès que le précédent a répondu). S’il reste « en attente », le serveur ne répond plus.@if (_latenceMax is { } latenceMax)
+                {
+                    <text> Latence maximale : <strong>@JsNumber.ToString(latenceMax) ms</strong>.</text>
+                }
+            </p>
+            <ul class="perf-pings">
+                @foreach (var ping in _pings)
+                {
+                    <li @key="ping" class="perf-ping">
+                        <span class="perf-ping-heure">@ping.Heure.ToString("HH':'mm':'ss", CultureInfo.InvariantCulture)</span>
+                        @if (ping.LatenceMs is not { } latence)
+                        {
+                            <span class="perf-badge perf-badge-attente">En attente</span>
+                        }
+                        else
+                        {
+                            <span class="perf-badge @(latence > LatenceLenteMs ? "perf-badge-lent" : "perf-badge-ok")">@JsNumber.ToString(latence) ms</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</div>
+
+@code {
+    // Réponse de POST /performance/traitement-long.
+    private sealed record Resultat(string mode, double dureeDemandeeMs, double dureeReelleMs, string debut, string fin, double? iterations);
+
+    // Réponse de POST /performance/impression-contrats.
+    private sealed record ContratImprime(string id, string? numero, double exemplaires, double dureeMs, double octets);
+
+    private sealed record EchecImpression(string id, string? numero, string message);
+
+    private sealed record ResultatImpression(
+        string dossier, double total, double exemplaires, double impressions, double dureeTotaleMs, double? dureeMoyenneMs,
+        double? dureeMinMs, double? dureeMaxMs, double octetsTotal, string debut, string fin, List<ContratImprime> contrats, List<EchecImpression> echecs);
+
+    // Réponse de GET /performance/ping.
+    private sealed record Avancement(double faits, double total);
+
+    private sealed record ReponsePing(string heure, Avancement? impression);
+
+    // Classe (pas record) : chaque ping est identifié par son instance, sa
+    // latence est complétée à la réponse.
+    private sealed class Ping(DateTime heure)
+    {
+        public DateTime Heure { get; } = heure;
+        public double? LatenceMs { get; set; }
+    }
+
+    private sealed record Tache(string Type, double Debut);
+
+    // Une ligne du tableau des mesures de transfert (GET /performance/transfert,
+    // répété) : durées en ms, médianes des répétitions sauf min/max.
+    private sealed record MesureTransfert(double Cle, double TailleKo, bool Compression, double OctetsJson, double OctetsEnvoyes,
+        double TotalMs, double MinMs, double MaxMs, double JsonMs, double CompressionMs);
+
+    private sealed record Mode(string Id, string Label, string Description);
+
+    // Même plafonds que l'API (PerformanceController).
+    private const int TailleMaxKo = 51_200;
+    private const int RepetitionsMax = 50;
+    private const int ExemplairesMax = 20;
+    private const int DureeS = 60;
+    private const int IntervallePingMs = 2000;
+    // Au-delà, le serveur est considéré comme bloqué pour ce ping.
+    private const int LatenceLenteMs = 1000;
+
+    private static readonly Mode[] Modes =
+    [
+        new("attente", "Attente (I/O)", "Le serveur attend 60 s sans calculer, comme une requête SQL ou un appel d’API lent. Il reste disponible pour les autres requêtes."),
+        new("cpu", "Calcul (CPU)", "Le serveur calcule sans s’arrêter pendant 60 s. Node.js n’a qu’un seul fil d’exécution : plus aucune requête n’est servie, pour aucun utilisateur."),
+    ];
+
+    private string _mode = "attente";
+    private Tache? _tache;
+    private double _maintenant = Clock.Now;
+    private Resultat? _resultat;
+    private string? _error;
+    private ResultatImpression? _impression;
+    private string? _erreurImpression;
+    private Avancement? _avancement;
+    private string _templateId = "";
+    private int _exemplaires = 1;
+    private List<Ping> _pings = [];
+    // Sur tout le traitement, pas seulement les derniers pings affichés.
+    private double? _latenceMax;
+    private int _tailleKo = 100;
+    private int _repetitions = 5;
+    // Mode de la mesure de transfert en cours (true : avec compression).
+    private bool? _transfertEnCours;
+    private List<MesureTransfert> _mesures = [];
+    private string? _erreurTransfert;
+    private List<DocumentTemplateSummary> _templates = [];
+    private bool _chargementModeles = true;
+    private string? _erreurModeles;
+    private CancellationTokenSource? _boucles;
+    private bool _dispose;
+
+    private bool EnCours => _tache is not null;
+    private bool TraitementEnCours => _tache?.Type == "traitement";
+    private bool ImpressionEnCours => _tache?.Type == "impression";
+    private string ModeleChoisi => _templateId.Length > 0 ? _templateId : _templates.FirstOrDefault()?.IDDOCUMENT_TEMPLATES ?? "";
+    private double EcouleMs => _tache is { } tache ? _maintenant - tache.Debut : 0;
+    private double EcouleS => TraitementEnCours ? Math.Min(DureeS, EcouleMs / 1000) : 0;
+
+    // toFixed(1) de JavaScript.
+    private static string ToFixed1(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
+
+    private static string Secondes(double ms, int decimales = 1) => $"{Format.Number(ms / 1000, decimales, decimales)} s";
+
+    private static string Millisecondes(double ms) => $"{Format.Number(ms, 1, 1)} ms";
+
+    private static string Ko(double octets) => $"{Format.Number(octets / 1024, 0, 1)} Ko";
+
+    // Heure locale « HH:MM:SS » d'un instant ISO renvoyé par l'API.
+    private static string Heure(string iso) => Format.ParseLocal(iso) is { } date ? date.ToString("HH':'mm':'ss", CultureInfo.InvariantCulture) : "";
+
+    // Math.min(max, Math.max(1, Math.trunc(valueAsNumber) || 1)).
+    private static int Borne(string? saisie, int max)
+    {
+        var nombre = Math.Truncate(JsNumber.Parse(saisie ?? ""));
+        if (double.IsNaN(nombre) || nombre == 0) nombre = 1;
+        return (int)Math.Min(max, Math.Max(1, nombre));
+    }
+
+    private static double Mediane(IEnumerable<double> valeurs)
+    {
+        var triees = valeurs.Order().ToList();
+        var milieu = triees.Count / 2;
+        return triees.Count % 2 == 1 ? triees[milieu] : (triees[milieu - 1] + triees[milieu]) / 2;
+    }
+
+    // Modèles utilisables pour l'impression : ceux de type CONTRAT.
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _templates = (await Api.GetAsync<DocumentTemplatesResponse>("document-templates?type=CONTRAT")).documentTemplates;
+        }
+        catch (Exception e)
+        {
+            _erreurModeles = e.Message;
+        }
+        _chargementModeles = false;
+    }
+
+    private void Demarrer(string type)
+    {
+        var maintenant = Clock.Now;
+        _tache = new Tache(type, maintenant);
+        _maintenant = maintenant;
+        _pings = [];
+        _latenceMax = null;
+        _avancement = null;
+        _boucles?.Cancel();
+        _boucles = new CancellationTokenSource();
+        _ = ChronometreAsync(_boucles.Token);
+        _ = PingsAsync(_boucles.Token);
+    }
+
+    private void Terminer()
+    {
+        _boucles?.Cancel();
+        _tache = null;
+    }
+
+    // Chronomètre : se met à jour tant que le navigateur n'est pas bloqué.
+    private async Task ChronometreAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(200, ct);
+                _maintenant = Clock.Now;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    // Ping du serveur pendant le traitement, toutes les 2 s. Un seul ping à
+    // la fois : s'ils s'accumulaient sans réponse, ils occuperaient les
+    // quelques connexions que le navigateur ouvre vers le serveur et
+    // bloqueraient le reste de l'application.
+    private async Task PingsAsync(CancellationToken ct)
+    {
+        var enAttente = false;
+        async Task EnvoyerAsync()
+        {
+            if (enAttente) return;
+            enAttente = true;
+            var envoi = Stopwatch.StartNew();
+            var ping = new Ping(DateTime.Now);
+            _pings = [ping, .. _pings.Take(29)];
+            StateHasChanged();
+            try
+            {
+                var reponse = await Api.GetAsync<ReponsePing>("performance/ping");
+                var latence = DateUtils.JsRound(envoi.Elapsed.TotalMilliseconds);
+                if (_dispose) return;
+                ping.LatenceMs = latence;
+                _latenceMax = Math.Max(_latenceMax ?? 0, latence);
+                if (reponse.impression is not null) _avancement = reponse.impression;
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                // Ping perdu : reste « en attente ».
+            }
+            finally
+            {
+                enAttente = false;
+            }
+        }
+
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                _ = EnvoyerAsync();
+                await Task.Delay(IntervallePingMs, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task LancerAsync()
+    {
+        Demarrer("traitement");
+        _resultat = null;
+        _error = null;
+        try
+        {
+            var reponse = await Api.SendJsonAsync<Resultat>(HttpMethod.Post, $"performance/traitement-long?mode={_mode}&duree={DureeS}");
+            if (!_dispose) _resultat = reponse;
+        }
+        catch (Exception e)
+        {
+            if (!_dispose) _error = e.Message;
+        }
+        finally
+        {
+            Terminer();
+        }
+    }
+
+    private async Task LancerImpressionAsync()
+    {
+        if (ModeleChoisi.Length == 0) return;
+        var modele = ModeleChoisi;
+        Demarrer("impression");
+        _impression = null;
+        _erreurImpression = null;
+        try
+        {
+            var reponse = await Api.SendJsonAsync<ResultatImpression>(HttpMethod.Post,
+                $"performance/impression-contrats?templateId={Js.EncodeUriComponent(modele)}&exemplaires={_exemplaires}");
+            if (!_dispose) _impression = reponse;
+        }
+        catch (Exception e)
+        {
+            if (!_dispose) _erreurImpression = e.Message;
+        }
+        finally
+        {
+            Terminer();
+        }
+    }
+
+    // Demandes envoyées l'une après l'autre : en parallèle, elles se
+    // partageraient le débit et le serveur.
+    private async Task MesurerTransfertAsync(bool compression)
+    {
+        _transfertEnCours = compression;
+        _erreurTransfert = null;
+        StateHasChanged();
+        try
+        {
+            var essais = new List<(double TotalMs, double JsonMs, double CompressionMs)>();
+            double octetsJson = 0, octetsEnvoyes = 0;
+            var (taille, repetitions) = (_tailleKo, _repetitions);
+            for (var i = 0; i < repetitions; i++)
+            {
+                var envoi = Stopwatch.StartNew();
+                var response = await Api.SendAsync(() =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, $"performance/transfert?taille={taille}&compression={(compression ? 1 : 0)}");
+                    request.SetBrowserRequestCache(BrowserRequestCache.NoStore);
+                    return request;
+                });
+                // Données « prêtes à l'emploi » : lues et analysées par .NET,
+                // comme le reste de l'application les utiliserait.
+                using (JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
+                {
+                }
+                var dureeMs = envoi.Elapsed.TotalMilliseconds;
+                double Entete(string nom) => response.Headers.TryGetValues(nom, out var valeurs) && JsNumber.Parse(valeurs.First()) is var v && !double.IsNaN(v) ? v : 0;
+                essais.Add((Math.Max(0, dureeMs - Entete("X-Perf-Generation-Ms")), Entete("X-Perf-Json-Ms"), Entete("X-Perf-Compression-Ms")));
+                octetsJson = Entete("X-Perf-Octets-Json");
+                octetsEnvoyes = Entete("X-Perf-Octets-Envoyes");
+            }
+            if (_dispose) return;
+            var totaux = essais.Select(e => e.TotalMs).ToList();
+            _mesures =
+            [
+                new MesureTransfert(Clock.Now, taille, compression, octetsJson, octetsEnvoyes, Mediane(totaux), totaux.Min(), totaux.Max(),
+                    Mediane(essais.Select(e => e.JsonMs)), Mediane(essais.Select(e => e.CompressionMs))),
+                .. _mesures,
+            ];
+        }
+        catch (Exception e)
+        {
+            if (!_dispose) _erreurTransfert = e.Message;
+        }
+        finally
+        {
+            _transfertEnCours = null;
+        }
+    }
+
+    public void Dispose()
+    {
+        _dispose = true;
+        _boucles?.Cancel();
+    }
+}
