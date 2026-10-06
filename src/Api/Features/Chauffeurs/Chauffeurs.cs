@@ -99,10 +99,6 @@ public class ChauffeurController(ChauffeurService service) : ApiControllerBase
     public Task<object> GetChauffeurs([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, [FromQuery] string? archive, CancellationToken ct) =>
         service.GetChauffeursAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), Params.ParseArchive(archive), ct);
 
-    // NestJS : GET chauffeurs/:id
-    [HttpGet("chauffeurs/{id}")]
-    public Task<object> GetChauffeur(string id, CancellationToken ct) => service.GetChauffeurAsync(Params.ParseId(id), ct);
-
     // NestJS : POST chauffeurs
     [HttpPost("chauffeurs")]
     public Task<IActionResult> CreateChauffeur([Body] CreateChauffeurDto dto, CancellationToken ct) => Created201(service.CreateChauffeurAsync(dto, ct));

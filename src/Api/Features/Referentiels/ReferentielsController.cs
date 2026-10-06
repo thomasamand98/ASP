@@ -26,14 +26,6 @@ public class ReferentielsController(ReferentielsService service) : ControllerBas
     [HttpGet("dechets")]
     public Task<object> GetDechets([FromQuery] string? search, CancellationToken ct) => service.GetDechetsAsync(search, ct);
 
-    // NestJS : ClientController.getClients — GET clients
-    [HttpGet("clients")]
-    public Task<object> GetClients(CancellationToken ct) => service.GetClientsAsync(ct);
-
-    // NestJS : FournisseurController.getFournisseurs — GET fournisseurs
-    [HttpGet("fournisseurs")]
-    public Task<object> GetFournisseurs(CancellationToken ct) => service.GetFournisseursAsync(ct);
-
     // NestJS : MessageController.getMessages — GET messages
     // ?societeId=X (obligatoire) : liste des messages envoyés liés à cette
     // société.

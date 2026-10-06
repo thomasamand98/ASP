@@ -76,10 +76,9 @@ public class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Contains("max-age=28800", cookie, StringComparison.OrdinalIgnoreCase);
 
         // Le jeton d'accès ouvre les routes protégées.
-        var me = new HttpRequestMessage(HttpMethod.Get, "auth/me");
-        me.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.accessToken);
-        var meResponse = await client.SendAsync(me);
-        Assert.Equal("""{"login":"alice"}""", await meResponse.Content.ReadAsStringAsync());
+        var ping = new HttpRequestMessage(HttpMethod.Get, "performance/ping");
+        ping.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.accessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(ping)).StatusCode);
 
         // Le cookie de renouvellement rouvre une session ; il ne sert pas de
         // jeton d'accès (audience différente).
@@ -88,7 +87,7 @@ public class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         refresh.Headers.Add("Cookie", $"refresh_token={refreshToken}");
         Assert.Equal("alice", (await (await client.SendAsync(refresh)).Content.ReadFromJsonAsync<Session>())!.login);
 
-        var misuse = new HttpRequestMessage(HttpMethod.Get, "auth/me");
+        var misuse = new HttpRequestMessage(HttpMethod.Get, "performance/ping");
         misuse.Headers.Authorization = new AuthenticationHeaderValue("Bearer", refreshToken);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(misuse)).StatusCode);
     }

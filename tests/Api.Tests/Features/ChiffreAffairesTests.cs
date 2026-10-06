@@ -53,16 +53,6 @@ public class ChiffreAffairesTests
         Assert.Equal(expected, ChiffreAffaires.ArrondiCentimes(value));
     }
 
-    // Le calcul lourd doit faire exactement le même travail que le backend
-    // NestJS (valeurs relevées sur celui-ci, avec ces petites tailles).
-    [Fact]
-    public void Le_calcul_lourd_donne_les_memes_resultats_que_NestJS()
-    {
-        var calcul = CalculLourd.Lancer(new TaillesCalcul(Crible: 1000, Matrice: 10, Tri: 1001, Hachage: 1000));
-        Assert.Equal([168d, 24940d, 2347184706d, 3298996588d], calcul.etapes.Select(etape => etape.resultat));
-        Assert.Equal(["Nombres premiers", "Produit de matrices", "Tri", "Arithmétique entière"], calcul.etapes.Select(etape => etape.nom));
-    }
-
     // Le générateur du test de transfert doit produire les mêmes données que
     // le backend NestJS (valeurs relevées sur celui-ci).
     [Fact]

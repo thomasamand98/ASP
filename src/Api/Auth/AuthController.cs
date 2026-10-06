@@ -70,10 +70,6 @@ public class AuthController(TokenService tokens, IOptions<AuthOptions> options) 
         return new { };
     }
 
-    // NestJS : GET auth/me
-    [HttpGet("me")]
-    public object Me() => new { login = User.FindFirst("sub")!.Value };
-
     private object StartSession(AuthUser user)
     {
         var accessToken = tokens.IssueAccessToken(user);

@@ -39,13 +39,6 @@ public class AttelageService(AppDbContext db)
         return new { attelages = await WithVehiculesAsync(rows, ct), total };
     }
 
-    public async Task<object> GetAttelageAsync(long id, CancellationToken ct)
-    {
-        var row = await Select(db.AttelageReference.Where(a => a.IDATTELAGE_REFERENCE == id)).FirstOrDefaultAsync(ct)
-            ?? throw new NotFoundException("Attelage introuvable.");
-        return (await WithVehiculesAsync([row], ct))[0];
-    }
-
     public async Task<object> CreateAttelageAsync(CreateAttelageDto dto, CancellationToken ct)
     {
         // Les IDs ont un défaut DB de 0, qui viole les clés étrangères quand
@@ -146,10 +139,6 @@ public class AttelageController(AttelageService service) : ApiControllerBase
     [HttpGet("attelages")]
     public Task<object> GetAttelages([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetAttelagesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
-
-    // NestJS : GET attelages/:id
-    [HttpGet("attelages/{id}")]
-    public Task<object> GetAttelage(string id, CancellationToken ct) => service.GetAttelageAsync(Params.ParseId(id), ct);
 
     // NestJS : POST attelages
     [HttpPost("attelages")]

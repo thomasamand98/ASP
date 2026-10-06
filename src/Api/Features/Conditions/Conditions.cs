@@ -67,10 +67,6 @@ public class ConditionController(ConditionService service) : ApiControllerBase
     public Task<object> GetConditions([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, CancellationToken ct) =>
         service.GetConditionsAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, ct);
 
-    // NestJS : GET conditions/:id
-    [HttpGet("conditions/{id}")]
-    public Task<object> GetCondition(string id, CancellationToken ct) => service.GetConditionAsync(Params.ParseId(id), ct);
-
     // NestJS : POST conditions
     [HttpPost("conditions")]
     public Task<IActionResult> CreateCondition([Body] CreateConditionDto dto, CancellationToken ct) =>

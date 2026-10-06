@@ -176,10 +176,6 @@ public class CommandeController(CommandeService service) : ApiControllerBase
     public Task<object> GetCommandes([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, [FromQuery] string? from, [FromQuery] string? to, CancellationToken ct) =>
         service.GetCommandesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), Params.ParsePeriod(from, to), ct);
 
-    // NestJS : GET commandes/:id
-    [HttpGet("commandes/{id}")]
-    public Task<object> GetCommande(string id, CancellationToken ct) => service.GetCommandeAsync(Params.ParseId(id), ct);
-
     // NestJS : POST commandes
     [HttpPost("commandes")]
     public Task<IActionResult> CreateCommande([Body] CreateCommandeDto dto, CancellationToken ct) => Created201(service.CreateCommandeAsync(dto, ct));

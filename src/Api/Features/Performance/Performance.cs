@@ -319,13 +319,6 @@ public class PerformanceController(PerformanceService service) : ApiControllerBa
         return StatusCode(StatusCodes.Status201Created, await service.LancerTraitementLongAsync(modeTraitement, (int)dureeS * 1000, ct));
     }
 
-    // NestJS : POST performance/calcul
-    // Calcul lourd de référence, sans durée imposée : la même charge de
-    // travail que le backend NestJS, pour comparer leur vitesse de calcul
-    // (voir CalculLourd.cs). Ne répond qu'à la fin.
-    [HttpPost("calcul")]
-    public IActionResult LancerCalcul() => StatusCode(StatusCodes.Status201Created, CalculLourd.Lancer());
-
     // NestJS : POST performance/impression-contrats
     // ?templateId= (obligatoire) : modèle de document de type CONTRAT.
     // &exemplaires= (défaut : 1, max 20) : nombre d'impressions par contrat.

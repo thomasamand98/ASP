@@ -50,18 +50,6 @@ public class ReferentielsService(AppDbContext db)
         return new { dechets };
     }
 
-    public async Task<object> GetClientsAsync(CancellationToken ct)
-    {
-        var clients = await db.Client.OrderBy(c => c.IDCLIENTS).Select(c => new { c.IDCLIENTS, c.Numero_client }).ToListAsync(ct);
-        return new { clients };
-    }
-
-    public async Task<object> GetFournisseursAsync(CancellationToken ct)
-    {
-        var fournisseurs = await db.Fournisseur.OrderBy(f => f.IDFOURNISSEURS).Select(f => new { f.IDFOURNISSEURS, f.Numero_fournisseur }).ToListAsync(ct);
-        return new { fournisseurs };
-    }
-
     // Alimente l'onglet « Messages envoyés » de la fiche Société
     // (SocieteForm.tsx) — lecture seule. search : champ Rechercher de l'onglet.
     public async Task<object> GetMessagesBySocieteAsync(long societeId, string? search, CancellationToken ct)
