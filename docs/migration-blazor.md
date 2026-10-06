@@ -70,26 +70,26 @@ de la fiche.
 
 | Menu | Écran (React) | Particularités | Endpoints | Vérifié |
 |---|---|---|---|---|
-| Tableau de bord | `dashboard/DashboardPage`, `ChiffreAffairesCard` | Période (année en cours), N-1, granularité mois/jour, bascule Graphique/Tableau, évolution sur la partie écoulée, infobulle | `statistiques/chiffre-affaires` | ☐ |
-| Commercial › Société | `societes/*` | Fiche à onglets : Principale (client / fournisseur), Contacts (CrudPage imbriqué), Contrats / Offres, Documents, Msg envoyés ; pagination, projection | `societes` CRUD+détail, `contacts`, `contrats`, `messages`, `lien-documents`, `pays`, `villes` | ☐ |
-| Commercial › Contrats / Offre de prix | `contrats/*` | Onglets Détail / Prestations / Factures, conditions CMR, numéro, bouton PDF (modèle choisi, ouverture dans un nouvel onglet), types de facture | `contrats` CRUD+détail, `contrats/:id/prestations`, `contrats/:id/pdf`, `conditions-cmr` (POST/PATCH/DELETE), `types-facture`, `document-templates?type=`, `societes/:id`, `enumerations?categorie=` | ☐ |
-| Commercial › Contacts | `contacts/*` | Fiche contact, adresse reprise de la société | `contacts` CRUD+détail, `societes/:id` | ☐ |
-| Commercial › Point | `points/*` | Onglets Principale / Contacts / Carte (iframe Google Maps), horaires | `points` CRUD+détail, `points/:id/contacts/:contactId` (PATCH/DELETE), `contacts` | ☐ |
-| Commercial › Conditions d'exécution | `conditions/*` | Libellés d'énumération | `conditions` CRUD, `enumerations?categorie=` | ☐ |
-| Commercial › Marchandises | `marchandises/*` | Recherche de déchets, couleur planning | `marchandises` CRUD+détail, `dechets?search=` | ☐ |
-| Gestion attelage › Chauffeurs | `chauffeurs/*` | Filtre d'archive | `chauffeurs` CRUD | ☐ |
-| Gestion attelage › Véhicules | `vehicules/*` | Onglets Général / Documents | `vehicules` CRUD+détail, `lien-documents` | ☐ |
-| Gestion attelage › Attelages | `attelages/*` | — | `attelages` CRUD | ☐ |
-| Production › Commandes | `commandes/*` | Filtre de période, prestations du contrat choisi | `commandes` CRUD, `contrats/:id/prestations` | ☐ |
-| Production › Planning | `planning/*` | Vues Colonne / Ligne, regroupement, panneau des commandes en attente, glisser-déposer (déplacer, redimensionner, déposer une commande), voies de chevauchement, préférences `localStorage`, avis « enregistré » | `planning`, `planning/executions` (POST/PATCH/DELETE) | ☐ |
-| Gestion personnel › Personnel | `personnel/*` | Onglets Principal / Contrat (contrats de travail : liste + fiche) / Contact / Documents | `personnel` CRUD+détail, `personnel/:id/contrats-travail` (GET/POST), `contrats-travail/:id` (PATCH/DELETE), `lien-documents`, `pays`, `villes` | ☐ |
-| Gestion personnel › Pointage | `pointage/*` | Liste + feuille de pointage (salarié, mois/période, totaux, montants, statuts colorés), saisie d'un jour | `pointage` CRUD+détail, `pointage/feuille`, `pointage/statuts`, `personnel` | ☐ |
-| Gestion documentaire | `documents/*` | Liste des modèles, création, éditeur 3 zones (en-tête / contenu / pied), champs de fusion par glisser-déposer, blocs répétables, mode code HTML, assainissement | `document-templates` CRUD+détail | ☐ |
-| Configuration › Société | `entite/*` | Fiche de l'entité, SMTP, pays/villes | `entite` (GET/PATCH), `pays`, `villes` | ☐ |
-| Configuration › Enumérations | `enumerations/*` | Catégories (système non supprimables), valeurs, recherche, ordre | `categories-enumeration` (GET/POST/PATCH/DELETE), `enumerations` (GET/POST/PATCH/DELETE) | ☐ |
-| Configuration › Test OCR | `ocr/*` | Dépôt PDF/image (glisser ou choisir), aperçu, préréglages (prompt + JSON Schema), résultat JSON + Markdown | `mistral/ocr` | ☐ |
-| Configuration › Performance | `performance/*` | Voir D4 | `performance/ping`, `performance/impression-contrats`, `performance/transfert`, (`performance/traitement-long`) | ☐ |
-| Exécutions, Général, Base de données, Comptabilité, Outils, Données brutes, Import/Export | `enDeveloppement/Dev.tsx` | Page « en développement » | — | ☐ |
+| Tableau de bord | `dashboard/DashboardPage`, `ChiffreAffairesCard` | Période (année en cours), N-1, granularité mois/jour, bascule Graphique/Tableau, évolution sur la partie écoulée, infobulle | `statistiques/chiffre-affaires` | ✔ |
+| Commercial › Société | `societes/*` | Fiche à onglets : Principale (client / fournisseur), Contacts (CrudPage imbriqué), Contrats / Offres, Documents, Msg envoyés ; pagination, projection | `societes` CRUD+détail, `contacts`, `contrats`, `messages`, `lien-documents`, `pays`, `villes` | ✔ |
+| Commercial › Contrats / Offre de prix | `contrats/*` | Onglets Détail / Prestations / Factures, conditions CMR, numéro, bouton PDF (modèle choisi, ouverture dans un nouvel onglet), types de facture | `contrats` CRUD+détail, `contrats/:id/prestations`, `contrats/:id/pdf`, `conditions-cmr` (POST/PATCH/DELETE), `types-facture`, `document-templates?type=`, `societes/:id`, `enumerations?categorie=` | ✔ |
+| Commercial › Contacts | `contacts/*` | Fiche contact, adresse reprise de la société | `contacts` CRUD+détail, `societes/:id` | ✔ |
+| Commercial › Point | `points/*` | Onglets Principale / Contacts / Carte (iframe Google Maps), horaires | `points` CRUD+détail, `points/:id/contacts/:contactId` (PATCH/DELETE), `contacts` | ✔ |
+| Commercial › Conditions d'exécution | `conditions/*` | Libellés d'énumération | `conditions` CRUD, `enumerations?categorie=` | ✔ |
+| Commercial › Marchandises | `marchandises/*` | Recherche de déchets, couleur planning | `marchandises` CRUD+détail, `dechets?search=` | ✔ |
+| Gestion attelage › Chauffeurs | `chauffeurs/*` | Filtre d'archive | `chauffeurs` CRUD | ✔ |
+| Gestion attelage › Véhicules | `vehicules/*` | Onglets Général / Documents | `vehicules` CRUD+détail, `lien-documents` | ✔ |
+| Gestion attelage › Attelages | `attelages/*` | — | `attelages` CRUD | ✔ |
+| Production › Commandes | `commandes/*` | Filtre de période, prestations du contrat choisi | `commandes` CRUD, `contrats/:id/prestations` | ✔ |
+| Production › Planning | `planning/*` | Vues Colonne / Ligne, regroupement, panneau des commandes en attente, glisser-déposer (déplacer, redimensionner, déposer une commande), voies de chevauchement, préférences `localStorage`, avis « enregistré » | `planning`, `planning/executions` (POST/PATCH/DELETE) | ✔ |
+| Gestion personnel › Personnel | `personnel/*` | Onglets Principal / Contrat (contrats de travail : liste + fiche) / Contact / Documents | `personnel` CRUD+détail, `personnel/:id/contrats-travail` (GET/POST), `contrats-travail/:id` (PATCH/DELETE), `lien-documents`, `pays`, `villes` | ✔ |
+| Gestion personnel › Pointage | `pointage/*` | Liste + feuille de pointage (salarié, mois/période, totaux, montants, statuts colorés), saisie d'un jour | `pointage` CRUD+détail, `pointage/feuille`, `pointage/statuts`, `personnel` | ✔ |
+| Gestion documentaire | `documents/*` | Liste des modèles, création, éditeur 3 zones (en-tête / contenu / pied), champs de fusion par glisser-déposer, blocs répétables, mode code HTML, assainissement | `document-templates` CRUD+détail | ✔ |
+| Configuration › Société | `entite/*` | Fiche de l'entité, SMTP, pays/villes | `entite` (GET/PATCH), `pays`, `villes` | ✔ |
+| Configuration › Enumérations | `enumerations/*` | Catégories (système non supprimables), valeurs, recherche, ordre | `categories-enumeration` (GET/POST/PATCH/DELETE), `enumerations` (GET/POST/PATCH/DELETE) | ✔ |
+| Configuration › Test OCR | `ocr/*` | Dépôt PDF/image (glisser ou choisir), aperçu, préréglages (prompt + JSON Schema), résultat JSON + Markdown | `mistral/ocr` | ✔ |
+| Configuration › Performance | `performance/*` | Voir D4 | `performance/ping`, `performance/impression-contrats`, `performance/transfert`, (`performance/traitement-long`) | ✔ |
+| Exécutions, Général, Base de données, Comptabilité, Outils, Données brutes, Import/Export | `enDeveloppement/Dev.tsx` | Page « en développement » | — | ✔ |
 
 ## 5. Bibliothèques et équivalents
 
