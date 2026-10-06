@@ -1,2 +1,258 @@
-@* MIGRATION EN COURS — écran pas encore porté. *@
-<p>À migrer : OcrPage</p>
+@implements IAsyncDisposable
+@using System.Text.Json
+@using System.Net.Http.Json
+@inject ApiClient Api
+@inject Browser Browser
+
+@* Page de test de l'OCR Mistral (Configuration > Test OCR) : on dépose un PDF
+   ou une image, on choisit éventuellement une extraction structurée (prompt +
+   JSON Schema, voir OcrPreset), on lance l'OCR et on compare le fichier
+   d'origine (à gauche) au résultat de POST /mistral/ocr (à droite) : le JSON
+   extrait puis le Markdown brut. *@
+<div class="ocr-page">
+    <div class="page-header">
+        <h2>Test OCR (Mistral)</h2>
+        <button type="button" class="btn primary" disabled="@(_file is null || _running)" @onclick="RunAsync">
+            @(_running ? "Extraction en cours..." : "Lancer l'OCR")
+        </button>
+    </div>
+
+    @* Le sélecteur de fichier invisible couvre toute la zone : clic et
+       glisser-déposer natifs. *@
+    <div class="ocr-drop@(_dragOver ? " drag-over" : "")" style="position: relative"
+         @ondragenter="() => _dragOver = true" @ondragleave="() => _dragOver = false" @ondrop="() => _dragOver = false">
+        @if (_file is { } file)
+        {
+            <span><strong>@file.Name</strong> · @FormatSize(file.Size) — cliquer ou déposer pour changer de fichier</span>
+        }
+        else
+        {
+            <span>Glisser-déposer un PDF ou une image ici, ou cliquer pour choisir (max @FormatSize(MaxOcrFileSize))</span>
+        }
+        <InputFile @ref="_fileInput" accept="application/pdf,image/*" OnChange="SelectFileAsync"
+                   style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer" />
+    </div>
+
+    <details class="ocr-settings" open>
+        <summary>Extraction structurée</summary>
+        <label class="field ocr-field">
+            <span>Préréglage</span>
+            <select value="@_presetId" @onchange="e => ChangePreset((string)e.Value!)">
+                @foreach (var preset in OcrPreset.All)
+                {
+                    <option @key="preset.Id" value="@preset.Id">@preset.Label</option>
+                }
+            </select>
+        </label>
+        <div class="ocr-settings-grid">
+            <label class="field ocr-field">
+                <span>Prompt (consigne pour l'extraction)</span>
+                <textarea value="@_prompt" @oninput="e => _prompt = (string)e.Value!" rows="14" spellcheck="false"></textarea>
+            </label>
+            <label class="field ocr-field">
+                <span>Schéma JSON de sortie (vide = OCR seul)</span>
+                <textarea value="@_schema" @oninput="e => _schema = (string)e.Value!" rows="14" spellcheck="false" class="ocr-code"></textarea>
+            </label>
+        </div>
+    </details>
+
+    @if (_error is not null)
+    {
+        <p class="ocr-error">@_error</p>
+    }
+
+    @if (_file is { } current && _previewUrl is not null)
+    {
+        <div class="ocr-panels">
+            <section class="ocr-panel">
+                <h3>Fichier d'origine</h3>
+                @if (current.Type == "application/pdf")
+                {
+                    <iframe class="ocr-preview" src="@_previewUrl" title="@current.Name"></iframe>
+                }
+                else
+                {
+                    <img class="ocr-preview ocr-preview-image" src="@_previewUrl" alt="@current.Name" />
+                }
+            </section>
+            <section class="ocr-panel">
+                @if (_result is { } result)
+                {
+                    <p class="ocr-meta">@Format.Number(result.Text.Length) caractères · @((result.DurationMs / 1000).ToString("0.0", CultureInfo.InvariantCulture)) s</p>
+                    @if (result.Annotation is not null)
+                    {
+                        <div class="ocr-panel-header">
+                            <h3>Extraction structurée (JSON)</h3>
+                            <button type="button" class="btn" @onclick="() => CopyAsync(true)">@(_copied == "json" ? "Copié" : "Copier")</button>
+                        </div>
+                        <pre class="ocr-result ocr-result-json">@result.Annotation</pre>
+                    }
+                    <div class="ocr-panel-header">
+                        <h3>Texte extrait (Markdown)</h3>
+                        <button type="button" class="btn" @onclick="() => CopyAsync(false)">@(_copied == "text" ? "Copié" : "Copier")</button>
+                    </div>
+                    <pre class="ocr-result">@(result.Text.Length > 0 ? result.Text : "(aucun texte détecté)")</pre>
+                }
+                else
+                {
+                    <h3>Résultat</h3>
+                    <p class="ocr-placeholder">@(_running ? "Extraction en cours..." : "Cliquer sur « Lancer l'OCR » pour extraire le texte.")</p>
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    // Même limite que côté API : vérifiée ici aussi pour éviter d'envoyer
+    // 50 Mo pour rien avant d'obtenir un 413.
+    private const long MaxOcrFileSize = 50 * 1024 * 1024;
+
+    private sealed record SelectedFile(string Name, string Type, long Size, byte[] Bytes);
+
+    // Annotation : JSON extrait, déjà mis en forme (indentation de 2), ou
+    // null sans schéma.
+    private sealed record OcrResult(string Text, string? Annotation, double DurationMs);
+
+    private sealed record OcrResponse(string text, JsonElement annotation);
+
+    private static readonly JsonSerializerOptions Pretty = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    private InputFile? _fileInput;
+    private SelectedFile? _file;
+    private string? _previewUrl;
+    private bool _dragOver;
+    private string _presetId = OcrPreset.Default.Id;
+    private string _prompt = OcrPreset.Default.Prompt;
+    private string _schema = OcrPreset.Default.Schema;
+    private bool _running;
+    private OcrResult? _result;
+    private string? _error;
+    private string? _copied;
+
+    private static string FormatSize(long bytes) => bytes < 1024 * 1024
+        ? $"{Math.Max(1, DateUtils.JsRound(bytes / 1024d))} Ko"
+        : $"{(bytes / 1024d / 1024d).ToString("0.0", CultureInfo.InvariantCulture)} Mo";
+
+    private static bool IsSupported(string type) => type == "application/pdf" || type.StartsWith("image/", StringComparison.Ordinal);
+
+    // Vérifié ici avant l'envoi pour un message immédiat — l'API refait la
+    // même vérification.
+    private static string? SchemaError(string schema)
+    {
+        if (schema.Trim().Length == 0) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(schema);
+            return document.RootElement.ValueKind == JsonValueKind.Object ? null : "Le schéma JSON doit être un objet.";
+        }
+        catch (JsonException)
+        {
+            return "Le schéma JSON n'est pas un JSON valide.";
+        }
+    }
+
+    private async Task SelectFileAsync(InputFileChangeEventArgs e)
+    {
+        _dragOver = false;
+        var next = e.File;
+        // Permet de re-sélectionner le même fichier après une erreur.
+        if (_fileInput?.Element is { } input) await Browser.ClearValueAsync(input);
+        _result = null;
+        _copied = null;
+        if (!IsSupported(next.ContentType))
+        {
+            _error = "Seuls les PDF et les images sont acceptés.";
+            return;
+        }
+        if (next.Size > MaxOcrFileSize)
+        {
+            _error = $"Fichier trop volumineux ({FormatSize(next.Size)}, maximum {FormatSize(MaxOcrFileSize)}).";
+            return;
+        }
+        _error = null;
+        var bytes = new byte[next.Size];
+        await using (var stream = next.OpenReadStream(MaxOcrFileSize))
+        {
+            await stream.ReadExactlyAsync(bytes);
+        }
+        // URL locale pour l'aperçu du fichier, libérée au changement de fichier.
+        if (_previewUrl is not null) await Browser.RevokeObjectUrlAsync(_previewUrl);
+        _file = new SelectedFile(next.Name, next.ContentType, next.Size, bytes);
+        _previewUrl = await Browser.CreateObjectUrlAsync(bytes, next.ContentType);
+    }
+
+    private void ChangePreset(string id)
+    {
+        if (OcrPreset.All.FirstOrDefault(p => p.Id == id) is not { } preset) return;
+        _presetId = preset.Id;
+        _prompt = preset.Prompt;
+        _schema = preset.Schema;
+    }
+
+    private async Task RunAsync()
+    {
+        if (_file is not { } file) return;
+        if (SchemaError(_schema) is { } invalid)
+        {
+            _error = invalid;
+            return;
+        }
+        if (_prompt.Trim().Length > 0 && _schema.Trim().Length == 0)
+        {
+            _error = "Un prompt exige un schéma JSON.";
+            return;
+        }
+        _running = true;
+        _error = null;
+        _result = null;
+        _copied = null;
+        StateHasChanged();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            // Champs « schema »/« prompt » seulement s'ils sont renseignés,
+            // comme le FormData du front d'origine (l'API lit les champs
+            // quel que soit leur ordre par rapport au fichier).
+            var fields = new List<(string, string)>();
+            if (_schema.Trim().Length > 0)
+            {
+                fields.Add(("schema", _schema));
+                if (_prompt.Trim().Length > 0) fields.Add(("prompt", _prompt));
+            }
+            var response = await Api.SendAsync(() => new HttpRequestMessage(HttpMethod.Post, "mistral/ocr")
+            {
+                Content = Uploads.Form(fields, "file", file.Name, file.Type, file.Bytes),
+            });
+            var json = (await response.Content.ReadFromJsonAsync<OcrResponse>(JsonConfig.Options))!;
+            var annotation = json.annotation.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                ? null
+                : JsonSerializer.Serialize(json.annotation, Pretty);
+            _result = new OcrResult(json.text, annotation, watch.Elapsed.TotalMilliseconds);
+        }
+        catch (Exception e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private async Task CopyAsync(bool json)
+    {
+        if (_result is not { } result) return;
+        await Browser.CopyTextAsync(json ? result.Annotation ?? "null" : result.Text);
+        _copied = json ? "json" : "text";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_previewUrl is not null) await Browser.RevokeObjectUrlAsync(_previewUrl);
+    }
+}

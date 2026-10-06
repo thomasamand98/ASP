@@ -32,6 +32,7 @@ public sealed class Browser(IJSRuntime js)
     public ValueTask CloseWindowAsync(int windowId) => js.InvokeVoidAsync("horizon.closeWindow", windowId);
     public ValueTask<string> CreateObjectUrlAsync(byte[] bytes, string? mime) => js.InvokeAsync<string>("horizon.createUrl", bytes, mime);
     public ValueTask RevokeObjectUrlAsync(string url) => js.InvokeVoidAsync("horizon.revokeUrl", url);
+    public ValueTask CopyTextAsync(string text) => js.InvokeVoidAsync("horizon.copyText", text);
 
     // ---------- Éléments ----------
     public ValueTask FocusAsync(ElementReference element) => js.InvokeVoidAsync("horizon.focus", element);

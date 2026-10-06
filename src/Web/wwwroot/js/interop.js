@@ -99,6 +99,9 @@ window.horizon = (() => {
   const createUrl = (bytes, mime) => blobUrl(bytes, mime)
   const revokeUrl = (url) => URL.revokeObjectURL(url)
 
+  // Presse-papier (boutons « Copier » de la page Test OCR).
+  const copyText = (text) => navigator.clipboard.writeText(text)
+
   // ---------- Éléments ----------
   const focus = (element) => element?.focus()
   // Bouton qui ouvre le sélecteur de fichiers d'un <input type="file"> masqué ;
@@ -678,6 +681,7 @@ window.horizon = (() => {
     closeWindow,
     createUrl,
     revokeUrl,
+    copyText,
     focus,
     click,
     clearValue,
