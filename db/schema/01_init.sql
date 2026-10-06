@@ -1,0 +1,1791 @@
+-- Schéma initial de la base (tables héritées de WinDev), tel qu'il existait
+-- avant la migration vers ASP.NET Core. Exécuté en premier sur une base vide
+-- (voir docs/base-de-donnees.md).
+
+-- CreateTable
+CREATE TABLE `adresses` (
+    `IDADRESSES` BIGINT NOT NULL AUTO_INCREMENT,
+    `CP` VARCHAR(50) NULL,
+    `Adresse1` VARCHAR(250) NULL,
+    `Localite` VARCHAR(50) NULL,
+    `Adresse2` VARCHAR(250) NULL,
+    `Type_adresse` VARCHAR(50) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Adresse3` VARCHAR(250) NULL,
+    `Pays` VARCHAR(5) NULL,
+    `Code_insee` VARCHAR(50) NULL,
+    `Pays_full_name` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_ADRESSES_CP`(`CP`),
+    INDEX `WDIDX_ADRESSES_Code_insee`(`Code_insee`),
+    INDEX `WDIDX_ADRESSES_Pays_full_name`(`Pays_full_name`),
+    PRIMARY KEY (`IDADRESSES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `attelage` (
+    `IDATTELAGE` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `IDTRACTEUR` BIGINT NULL DEFAULT 0,
+    `IDREMORQUE` BIGINT NULL DEFAULT 0,
+    `Date_debut` TIMESTAMP(0) NULL,
+    `Date_fin` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDCHAUFFEUR` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_ATTELAGE_IDCHAUFFEUR`(`IDCHAUFFEUR`),
+    INDEX `WDIDX_ATTELAGE_IDPERSONNELS`(`IDPERSONNELS`),
+    INDEX `WDIDX_ATTELAGE_IDREMORQUE`(`IDREMORQUE`),
+    INDEX `WDIDX_ATTELAGE_IDTRACTEUR`(`IDTRACTEUR`),
+    PRIMARY KEY (`IDATTELAGE`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `attelages_reference` (
+    `IDATTELAGE_REFERENCE` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `IDTRACTEUR` BIGINT NULL DEFAULT 0,
+    `IDREMORQUE` BIGINT NULL DEFAULT 0,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `IDCHAUFFEUR` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_ATTELAGES_REFERENCE_IDCHAUFFEUR`(`IDCHAUFFEUR`),
+    INDEX `WDIDX_ATTELAGES_REFERENCE_IDPERSONNELS`(`IDPERSONNELS`),
+    INDEX `WDIDX_ATTELAGES_REFERENCE_IDREMORQUE`(`IDREMORQUE`),
+    INDEX `WDIDX_ATTELAGES_REFERENCE_IDSOCIETES`(`IDSOCIETES`),
+    INDEX `WDIDX_ATTELAGES_REFERENCE_IDTRACTEUR`(`IDTRACTEUR`),
+    PRIMARY KEY (`IDATTELAGE_REFERENCE`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `bons_execution` (
+    `IDBONS_EXECUTION` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDFACTURES` BIGINT NULL DEFAULT 0,
+    `IDEXECUTIONS` BIGINT NULL DEFAULT 0,
+
+    UNIQUE INDEX `IDFACTURES`(`IDFACTURES`),
+    UNIQUE INDEX `IDEXECUTIONS`(`IDEXECUTIONS`),
+    PRIMARY KEY (`IDBONS_EXECUTION`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `categories_enumeration` (
+    `IDCATEGORIES_ENUMERATION` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom` VARCHAR(50) NULL,
+    `Nom_affiche` VARCHAR(50) NULL,
+    `Enum_system` TINYINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_CATEGORIES_ENUMERATION_Enum_system`(`Enum_system`),
+    INDEX `WDIDX_CATEGORIES_ENUMERATION_Nom`(`Nom`),
+    PRIMARY KEY (`IDCATEGORIES_ENUMERATION`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `chauffeurs` (
+    `IDCHAUFFEURS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `Nom_chauffeur` VARCHAR(50) NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `Telephone` VARCHAR(50) NULL,
+    `Archive` TINYINT NULL DEFAULT 0,
+    `Categorie` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_CHAUFFEURS_Archive`(`Archive`),
+    INDEX `WDIDX_CHAUFFEURS_Categorie`(`Categorie`),
+    INDEX `WDIDX_CHAUFFEURS_IDPERSONNELS`(`IDPERSONNELS`),
+    INDEX `WDIDX_CHAUFFEURS_IDSOCIETES`(`IDSOCIETES`),
+    PRIMARY KEY (`IDCHAUFFEURS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `clients` (
+    `IDCLIENTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDADRESSES_facturation` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Delai_paiement` VARCHAR(50) NULL DEFAULT '0',
+    `Taux_tva` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `E_mail_comptabilite` VARCHAR(100) NULL,
+    `Note` VARCHAR(500) NULL,
+    `Facture_mail` TINYINT NULL DEFAULT 0,
+    `Adresse_facturation_societe` TINYINT NULL DEFAULT 0,
+    `Numero_client` VARCHAR(50) NULL,
+    `IDCONTACTS_Comptabilite` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_CLIENTS_IDCONTACTS_Comptabilite`(`IDCONTACTS_Comptabilite`),
+    PRIMARY KEY (`IDCLIENTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `commandes` (
+    `IDCOMMANDES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDCONTRATS` BIGINT NULL DEFAULT 0,
+    `Date_commande` DATE NULL,
+    `IDPRESTATIONS` BIGINT NULL DEFAULT 0,
+    `QT` INTEGER NULL DEFAULT 0,
+    `Statut` VARCHAR(50) NULL,
+    `NumRef` VARCHAR(50) NULL DEFAULT '0',
+    `Instruction` VARCHAR(300) NULL,
+    `QT_planifie` INTEGER NULL DEFAULT 0,
+
+    INDEX `WDIDX_COMMANDES_Date_commande`(`Date_commande`),
+    INDEX `WDIDX_COMMANDES_IDCONTRATS`(`IDCONTRATS`),
+    INDEX `WDIDX_COMMANDES_IDPRESTATIONS`(`IDPRESTATIONS`),
+    PRIMARY KEY (`IDCOMMANDES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `conditions_cmr` (
+    `IDCONDITIONS_CMR` BIGINT NOT NULL AUTO_INCREMENT,
+    `Libelle` VARCHAR(200) NULL,
+    `Boite_a_cocher` TINYINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDCONTRATS` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_CONDITIONS_CMR_IDCONTRATS`(`IDCONTRATS`),
+    PRIMARY KEY (`IDCONDITIONS_CMR`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `conditions_execution` (
+    `IDCONDITIONS_EXECUTION` BIGINT NOT NULL AUTO_INCREMENT,
+    `Type_Prestation` INTEGER NULL DEFAULT 0,
+    `CMR_or_FDR` TINYINT NULL DEFAULT 0,
+    `Libelle` VARCHAR(200) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+
+    PRIMARY KEY (`IDCONDITIONS_EXECUTION`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `conditions_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `type_prestation` VARCHAR(191) NOT NULL,
+    `libelle` VARCHAR(191) NOT NULL,
+    `cmr_fdr` VARCHAR(191) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `contacts` (
+    `IDCONTACTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom_contact` VARCHAR(50) NULL,
+    `Prenom_contact` VARCHAR(50) NULL,
+    `IDADRESSES` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Remarque` VARCHAR(200) NULL,
+    `Civilite` VARCHAR(50) NULL,
+    `Personne_physique` TINYINT NULL DEFAULT 0,
+    `Telephone_fixe` VARCHAR(50) NULL,
+    `Telephone_portable` VARCHAR(50) NULL,
+    `Telephone_autre` VARCHAR(50) NULL,
+    `E_mail` VARCHAR(100) NULL,
+    `Adresse_entreprise` TINYINT NULL DEFAULT 0,
+    `description_telephone` VARCHAR(50) NULL,
+
+    PRIMARY KEY (`IDCONTACTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `contacts_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `nom` VARCHAR(191) NOT NULL,
+    `prenom` VARCHAR(191) NOT NULL,
+    `societe` VARCHAR(191) NOT NULL,
+    `fonction` VARCHAR(191) NOT NULL,
+    `service_bureau` VARCHAR(191) NOT NULL,
+    `portable` VARCHAR(191) NOT NULL,
+    `fixe` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NOT NULL,
+    `civilite` VARCHAR(191) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `contrat_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `numero` VARCHAR(191) NOT NULL,
+    `societe` VARCHAR(191) NOT NULL,
+    `numero_tva` VARCHAR(191) NOT NULL,
+    `date_debut` DATETIME(3) NOT NULL,
+    `date_fin` DATETIME(3) NOT NULL,
+    `description` VARCHAR(191) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `contrats` (
+    `IDTYPES_FACTURE` BIGINT NULL DEFAULT 0,
+    `IDCONTRATS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `Num_contrat` VARCHAR(50) NULL DEFAULT '0',
+    `Date_debut` DATE NULL,
+    `Date_fin` DATE NULL,
+    `Annee_archivage` VARCHAR(50) NULL DEFAULT '0',
+    `Offre_de_prix` TINYINT NULL DEFAULT 0,
+    `Note_confidentielle` VARCHAR(500) NULL,
+    `Description_projet` VARCHAR(1000) NULL,
+    `Instruction_CMR` VARCHAR(250) NULL,
+    `Version_contrat` VARCHAR(50) NOT NULL DEFAULT '0',
+    `Archive` TINYINT NULL DEFAULT 0,
+    `Reference_client` VARCHAR(100) NULL,
+    `Taux_tva` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Qt_client_facturation` TINYINT NULL DEFAULT 0,
+    `Suivant` TINYINT NULL DEFAULT 0,
+    `IDMARCHANDISES` BIGINT NULL DEFAULT 0,
+    `Commissionnaire` VARCHAR(250) NULL,
+    `Type_contrat` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_CONTRATS_Annee_archivage`(`Annee_archivage`),
+    INDEX `WDIDX_CONTRATS_IDMARCHANDISES`(`IDMARCHANDISES`),
+    INDEX `WDIDX_CONTRATS_IDSOCIETES`(`IDSOCIETES`),
+    INDEX `WDIDX_CONTRATS_IDTYPES_FACTURE`(`IDTYPES_FACTURE`),
+    INDEX `WDIDX_CONTRATS_Num_contrat`(`Num_contrat`),
+    INDEX `WDIDX_CONTRATS_Offre_de_prix`(`Offre_de_prix`),
+    INDEX `WDIDX_CONTRATS_Suivant`(`Suivant`),
+    INDEX `WDIDX_CONTRATS_Version_contrat`(`Version_contrat`),
+    PRIMARY KEY (`IDCONTRATS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `contrats_travail` (
+    `IDCONTRATS_TRAVAIL` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_debut` DATE NULL,
+    `Date_fin` DATE NULL,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `Routier` TINYINT NULL DEFAULT 0,
+    `Manutention` TINYINT NULL DEFAULT 0,
+    `Atelier` TINYINT NULL DEFAULT 0,
+    `TypeContrat` VARCHAR(50) NULL,
+    `Qualification` VARCHAR(50) NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_CONTRATS_TRAVAIL_IDPERSONNELS`(`IDPERSONNELS`),
+    INDEX `WDIDX_CONTRATS_TRAVAIL_IDSOCIETES`(`IDSOCIETES`),
+    PRIMARY KEY (`IDCONTRATS_TRAVAIL`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `dechets` (
+    `IDDECHETS` BIGINT NOT NULL AUTO_INCREMENT,
+    `Code` VARCHAR(50) NULL,
+    `Description_dechet` VARCHAR(250) NULL,
+    `Dangereux` TINYINT NULL DEFAULT 0,
+    `Inerte` TINYINT NULL DEFAULT 0,
+    `Menager` TINYINT NULL DEFAULT 0,
+    `Autorisation` TINYINT NULL DEFAULT 0,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDDECHETS_PARENT` BIGINT NULL DEFAULT 0,
+    `Niveau` INTEGER NULL DEFAULT 0,
+
+    INDEX `WDIDX_DECHETS_IDDECHETS_PARENT`(`IDDECHETS_PARENT`),
+    PRIMARY KEY (`IDDECHETS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `documents` (
+    `IDDOCUMENTS` BINARY(32) NOT NULL DEFAULT (random_bytes(32)),
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Nom` VARCHAR(100) NULL,
+    `Commentaire` VARCHAR(1000) NULL,
+    `Categorie` INTEGER NULL DEFAULT 0,
+    `Verrouille` TINYINT NULL DEFAULT 0,
+    `IDDOCUMENTS_VERSION_courante` BINARY(32) NULL DEFAULT (unhex(_utf8mb4'0000000000000000000000000000000000000000000000000000000000000000')),
+    `Document_physique` LONGBLOB NULL,
+    `Version` INTEGER NULL DEFAULT 0,
+    `IDClient` INTEGER NULL DEFAULT 0,
+    `NomFichier` VARCHAR(100) NULL,
+    `IDDocument_Origine` BIGINT NULL DEFAULT 0,
+    `Fichier_extrait` TINYINT NULL DEFAULT 0,
+    `Extension_Document` VARCHAR(50) NULL,
+    `Emplacement` VARCHAR(500) NULL,
+    `Emplacement_extrait` VARCHAR(500) NULL,
+    `Nom_Document_Origine` VARCHAR(100) NULL,
+    `Nom_ordianteur_extrait` VARCHAR(256) NULL,
+
+    INDEX `WDIDX_DOCUMENTS_Categorie`(`Categorie`),
+    INDEX `WDIDX_DOCUMENTS_Date_heure_creation`(`Date_heure_creation`),
+    INDEX `WDIDX_DOCUMENTS_Date_heure_modification`(`Date_heure_modification`),
+    INDEX `WDIDX_DOCUMENTS_Fichier_extrait`(`Fichier_extrait`),
+    INDEX `WDIDX_DOCUMENTS_IDDOCUMENTS_VERSION_courante`(`IDDOCUMENTS_VERSION_courante`),
+    INDEX `WDIDX_DOCUMENTS_IDDocument_Origine`(`IDDocument_Origine`),
+    INDEX `WDIDX_DOCUMENTS_Nom`(`Nom`),
+    INDEX `WDIDX_DOCUMENTS_NomFichier`(`NomFichier`),
+    PRIMARY KEY (`IDDOCUMENTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `documents_version` (
+    `IDDOCUMENTS_VERSION` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDDOCUMENTS` BINARY(32) NULL DEFAULT (unhex(_utf8mb4'0000000000000000000000000000000000000000000000000000000000000000')),
+    `Nom_fichier` VARCHAR(100) NULL,
+    `Chemin` VARCHAR(500) NULL,
+    `Version` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+
+    INDEX `WDIDX_DOCUMENTS_VERSION_IDDOCUMENTS`(`IDDOCUMENTS`),
+    PRIMARY KEY (`IDDOCUMENTS_VERSION`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `entites` (
+    `IDSignaletique` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom_societe` VARCHAR(50) NULL,
+    `IDADRESSES` BIGINT NULL DEFAULT 0,
+    `Num_TVA` VARCHAR(50) NULL,
+    `Num_Telephone` VARCHAR(50) NULL,
+    `Email_contact` VARCHAR(50) NULL,
+    `EntiteActive` TINYINT NULL DEFAULT 0,
+    `Logo` LONGBLOB NULL,
+    `Nom_Banque` VARCHAR(50) NULL,
+    `Bic` VARCHAR(50) NULL,
+    `Iban` VARCHAR(50) NULL,
+    `Nom_court` VARCHAR(50) NULL,
+    `Signataire` VARCHAR(50) NULL,
+    `Num_licence` VARCHAR(50) NULL,
+    `Seveur_SMTP` VARCHAR(150) NULL,
+    `Port_SMTP` INTEGER NULL DEFAULT 0,
+    `Utilisateur_SMTP` VARCHAR(50) NULL,
+    `MDP_SMTP` VARCHAR(50) NULL,
+    `TypeConnexion_SMTP` INTEGER NULL DEFAULT 0,
+    `numero_ucm` VARCHAR(5) NULL,
+    `Valeur_facial_cheque_repas` DOUBLE NULL DEFAULT 0,
+    `Utilisateur_smtp_planning` VARCHAR(100) NULL,
+    `MDP_SMTP_Planning` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_ENTITES_IDADRESSES`(`IDADRESSES`),
+    PRIMARY KEY (`IDSignaletique`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `enumerations` (
+    `IDENUMERATIONS` BIGINT NOT NULL AUTO_INCREMENT,
+    `Valeur_affiche` VARCHAR(150) NULL,
+    `Valeur` VARCHAR(150) NULL,
+    `Ordre` INTEGER NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Valeur_associee` VARCHAR(150) NULL,
+    `IDCATEGORIES_ENUMERATION` BIGINT NULL DEFAULT 0,
+    `Valeur_system` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_ENUMERATIONS_IDCATEGORIES_ENUMERATION`(`IDCATEGORIES_ENUMERATION`),
+    INDEX `WDIDX_ENUMERATIONS_Valeur_affiche`(`Valeur_affiche`),
+    PRIMARY KEY (`IDENUMERATIONS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `executions` (
+    `IDEXECUTIONS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDCOMMANDES` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_Execution` TIMESTAMP(0) NULL,
+    `IDPRESTATIONS` BIGINT NULL DEFAULT 0,
+    `Date_Fin_Execution` TIMESTAMP(0) NULL,
+    `Execution_soustraitant` TINYINT NULL DEFAULT 0,
+    `IDSOCIETES_FOURNISSEUR` BIGINT NULL DEFAULT 0,
+    `Qt_depart` DOUBLE NULL DEFAULT 0,
+    `Qt_arrivee` DOUBLE NULL DEFAULT 0,
+    `Immat_tracteur` VARCHAR(50) NULL,
+    `Execution_dechargement` TINYINT NULL DEFAULT 0,
+    `IDEXECUTIONS_LIEE` BIGINT NULL DEFAULT 0,
+    `Immat_remorque` VARCHAR(50) NULL,
+    `Bon_chargement` VARCHAR(50) NULL,
+    `Num_doc` VARCHAR(50) NULL,
+    `Reference_client` VARCHAR(50) NULL,
+    `Num_facture` VARCHAR(50) NULL DEFAULT '0',
+    `Num_facture_achat` VARCHAR(50) NULL,
+    `Facture` TINYINT NULL DEFAULT 0,
+    `Facture_achat` TINYINT NULL DEFAULT 0,
+    `Duree` TIME(0) NULL,
+    `IDCHAUFFEUR` BIGINT NULL DEFAULT 0,
+    `IDTRACTEUR` BIGINT NULL DEFAULT 0,
+    `IDREMORQUE` BIGINT NULL DEFAULT 0,
+    `RefPlanning` VARCHAR(100) NULL,
+    `Commentaire_Exec` VARCHAR(1000) NULL,
+    `Date_execution_liee` TIMESTAMP(0) NULL,
+    `Heure_Fin_Charge` TIMESTAMP(0) NULL,
+    `Heure_Fin_Decharge` TIMESTAMP(0) NULL,
+    `Bon_dechargement` VARCHAR(50) NULL,
+    `Num_CMR` VARCHAR(50) NULL,
+    `Heure_Debut_Charge` TIMESTAMP(0) NULL,
+    `Heure_Debut_Decharge` TIMESTAMP(0) NULL,
+    `IDFACTURES` BIGINT NULL DEFAULT 0,
+    `Instruction_planning` VARCHAR(500) NULL,
+    `Statut` VARCHAR(50) NULL,
+    `IDCONTRATS` BIGINT NULL DEFAULT 0,
+    `IDFACTUREACHAT` BIGINT NULL DEFAULT 0,
+    `Attelage_mixte` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_EXECUTIONS_Attelage_mixte`(`Attelage_mixte`),
+    INDEX `WDIDX_EXECUTIONS_Date_Execution`(`Date_Execution`),
+    INDEX `WDIDX_EXECUTIONS_Date_Fin_Execution`(`Date_Fin_Execution`),
+    INDEX `WDIDX_EXECUTIONS_Date_execution_liee`(`Date_execution_liee`),
+    INDEX `WDIDX_EXECUTIONS_Execution_dechargement`(`Execution_dechargement`),
+    INDEX `WDIDX_EXECUTIONS_Facture`(`Facture`),
+    INDEX `WDIDX_EXECUTIONS_IDCHAUFFEUR`(`IDCHAUFFEUR`),
+    INDEX `WDIDX_EXECUTIONS_IDCOMMANDES`(`IDCOMMANDES`),
+    INDEX `WDIDX_EXECUTIONS_IDCONTRATS`(`IDCONTRATS`),
+    INDEX `WDIDX_EXECUTIONS_IDFACTURES`(`IDFACTURES`),
+    INDEX `WDIDX_EXECUTIONS_IDPRESTATIONS`(`IDPRESTATIONS`),
+    INDEX `WDIDX_EXECUTIONS_IDREMORQUE`(`IDREMORQUE`),
+    INDEX `WDIDX_EXECUTIONS_IDSOCIETES_FOURNISSEUR`(`IDSOCIETES_FOURNISSEUR`),
+    INDEX `WDIDX_EXECUTIONS_IDTRACTEUR`(`IDTRACTEUR`),
+    INDEX `WDIDX_EXECUTIONS_Immat_remorque`(`Immat_remorque`),
+    INDEX `WDIDX_EXECUTIONS_Immat_tracteur`(`Immat_tracteur`),
+    INDEX `WDIDX_EXECUTIONS_Num_facture`(`Num_facture`),
+    INDEX `WDIDX_EXECUTIONS_Num_facture_achat`(`Num_facture_achat`),
+    INDEX `WDIDX_EXECUTIONS_RefPlanning`(`RefPlanning`),
+    INDEX `WDIDX_EXECUTIONS_Reference_client`(`Reference_client`),
+    PRIMARY KEY (`IDEXECUTIONS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `executions_supplementaires` (
+    `IDEXECUTIONS_SUPPLEMENTAIRES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPRESTATIONS_SUPPLEMENTAIRES` BIGINT NULL DEFAULT 0,
+    `IDEXECUTIONS` BIGINT NULL DEFAULT 0,
+    `Quantite` DOUBLE NULL DEFAULT 0,
+    `Libelle_ES` VARCHAR(50) NULL,
+    `Unite_ES` INTEGER NULL DEFAULT 0,
+    `Prix_unitaire_ES` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `IDFACTURES` BIGINT NULL DEFAULT 0,
+    `Num_facture` VARCHAR(50) NULL,
+    `Type_Exec_Supp` INTEGER NULL DEFAULT 0,
+    `Quantite_Calculee` DOUBLE NULL DEFAULT 0,
+    `Quantite_Settee` TINYINT NULL DEFAULT 0,
+    `Ajout_automatique` TINYINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDFACTUREACHAT` BIGINT NULL DEFAULT 0,
+    `Num_facture_achat` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_EXECUTIONS_SUPPLEMENTAIRES_IDEXECUTIONS`(`IDEXECUTIONS`),
+    INDEX `WDIDX_EXECUTIONS_SUPPLEMENTAIRES_IDFACTURES`(`IDFACTURES`),
+    INDEX `WDIDX_EXECUTIONS_SUPPLEMENTAIRES_IDPRESTATIONS_SUPPLEMENTAIRES`(`IDPRESTATIONS_SUPPLEMENTAIRES`),
+    INDEX `WDIDX_EXECUTIONS_SUPPLEMENTAIRES_Num_facture`(`Num_facture`),
+    INDEX `WDIDX_EXECUTIONS_SUPPLEMENTAIRES_Num_facture_achat`(`Num_facture_achat`),
+    PRIMARY KEY (`IDEXECUTIONS_SUPPLEMENTAIRES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `factures` (
+    `IDFACTURES` BIGINT NOT NULL AUTO_INCREMENT,
+    `num_Facture` VARCHAR(50) NULL,
+    `Date_Facture` DATE NULL,
+    `Montant_Facture_HT` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_TVA` DOUBLE NULL DEFAULT 0,
+    `IDCONTRATS` BIGINT NULL DEFAULT 0,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `etat_Facture` INTEGER NULL DEFAULT 0,
+    `Date_echeance` DATE NULL,
+    `Reference_client` VARCHAR(50) NULL,
+    `Date_debut` DATE NULL,
+    `Date_fin` DATE NULL,
+    `Type_Facture` INTEGER NULL DEFAULT 0,
+    `Proformat` TINYINT NULL DEFAULT 0,
+    `Note_de_Credit` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_FACTURES_Date_Facture`(`Date_Facture`),
+    INDEX `WDIDX_FACTURES_IDCONTRATS`(`IDCONTRATS`),
+    INDEX `WDIDX_FACTURES_IDSOCIETES`(`IDSOCIETES`),
+    INDEX `WDIDX_FACTURES_Proformat`(`Proformat`),
+    PRIMARY KEY (`IDFACTURES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `fms_data` (
+    `IDFMS_DATA` BIGINT NOT NULL AUTO_INCREMENT,
+    `FLUX` VARCHAR(1000) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Traite` TINYINT NULL DEFAULT 0,
+    `IP` VARCHAR(50) NULL,
+
+    PRIMARY KEY (`IDFMS_DATA`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `fournisseurs` (
+    `IDFOURNISSEURS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDADRESSES_facturation` BIGINT NULL DEFAULT 0,
+    `Transporteur` TINYINT NULL DEFAULT 0,
+    `Delai_paiement` VARCHAR(50) NULL DEFAULT '0',
+    `Taux_tva` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `E_mail_comptabilite` VARCHAR(100) NULL,
+    `Note` VARCHAR(500) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Facture_mail` TINYINT NULL DEFAULT 0,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Iban` VARCHAR(50) NULL,
+    `IDCONTACTS_Comptabilite` BIGINT NULL DEFAULT 0,
+    `Bic` VARCHAR(50) NULL,
+    `Adresse_facturation_societe` TINYINT NULL DEFAULT 0,
+    `Numero_fournisseur` VARCHAR(50) NULL,
+    `Numero_imputation` VARCHAR(50) NULL,
+    `Manutentionnaire` TINYINT NULL DEFAULT 0,
+    `IDCONTACTS_planning` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_FOURNISSEURS_IDCONTACTS_Comptabilite`(`IDCONTACTS_Comptabilite`),
+    INDEX `WDIDX_FOURNISSEURS_Manutentionnaire`(`Manutentionnaire`),
+    INDEX `WDIDX_FOURNISSEURS_Transporteur`(`Transporteur`),
+    PRIMARY KEY (`IDFOURNISSEURS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `grilles_horaires` (
+    `IDGRILLES_HORAIRES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Jour_semaine` TINYINT NULL DEFAULT 0,
+    `Heure_debut` TIME(0) NULL,
+    `Heure_fin` TIME(0) NULL,
+    `IDLIENS` BIGINT NULL DEFAULT 0,
+    `Horaire` VARCHAR(80) NULL,
+
+    INDEX `WDIDX_GRILLES_HORAIRES_IDLIENS`(`IDLIENS`),
+    PRIMARY KEY (`IDGRILLES_HORAIRES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `imputations_comptable` (
+    `IDIMPUTATIONS_COMPTABLE` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Num_imputation` VARCHAR(50) NULL DEFAULT '0',
+    `Libelle_imputation` VARCHAR(50) NULL,
+    `Categorie_imputation` INTEGER NULL DEFAULT 0,
+
+    PRIMARY KEY (`IDIMPUTATIONS_COMPTABLE`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `lien_documents` (
+    `IDLIEN_DOCUMENTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `TYPE` INTEGER NULL DEFAULT 0,
+    `IDReferent` BIGINT NULL DEFAULT 0,
+    `IDDOCUMENTS` BINARY(32) NULL DEFAULT (unhex(_utf8mb4'0000000000000000000000000000000000000000000000000000000000000000')),
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Nom_lien` VARCHAR(100) NULL,
+    `Libelle_referent` VARCHAR(100) NULL,
+
+    INDEX `WDIDX_LIEN_DOCUMENTS_IDDOCUMENTS`(`IDDOCUMENTS`),
+    INDEX `WDIDX_LIEN_DOCUMENTS_IDReferent`(`IDReferent`),
+    INDEX `WDIDX_LIEN_DOCUMENTS_TYPE`(`TYPE`),
+    PRIMARY KEY (`IDLIEN_DOCUMENTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `lignes_detail_facture` (
+    `IDLIGNES_DETAIL_FACTURE` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDFACTURES` BIGINT NULL DEFAULT 0,
+    `QT` DOUBLE NULL DEFAULT 0,
+    `Description_ligne` VARCHAR(100) NULL,
+    `PU` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_TVA` DOUBLE NULL DEFAULT 0,
+
+    INDEX `WDIDX_LIGNES_DETAIL_FACTURE_IDFACTURES`(`IDFACTURES`),
+    PRIMARY KEY (`IDLIGNES_DETAIL_FACTURE`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `marchandises` (
+    `IDMARCHANDISES` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom_marchandise` VARCHAR(100) NULL,
+    `Is_dechet` TINYINT NULL DEFAULT 0,
+    `IDDECHETS` BIGINT NULL DEFAULT 0,
+    `Archive` TINYINT NULL DEFAULT 0,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `CouleurPlanning` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_MARCHANDISES_Archive`(`Archive`),
+    INDEX `WDIDX_MARCHANDISES_IDDECHETS`(`IDDECHETS`),
+    PRIMARY KEY (`IDMARCHANDISES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `marchandises_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `marchandise` VARCHAR(191) NOT NULL,
+    `dechet` VARCHAR(191) NOT NULL,
+    `code_dechet` VARCHAR(191) NOT NULL,
+    `dangereux` BOOLEAN NOT NULL,
+    `autorisation` BOOLEAN NOT NULL,
+    `interte` BOOLEAN NOT NULL,
+    `menage` BOOLEAN NOT NULL,
+    `couleur` INTEGER NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `message_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `content` VARCHAR(191) NOT NULL,
+    `numero` INTEGER NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `messages` (
+    `IDMESSAGES` BIGINT NOT NULL AUTO_INCREMENT,
+    `Sujet` VARCHAR(50) NULL,
+    `Contenu` LONGTEXT NULL,
+    `Destinataire` VARCHAR(50) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `ID_lien` BIGINT NULL DEFAULT 0,
+    `Type_message` VARCHAR(50) NULL,
+    `Date_message` DATE NULL,
+    `Heure_message` TIME(0) NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `NomContact` VARCHAR(50) NULL,
+    `PiecesJointes` VARCHAR(500) NULL,
+
+    INDEX `WDIDX_MESSAGES_IDSOCIETES`(`IDSOCIETES`),
+    INDEX `WDIDX_MESSAGES_ID_lien`(`ID_lien`),
+    INDEX `WDIDX_MESSAGES_PiecesJointes`(`PiecesJointes`),
+    INDEX `WDIDX_MESSAGES_Sujet`(`Sujet`),
+    INDEX `WDIDX_MESSAGES_Type_message`(`Type_message`),
+    PRIMARY KEY (`IDMESSAGES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `numero_factures_reutilisables` (
+    `IDNUMERO_FACTURES_REUTILISABLES` BIGINT NOT NULL AUTO_INCREMENT,
+    `Numero_Facture` INTEGER NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Type_numero` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_NUMERO_FACTURES_REUTILISABLES_Type_numero`(`Type_numero`),
+    PRIMARY KEY (`IDNUMERO_FACTURES_REUTILISABLES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `parametres` (
+    `IDPARAMETRES` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom` VARCHAR(100) NULL,
+    `Valeur` VARCHAR(150) NULL,
+    `Type` VARCHAR(100) NULL,
+    `Valeur_affiche` VARCHAR(250) NULL,
+    `Description_parametre` VARCHAR(200) NULL,
+    `Modification_user` TINYINT NULL DEFAULT 0,
+    `TexteValue` LONGTEXT NOT NULL,
+
+    PRIMARY KEY (`IDPARAMETRES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `parametres_ged` (
+    `IDPARAMETRES_GED` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Racine_ged` VARCHAR(500) NULL,
+    `Type_ged` SMALLINT NULL DEFAULT 0,
+    `Login` VARCHAR(50) NULL,
+    `MDP` VARCHAR(50) NULL,
+    `Adresse_serveur` VARCHAR(150) NULL,
+    `Cle_ssh` LONGBLOB NULL,
+    `Num_port` INTEGER NULL DEFAULT 0,
+
+    PRIMARY KEY (`IDPARAMETRES_GED`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `pays` (
+    `IDPAYS` BIGINT NOT NULL AUTO_INCREMENT,
+    `Code` INTEGER NULL DEFAULT 0,
+    `ISO` VARCHAR(3) NULL,
+    `ISO2` VARCHAR(3) NULL,
+    `Nom` VARCHAR(50) NULL,
+    `Nom_en` VARCHAR(50) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+
+    INDEX `WDIDX_PAYS_ISO`(`ISO`),
+    INDEX `WDIDX_PAYS_Nom`(`Nom`),
+    INDEX `WDIDX_PAYS_Nom_en`(`Nom_en`),
+    PRIMARY KEY (`IDPAYS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `personnels` (
+    `IDPERSONNELS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Nom_Personnel` VARCHAR(50) NULL,
+    `Prenom_Personnel` VARCHAR(50) NULL,
+    `Date_naissance` DATE NULL,
+    `Num_registre_national` VARCHAR(50) NULL,
+    `Lieu_naissance` VARCHAR(50) NULL,
+    `Etat_civil` VARCHAR(50) NULL,
+    `Nbr_personne_charge` TINYINT NULL DEFAULT 0,
+    `Iban` VARCHAR(50) NULL,
+    `Bic` VARCHAR(50) NULL,
+    `Telephone_portable` VARCHAR(50) NULL,
+    `Telephone_fixe` VARCHAR(50) NULL,
+    `Telephone_autre` VARCHAR(50) NULL,
+    `E_mail` VARCHAR(100) NULL,
+    `E_mail_professionnel` VARCHAR(50) NULL DEFAULT '0',
+    `Num_service_social` VARCHAR(50) NULL,
+    `Civilite_Personnel` VARCHAR(50) NULL,
+    `Nom_Banque` VARCHAR(50) NULL,
+    `Commentaire_Personnel` VARCHAR(50) NULL,
+    `Description_telephone` VARCHAR(50) NULL,
+    `Qualification` VARCHAR(50) NULL,
+    `Routier` TINYINT NULL DEFAULT 0,
+    `Manutention` TINYINT NULL DEFAULT 0,
+    `Atelier` TINYINT NULL DEFAULT 0,
+    `IDADRESSES` BIGINT NULL DEFAULT 0,
+    `Pays_Naissance` VARCHAR(50) NULL,
+    `Telephone_professionnel` VARCHAR(50) NULL,
+    `Date_validite_selection_medicale` DATE NULL,
+    `Date_validite_carte_chauffeur` DATE NULL,
+    `Date_validite_CAP` DATE NULL,
+    `Date_validite_carte_identite` DATE NULL,
+    `Date_validite_A1` DATE NULL,
+    `Date_validite_SIPSI` DATE NULL,
+
+    INDEX `WDIDX_PERSONNELS_IDADRESSES`(`IDADRESSES`),
+    PRIMARY KEY (`IDPERSONNELS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `personnels_contacts` (
+    `IDPERSONNELS_CONTACTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `IDCONTACTS` BIGINT NULL DEFAULT 0,
+    `Lien` VARCHAR(50) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+
+    INDEX `WDIDX_PERSONNELS_CONTACTS_IDCONTACTS`(`IDCONTACTS`),
+    INDEX `WDIDX_PERSONNELS_CONTACTS_IDPERSONNELS`(`IDPERSONNELS`),
+    PRIMARY KEY (`IDPERSONNELS_CONTACTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `point_contacts` (
+    `IDPOINT_CONTACTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `IDCONTACTS` BIGINT NULL DEFAULT 0,
+    `IDPOINTS` BIGINT NULL DEFAULT 0,
+    `Lien` VARCHAR(50) NULL,
+    `Recevoir_Mail_Planning` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_POINT_CONTACTS_IDCONTACTS`(`IDCONTACTS`),
+    INDEX `WDIDX_POINT_CONTACTS_IDPOINTS`(`IDPOINTS`),
+    INDEX `WDIDX_POINT_CONTACTS_IDSOCIETES`(`IDSOCIETES`),
+    PRIMARY KEY (`IDPOINT_CONTACTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `pointages` (
+    `IDType_Statut` BIGINT NULL DEFAULT 0,
+    `IDPOINTAGES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `Date_heure_debut` TIMESTAMP(0) NULL,
+    `Date_heure_fin` TIMESTAMP(0) NULL,
+    `Heure_coupure` TIME(0) NULL,
+    `Heure_liaison` TIME(0) NULL,
+    `Date_application` DATE NULL,
+    `Debut_pause` TIME(0) NULL,
+    `Fin_Pause` TIME(0) NULL,
+    `Heure_jour` TIME(0) NULL,
+    `Remarque` VARCHAR(200) NULL,
+    `Nuitee` TINYINT NULL DEFAULT 0,
+    `Heure_nuit` TIME(0) NULL,
+    `Heure_Stanby` TIME(0) NOT NULL,
+
+    INDEX `WDIDX_POINTAGES_Date_application`(`Date_application`),
+    INDEX `WDIDX_POINTAGES_IDPERSONNELS`(`IDPERSONNELS`),
+    INDEX `WDIDX_POINTAGES_IDType_Statut`(`IDType_Statut`),
+    PRIMARY KEY (`IDPOINTAGES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `pointages_resume` (
+    `IDPOINTAGES_COMPLEMENTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `PremierJourPointage` DATE NULL,
+    `IDPERSONNELS` BIGINT NULL DEFAULT 0,
+    `NBR_nuitee` TINYINT NULL DEFAULT 0,
+    `IDTAUX_HORAIRE` BIGINT NULL DEFAULT 0,
+    `Tx_nuitee` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Verrouille` TINYINT NULL DEFAULT 0,
+    `TotalHnuit` DECIMAL(19, 0) NULL,
+    `TotalHSupp` DECIMAL(19, 0) NULL,
+    `NbrSamedi` INTEGER NULL DEFAULT 0,
+    `TotalHDimanche` DECIMAL(19, 0) NULL,
+    `Mt_HeureSupp` DOUBLE NULL DEFAULT 0,
+    `Mt_HeureNuit` DOUBLE NULL DEFAULT 0,
+    `Mt_Samedi` DOUBLE NULL DEFAULT 0,
+    `Mt_ChequeRepas` DOUBLE NULL DEFAULT 0,
+    `Mt_Nuitee` DOUBLE NULL DEFAULT 0,
+    `Balance` DOUBLE NULL DEFAULT 0,
+    `TotalHStandby` DECIMAL(19, 0) NOT NULL,
+    `Mt_HeureStanby` DECIMAL(24, 6) NOT NULL DEFAULT 0.000000,
+
+    INDEX `WDIDX_POINTAGES_RESUME_IDPERSONNELS`(`IDPERSONNELS`),
+    INDEX `WDIDX_POINTAGES_RESUME_IDTAUX_HORAIRE`(`IDTAUX_HORAIRE`),
+    PRIMARY KEY (`IDPOINTAGES_COMPLEMENTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `points` (
+    `IDPOINTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDADRESSES` BIGINT NULL DEFAULT 0,
+    `Libelle` VARCHAR(300) NULL,
+    `Nom_societe` VARCHAR(50) NULL,
+    `Telephone` VARCHAR(50) NULL,
+    `Archive` TINYINT NULL DEFAULT 0,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `Lien_googleMap` VARCHAR(300) NULL,
+    `Instruction` VARCHAR(300) NULL,
+    `IDCONTACTS_DEFAUTS` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_POINTS_Archive`(`Archive`),
+    INDEX `WDIDX_POINTS_IDADRESSES`(`IDADRESSES`),
+    INDEX `WDIDX_POINTS_IDCONTACTS_DEFAUTS`(`IDCONTACTS_DEFAUTS`),
+    INDEX `WDIDX_POINTS_IDSOCIETES`(`IDSOCIETES`),
+    INDEX `WDIDX_POINTS_Libelle`(`Libelle`),
+    INDEX `WDIDX_POINTS_Nom_societe`(`Nom_societe`),
+    PRIMARY KEY (`IDPOINTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `points_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `nom` VARCHAR(191) NOT NULL,
+    `nom_societe` VARCHAR(191) NOT NULL,
+    `telephone` VARCHAR(191) NOT NULL,
+    `adresse_rue` VARCHAR(191) NOT NULL,
+    `code_postal` VARCHAR(191) NOT NULL,
+    `localite` VARCHAR(191) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `prestations` (
+    `IDPRESTATIONS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDCONTRATS` BIGINT NULL DEFAULT 0,
+    `Prix_unitaire` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Unite` INTEGER NULL DEFAULT 0,
+    `IDMARCHANDISES` BIGINT NULL DEFAULT 0,
+    `Description_prestation` VARCHAR(250) NULL,
+    `Num_imputation` VARCHAR(50) NULL DEFAULT '0',
+    `Ordre` INTEGER NULL DEFAULT 0,
+    `Type` SMALLINT NOT NULL DEFAULT 0,
+    `Instruction` VARCHAR(300) NULL,
+    `Code_marchandise_client` VARCHAR(250) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `Qt_client_facturation` TINYINT NULL DEFAULT 0,
+    `Description_courte` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_PRESTATIONS_IDCONTRATS`(`IDCONTRATS`),
+    INDEX `WDIDX_PRESTATIONS_IDMARCHANDISES`(`IDMARCHANDISES`),
+    INDEX `WDIDX_PRESTATIONS_Type`(`Type`),
+    PRIMARY KEY (`IDPRESTATIONS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `prestations_conditions` (
+    `IDCONDITIONS_EXECUTION` BIGINT NOT NULL AUTO_INCREMENT,
+    `Type_Prestation` VARCHAR(50) NULL,
+    `CMR_or_FDR` TINYINT NULL DEFAULT 0,
+    `Libelle` VARCHAR(200) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDPRESTATIONS` BIGINT NULL DEFAULT 0,
+    `Ordre` INTEGER NULL DEFAULT 0,
+
+    UNIQUE INDEX `IDPRESTATIONS`(`IDPRESTATIONS`),
+    PRIMARY KEY (`IDCONDITIONS_EXECUTION`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `prestations_manutention` (
+    `IDPRESTATIONS_MANUTENTION` BIGINT NOT NULL AUTO_INCREMENT,
+    `Equipement` VARCHAR(100) NULL,
+    `Lieu` VARCHAR(100) NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDPRESTATIONS` BIGINT NULL DEFAULT 0,
+    `Type_manutention` VARCHAR(250) NULL,
+    `Duree` TIME(0) NULL,
+
+    INDEX `WDIDX_PRESTATIONS_MANUTENTION_IDPRESTATIONS`(`IDPRESTATIONS`),
+    PRIMARY KEY (`IDPRESTATIONS_MANUTENTION`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `prestations_routier` (
+    `IDPRESTATIONS_ROUTIER` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPOINTDEPART` BIGINT NULL DEFAULT 0,
+    `IDPOINTARRIVEE` BIGINT NULL DEFAULT 0,
+    `Charge_minimum` DOUBLE NULL DEFAULT 0,
+    `Distance` DOUBLE NULL DEFAULT 0,
+    `Taux_km` DOUBLE NULL DEFAULT 0,
+    `Montant_prise_en_charge` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Type_remorque` VARCHAR(50) NULL,
+    `CMR` TINYINT NULL DEFAULT 0,
+    `Duree` TIME(0) NULL,
+    `Duree_trajet_retour` TIME(0) NULL,
+    `Duree_depot_point_chargement` TIME(0) NULL,
+    `Duree_depot_point_dechargement` TIME(0) NULL,
+    `Taux_horaire` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Tranche` VARCHAR(100) NULL,
+    `Taux_horaire_attente` VARCHAR(100) NULL,
+    `Nbr_voyage_jour` SMALLINT NULL DEFAULT 0,
+    `Charge` DOUBLE NULL DEFAULT 0,
+    `Prix_unitaire_calcule` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Temps_prise_en_charge_chargement` TIME(0) NULL,
+    `Temps_prise_en_charge_dechargement` TIME(0) NULL,
+    `Km_jour` DOUBLE NULL DEFAULT 0,
+    `CA_jour` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Marge_theorique` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `IDPRESTATIONS` BIGINT NOT NULL DEFAULT 0,
+    `Type_remorque2` VARCHAR(50) NULL,
+    `Overtime_global` TINYINT NULL DEFAULT 0,
+    `Overtime_delai_chargment` TIME(0) NULL,
+    `Overtime_montant_penalite_chargement` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Overtime_periodicite_chargement` TIME(0) NULL,
+    `Overtime_delai_dechargement` TIME(0) NULL,
+    `Overtime_montant_penalite_dechargement` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Overtime_periodicite_dechargement` TIME(0) NULL,
+    `Taxe_km` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taxe_km_unite` INTEGER NULL DEFAULT 0,
+    `Taxe_km_sous_traitant` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Overtime_montant_chargement_sous_traitant` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Overtime_montant_dechargement_sou_traitant` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+
+    INDEX `WDIDX_PRESTATIONS_ROUTIER_IDPOINTARRIVEE`(`IDPOINTARRIVEE`),
+    INDEX `WDIDX_PRESTATIONS_ROUTIER_IDPOINTDEPART`(`IDPOINTDEPART`),
+    INDEX `WDIDX_PRESTATIONS_ROUTIER_IDPRESTATIONS`(`IDPRESTATIONS`),
+    PRIMARY KEY (`IDPRESTATIONS_ROUTIER`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `prestations_supplementaires` (
+    `IDPRESTATIONS_SUPPLEMENTAIRES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPRESTATIONS` BIGINT NULL DEFAULT 0,
+    `Description_prestation` VARCHAR(250) NULL,
+    `Prix_unitaire` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Unite` INTEGER NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `Ajout_automatique` TINYINT NULL DEFAULT 0,
+    `Prix_unitaire_soustraitant` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Date_Debut` DATE NULL,
+    `Date_Fin` DATE NULL,
+    `Prix_unitaire_sansAttelage` DECIMAL(24, 6) NOT NULL DEFAULT 0.000000,
+    `Prix_unitaire_sansAttelage_Compresseur` DECIMAL(24, 6) NOT NULL DEFAULT 0.000000,
+
+    INDEX `WDIDX_PRESTATIONS_SUPPLEMENTAIRES_Date_Debut`(`Date_Debut`),
+    INDEX `WDIDX_PRESTATIONS_SUPPLEMENTAIRES_Date_Fin`(`Date_Fin`),
+    INDEX `WDIDX_PRESTATIONS_SUPPLEMENTAIRES_IDPRESTATIONS`(`IDPRESTATIONS`),
+    PRIMARY KEY (`IDPRESTATIONS_SUPPLEMENTAIRES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `rappels` (
+    `IDTRAPPEL` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Libelle` VARCHAR(200) NULL,
+    `Date_heure_rappel` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_destinataire` BIGINT NULL DEFAULT 0,
+    `Type_rappel` VARCHAR(50) NULL,
+    `Coordonnï¿½e_destinataire` VARCHAR(200) NULL,
+    `Traite` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_RAPPELS_IDUTILISATEURS_destinataire`(`IDUTILISATEURS_destinataire`),
+    INDEX `WDIDX_RAPPELS_Type_rappel`(`Type_rappel`),
+    PRIMARY KEY (`IDTRAPPEL`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `societe_old` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `nom` VARCHAR(191) NOT NULL,
+    `denomination` VARCHAR(191) NOT NULL,
+    `numero_tva` VARCHAR(191) NOT NULL,
+    `activite` VARCHAR(191) NOT NULL,
+    `site_web` VARCHAR(191) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `societes` (
+    `IDSOCIETES` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom_societe` VARCHAR(50) NULL,
+    `Denomination` VARCHAR(50) NULL,
+    `TVA` VARCHAR(50) NULL,
+    `IDADRESSES` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Note` VARCHAR(500) NULL,
+    `Activite` VARCHAR(50) NULL,
+    `Site_web` VARCHAR(250) NULL,
+    `IDCLIENTS` BIGINT NULL DEFAULT 0,
+    `IDFOURNISSEURS` BIGINT NULL DEFAULT 0,
+    `Prospect` TINYINT NULL DEFAULT 0,
+    `Archive` TINYINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_SOCIETES_IDADRESSES`(`IDADRESSES`),
+    INDEX `WDIDX_SOCIETES_IDCLIENTS`(`IDCLIENTS`),
+    INDEX `WDIDX_SOCIETES_IDFOURNISSEURS`(`IDFOURNISSEURS`),
+    PRIMARY KEY (`IDSOCIETES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `societes_contacts` (
+    `IDSOCIETES_CONTACTS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `IDCONTACTS` BIGINT NULL DEFAULT 0,
+    `Type_lien` VARCHAR(50) NULL,
+    `Service_bureau` VARCHAR(50) NULL,
+    `Fonction_contact` VARCHAR(50) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+
+    INDEX `WDIDX_SOCIETES_CONTACTS_Fonction_contact`(`Fonction_contact`),
+    INDEX `WDIDX_SOCIETES_CONTACTS_IDCONTACTS`(`IDCONTACTS`),
+    INDEX `WDIDX_SOCIETES_CONTACTS_IDSOCIETES`(`IDSOCIETES`),
+    INDEX `WDIDX_SOCIETES_CONTACTS_Service_bureau`(`Service_bureau`),
+    INDEX `WDIDX_SOCIETES_CONTACTS_Type_lien`(`Type_lien`),
+    PRIMARY KEY (`IDSOCIETES_CONTACTS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `sous_traitants_prestations` (
+    `IDSOUS_TRAITANTS_PRESTATIONS` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDPRESTATIONS` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `Prix_unitaire` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Prix_unitaire_sansAttelage` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Unite` INTEGER NOT NULL DEFAULT 0,
+    `Prix_unitaire_sansAttelage_Compresseur` DECIMAL(24, 6) NOT NULL DEFAULT 0.000000,
+
+    INDEX `WDIDX_SOUS_TRAITANTS_PRESTATIONS_IDPRESTATIONS`(`IDPRESTATIONS`),
+    INDEX `WDIDX_SOUS_TRAITANTS_PRESTATIONS_IDSOCIETES`(`IDSOCIETES`),
+    PRIMARY KEY (`IDSOUS_TRAITANTS_PRESTATIONS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `taches` (
+    `IDTACHES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Tache_system` TINYINT NULL DEFAULT 0,
+    `Traite` TINYINT NULL DEFAULT 0,
+    `Type` TINYINT NULL DEFAULT 0,
+    `IDUTILISATEURS_cible` BIGINT NULL DEFAULT 0,
+    `Libelle` VARCHAR(500) NULL,
+    `Date_tache` DATE NULL,
+    `Date_traitement` DATE NULL,
+    `Idlien` BIGINT NULL DEFAULT 0,
+    `Champs` VARCHAR(50) NULL,
+
+    INDEX `WDIDX_TACHES_Champs`(`Champs`),
+    INDEX `WDIDX_TACHES_Date_tache`(`Date_tache`),
+    INDEX `WDIDX_TACHES_IDUTILISATEURS_cible`(`IDUTILISATEURS_cible`),
+    INDEX `WDIDX_TACHES_Idlien`(`Idlien`),
+    INDEX `WDIDX_TACHES_Traite`(`Traite`),
+    PRIMARY KEY (`IDTACHES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `taux_horaire_contrat_travail` (
+    `IDTAUX_HORAIRE` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Taux_horaire` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_horaire_supplementaire` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_horaire_nuitee` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_nuitee` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_samedi` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Taux_cheque_repas` DECIMAL(24, 6) NULL DEFAULT 0.000000,
+    `Date_application` DATE NULL,
+    `IDCONTRATS_TRAVAIL` BIGINT NULL DEFAULT 0,
+    `Taux_stanby` DECIMAL(24, 6) NOT NULL DEFAULT 0.000000,
+
+    INDEX `WDIDX_TAUX_HORAIRE_CONTRAT_TRAVAIL_IDCONTRATS_TRAVAIL`(`IDCONTRATS_TRAVAIL`),
+    PRIMARY KEY (`IDTAUX_HORAIRE`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `types_facture` (
+    `IDTYPES_FACTURE` BIGINT NOT NULL AUTO_INCREMENT,
+    `Nom` VARCHAR(50) NULL,
+    `Modele_document` VARCHAR(50) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+
+    PRIMARY KEY (`IDTYPES_FACTURE`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `types_statut` (
+    `IDType_Statut` BIGINT NOT NULL AUTO_INCREMENT,
+    `Libelle_generique` VARCHAR(50) NULL,
+    `CouleurStatut` INTEGER NULL DEFAULT 0,
+    `Statut_de_travail` TINYINT NULL DEFAULT 0,
+    `Archive` TINYINT NULL DEFAULT 0,
+    `Code_prestation` VARCHAR(3) NULL,
+    `Nuitee` TINYINT NULL DEFAULT 0,
+    `Ordre` SMALLINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_TYPES_STATUT_Archive`(`Archive`),
+    INDEX `WDIDX_TYPES_STATUT_Ordre`(`Ordre`),
+    PRIMARY KEY (`IDType_Statut`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `utilisateurs` (
+    `IDUTILISATEURS` BIGINT NOT NULL AUTO_INCREMENT,
+    `Login` VARCHAR(50) NULL,
+    `Password_hash` VARCHAR(200) NULL,
+    `Nom` VARCHAR(50) NULL,
+    `Actif` TINYINT NULL DEFAULT 0,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `IDCONTACTS` BIGINT NULL DEFAULT 0,
+
+    INDEX `WDIDX_UTILISATEURS_IDCONTACTS`(`IDCONTACTS`),
+    PRIMARY KEY (`IDUTILISATEURS`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `vehicules` (
+    `IDVEHICULES` BIGINT NOT NULL AUTO_INCREMENT,
+    `IDUTILISATEURS_createur` BIGINT NULL DEFAULT 0,
+    `IDUTILISATEURS_modificateur` BIGINT NULL DEFAULT 0,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Type` INTEGER NULL DEFAULT 0,
+    `Marque` VARCHAR(50) NULL,
+    `Modele` VARCHAR(50) NULL,
+    `Num_police_assurance` VARCHAR(50) NULL,
+    `Num_immat` VARCHAR(50) NULL,
+    `Num_chassis` VARCHAR(50) NULL,
+    `Date_validite_assurance` DATE NULL,
+    `Num_licence_transport` VARCHAR(50) NULL,
+    `Date_validite_licence` DATE NULL,
+    `Date_modification_licence` DATE NULL,
+    `Date_inspection_auto` DATE NULL,
+    `Date_radiation_immatriculation` DATE NULL,
+    `Date_vente` DATE NULL,
+    `IDSOCIETES` BIGINT NULL DEFAULT 0,
+    `Date_premiere_mise_en_circulation` DATE NULL,
+    `Date_validite_tachygeaphe` DATE NULL,
+    `Avec_compresseur` TINYINT NOT NULL DEFAULT 0,
+
+    INDEX `WDIDX_VEHICULES_IDSOCIETES`(`IDSOCIETES`),
+    PRIMARY KEY (`IDVEHICULES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `villes` (
+    `IDVILLES` BIGINT NOT NULL AUTO_INCREMENT,
+    `CP` VARCHAR(50) NULL,
+    `Nom_ville` VARCHAR(50) NULL,
+    `Code_insee` VARCHAR(50) NULL,
+    `IDPAYS` BIGINT NULL DEFAULT 0,
+    `Date_heure_modification` TIMESTAMP(0) NULL,
+    `Date_heure_creation` TIMESTAMP(0) NULL,
+    `IDUTILISATEURS_modificateur` BIGINT NULL,
+    `IDUTILISATEURS_createur` BIGINT NULL,
+
+    INDEX `WDIDX_VILLES_CP`(`CP`),
+    INDEX `WDIDX_VILLES_Code_insee`(`Code_insee`),
+    INDEX `WDIDX_VILLES_IDPAYS`(`IDPAYS`),
+    PRIMARY KEY (`IDVILLES`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `attelage` ADD CONSTRAINT `attelage_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelage` ADD CONSTRAINT `attelage_IDCHAUFFEUR_fkey` FOREIGN KEY (`IDCHAUFFEUR`) REFERENCES `chauffeurs`(`IDCHAUFFEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelage` ADD CONSTRAINT `attelage_IDTRACTEUR_fkey` FOREIGN KEY (`IDTRACTEUR`) REFERENCES `vehicules`(`IDVEHICULES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelage` ADD CONSTRAINT `attelage_IDREMORQUE_fkey` FOREIGN KEY (`IDREMORQUE`) REFERENCES `vehicules`(`IDVEHICULES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelage` ADD CONSTRAINT `attelage_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelage` ADD CONSTRAINT `attelage_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelages_reference` ADD CONSTRAINT `attelages_reference_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelages_reference` ADD CONSTRAINT `attelages_reference_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelages_reference` ADD CONSTRAINT `attelages_reference_IDCHAUFFEUR_fkey` FOREIGN KEY (`IDCHAUFFEUR`) REFERENCES `chauffeurs`(`IDCHAUFFEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelages_reference` ADD CONSTRAINT `attelages_reference_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `attelages_reference` ADD CONSTRAINT `attelages_reference_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `bons_execution` ADD CONSTRAINT `bons_execution_IDFACTURES_fkey` FOREIGN KEY (`IDFACTURES`) REFERENCES `factures`(`IDFACTURES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `bons_execution` ADD CONSTRAINT `bons_execution_IDEXECUTIONS_fkey` FOREIGN KEY (`IDEXECUTIONS`) REFERENCES `executions`(`IDEXECUTIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `categories_enumeration` ADD CONSTRAINT `categories_enumeration_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `categories_enumeration` ADD CONSTRAINT `categories_enumeration_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `chauffeurs` ADD CONSTRAINT `chauffeurs_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `chauffeurs` ADD CONSTRAINT `chauffeurs_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `clients` ADD CONSTRAINT `clients_IDCONTACTS_Comptabilite_fkey` FOREIGN KEY (`IDCONTACTS_Comptabilite`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `clients` ADD CONSTRAINT `clients_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `clients` ADD CONSTRAINT `clients_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `commandes` ADD CONSTRAINT `commandes_IDCONTRATS_fkey` FOREIGN KEY (`IDCONTRATS`) REFERENCES `contrats`(`IDCONTRATS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `commandes` ADD CONSTRAINT `commandes_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `commandes` ADD CONSTRAINT `commandes_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `commandes` ADD CONSTRAINT `commandes_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `conditions_cmr` ADD CONSTRAINT `conditions_cmr_IDCONTRATS_fkey` FOREIGN KEY (`IDCONTRATS`) REFERENCES `contrats`(`IDCONTRATS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `conditions_cmr` ADD CONSTRAINT `conditions_cmr_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `conditions_cmr` ADD CONSTRAINT `conditions_cmr_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `conditions_execution` ADD CONSTRAINT `conditions_execution_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `conditions_execution` ADD CONSTRAINT `conditions_execution_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contacts` ADD CONSTRAINT `contacts_IDADRESSES_fkey` FOREIGN KEY (`IDADRESSES`) REFERENCES `adresses`(`IDADRESSES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contacts` ADD CONSTRAINT `contacts_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contacts` ADD CONSTRAINT `contacts_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats` ADD CONSTRAINT `contrats_IDTYPES_FACTURE_fkey` FOREIGN KEY (`IDTYPES_FACTURE`) REFERENCES `types_facture`(`IDTYPES_FACTURE`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats` ADD CONSTRAINT `contrats_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats` ADD CONSTRAINT `contrats_IDMARCHANDISES_fkey` FOREIGN KEY (`IDMARCHANDISES`) REFERENCES `marchandises`(`IDMARCHANDISES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats` ADD CONSTRAINT `contrats_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats` ADD CONSTRAINT `contrats_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats_travail` ADD CONSTRAINT `contrats_travail_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats_travail` ADD CONSTRAINT `contrats_travail_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats_travail` ADD CONSTRAINT `contrats_travail_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `contrats_travail` ADD CONSTRAINT `contrats_travail_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `dechets` ADD CONSTRAINT `dechets_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `dechets` ADD CONSTRAINT `dechets_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `documents` ADD CONSTRAINT `documents_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `documents` ADD CONSTRAINT `documents_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `documents_version` ADD CONSTRAINT `documents_version_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `documents_version` ADD CONSTRAINT `documents_version_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `enumerations` ADD CONSTRAINT `enumerations_IDCATEGORIES_ENUMERATION_fkey` FOREIGN KEY (`IDCATEGORIES_ENUMERATION`) REFERENCES `categories_enumeration`(`IDCATEGORIES_ENUMERATION`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `enumerations` ADD CONSTRAINT `enumerations_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `enumerations` ADD CONSTRAINT `enumerations_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDCOMMANDES_fkey` FOREIGN KEY (`IDCOMMANDES`) REFERENCES `commandes`(`IDCOMMANDES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDSOCIETES_FOURNISSEUR_fkey` FOREIGN KEY (`IDSOCIETES_FOURNISSEUR`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDCHAUFFEUR_fkey` FOREIGN KEY (`IDCHAUFFEUR`) REFERENCES `chauffeurs`(`IDCHAUFFEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDFACTURES_fkey` FOREIGN KEY (`IDFACTURES`) REFERENCES `factures`(`IDFACTURES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDCONTRATS_fkey` FOREIGN KEY (`IDCONTRATS`) REFERENCES `contrats`(`IDCONTRATS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions` ADD CONSTRAINT `executions_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions_supplementaires` ADD CONSTRAINT `executions_supplementaires_IDPRESTATIONS_SUPPLEMENTAIRES_fkey` FOREIGN KEY (`IDPRESTATIONS_SUPPLEMENTAIRES`) REFERENCES `prestations_supplementaires`(`IDPRESTATIONS_SUPPLEMENTAIRES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions_supplementaires` ADD CONSTRAINT `executions_supplementaires_IDEXECUTIONS_fkey` FOREIGN KEY (`IDEXECUTIONS`) REFERENCES `executions`(`IDEXECUTIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions_supplementaires` ADD CONSTRAINT `executions_supplementaires_IDFACTURES_fkey` FOREIGN KEY (`IDFACTURES`) REFERENCES `factures`(`IDFACTURES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions_supplementaires` ADD CONSTRAINT `executions_supplementaires_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `executions_supplementaires` ADD CONSTRAINT `executions_supplementaires_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `factures` ADD CONSTRAINT `factures_IDCONTRATS_fkey` FOREIGN KEY (`IDCONTRATS`) REFERENCES `contrats`(`IDCONTRATS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `factures` ADD CONSTRAINT `factures_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `fournisseurs` ADD CONSTRAINT `fournisseurs_IDCONTACTS_Comptabilite_fkey` FOREIGN KEY (`IDCONTACTS_Comptabilite`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `fournisseurs` ADD CONSTRAINT `fournisseurs_IDCONTACTS_planning_fkey` FOREIGN KEY (`IDCONTACTS_planning`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `fournisseurs` ADD CONSTRAINT `fournisseurs_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `fournisseurs` ADD CONSTRAINT `fournisseurs_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `grilles_horaires` ADD CONSTRAINT `grilles_horaires_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `grilles_horaires` ADD CONSTRAINT `grilles_horaires_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `imputations_comptable` ADD CONSTRAINT `imputations_comptable_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `imputations_comptable` ADD CONSTRAINT `imputations_comptable_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `lien_documents` ADD CONSTRAINT `lien_documents_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `lien_documents` ADD CONSTRAINT `lien_documents_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `lignes_detail_facture` ADD CONSTRAINT `lignes_detail_facture_IDFACTURES_fkey` FOREIGN KEY (`IDFACTURES`) REFERENCES `factures`(`IDFACTURES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `marchandises` ADD CONSTRAINT `marchandises_IDDECHETS_fkey` FOREIGN KEY (`IDDECHETS`) REFERENCES `dechets`(`IDDECHETS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `marchandises` ADD CONSTRAINT `marchandises_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `marchandises` ADD CONSTRAINT `marchandises_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `messages` ADD CONSTRAINT `messages_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `messages` ADD CONSTRAINT `messages_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `messages` ADD CONSTRAINT `messages_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `numero_factures_reutilisables` ADD CONSTRAINT `numero_factures_reutilisables_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `numero_factures_reutilisables` ADD CONSTRAINT `numero_factures_reutilisables_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `parametres_ged` ADD CONSTRAINT `parametres_ged_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `parametres_ged` ADD CONSTRAINT `parametres_ged_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pays` ADD CONSTRAINT `pays_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pays` ADD CONSTRAINT `pays_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personnels` ADD CONSTRAINT `personnels_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personnels` ADD CONSTRAINT `personnels_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personnels_contacts` ADD CONSTRAINT `personnels_contacts_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personnels_contacts` ADD CONSTRAINT `personnels_contacts_IDCONTACTS_fkey` FOREIGN KEY (`IDCONTACTS`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personnels_contacts` ADD CONSTRAINT `personnels_contacts_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personnels_contacts` ADD CONSTRAINT `personnels_contacts_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `point_contacts` ADD CONSTRAINT `point_contacts_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `point_contacts` ADD CONSTRAINT `point_contacts_IDCONTACTS_fkey` FOREIGN KEY (`IDCONTACTS`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `point_contacts` ADD CONSTRAINT `point_contacts_IDPOINTS_fkey` FOREIGN KEY (`IDPOINTS`) REFERENCES `points`(`IDPOINTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pointages` ADD CONSTRAINT `pointages_IDType_Statut_fkey` FOREIGN KEY (`IDType_Statut`) REFERENCES `types_statut`(`IDType_Statut`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pointages` ADD CONSTRAINT `pointages_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pointages` ADD CONSTRAINT `pointages_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pointages` ADD CONSTRAINT `pointages_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pointages_resume` ADD CONSTRAINT `pointages_resume_IDPERSONNELS_fkey` FOREIGN KEY (`IDPERSONNELS`) REFERENCES `personnels`(`IDPERSONNELS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `pointages_resume` ADD CONSTRAINT `pointages_resume_IDTAUX_HORAIRE_fkey` FOREIGN KEY (`IDTAUX_HORAIRE`) REFERENCES `taux_horaire_contrat_travail`(`IDTAUX_HORAIRE`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `points` ADD CONSTRAINT `points_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `points` ADD CONSTRAINT `points_IDCONTACTS_DEFAUTS_fkey` FOREIGN KEY (`IDCONTACTS_DEFAUTS`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `points` ADD CONSTRAINT `points_IDADRESSES_fkey` FOREIGN KEY (`IDADRESSES`) REFERENCES `adresses`(`IDADRESSES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `points` ADD CONSTRAINT `points_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `points` ADD CONSTRAINT `points_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations` ADD CONSTRAINT `prestations_IDCONTRATS_fkey` FOREIGN KEY (`IDCONTRATS`) REFERENCES `contrats`(`IDCONTRATS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations` ADD CONSTRAINT `prestations_IDMARCHANDISES_fkey` FOREIGN KEY (`IDMARCHANDISES`) REFERENCES `marchandises`(`IDMARCHANDISES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations` ADD CONSTRAINT `prestations_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations` ADD CONSTRAINT `prestations_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_conditions` ADD CONSTRAINT `prestations_conditions_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_conditions` ADD CONSTRAINT `prestations_conditions_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_conditions` ADD CONSTRAINT `prestations_conditions_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_manutention` ADD CONSTRAINT `prestations_manutention_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_manutention` ADD CONSTRAINT `prestations_manutention_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_manutention` ADD CONSTRAINT `prestations_manutention_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_routier` ADD CONSTRAINT `prestations_routier_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_routier` ADD CONSTRAINT `prestations_routier_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_routier` ADD CONSTRAINT `prestations_routier_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_supplementaires` ADD CONSTRAINT `prestations_supplementaires_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_supplementaires` ADD CONSTRAINT `prestations_supplementaires_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `prestations_supplementaires` ADD CONSTRAINT `prestations_supplementaires_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `rappels` ADD CONSTRAINT `rappels_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `rappels` ADD CONSTRAINT `rappels_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `rappels` ADD CONSTRAINT `rappels_IDUTILISATEURS_destinataire_fkey` FOREIGN KEY (`IDUTILISATEURS_destinataire`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes` ADD CONSTRAINT `societes_IDCLIENTS_fkey` FOREIGN KEY (`IDCLIENTS`) REFERENCES `clients`(`IDCLIENTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes` ADD CONSTRAINT `societes_IDFOURNISSEURS_fkey` FOREIGN KEY (`IDFOURNISSEURS`) REFERENCES `fournisseurs`(`IDFOURNISSEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes` ADD CONSTRAINT `societes_IDADRESSES_fkey` FOREIGN KEY (`IDADRESSES`) REFERENCES `adresses`(`IDADRESSES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes` ADD CONSTRAINT `societes_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes` ADD CONSTRAINT `societes_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes_contacts` ADD CONSTRAINT `societes_contacts_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes_contacts` ADD CONSTRAINT `societes_contacts_IDCONTACTS_fkey` FOREIGN KEY (`IDCONTACTS`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes_contacts` ADD CONSTRAINT `societes_contacts_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `societes_contacts` ADD CONSTRAINT `societes_contacts_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `sous_traitants_prestations` ADD CONSTRAINT `sous_traitants_prestations_IDPRESTATIONS_fkey` FOREIGN KEY (`IDPRESTATIONS`) REFERENCES `prestations`(`IDPRESTATIONS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `sous_traitants_prestations` ADD CONSTRAINT `sous_traitants_prestations_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `sous_traitants_prestations` ADD CONSTRAINT `sous_traitants_prestations_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `sous_traitants_prestations` ADD CONSTRAINT `sous_traitants_prestations_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `taches` ADD CONSTRAINT `taches_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `taches` ADD CONSTRAINT `taches_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `taches` ADD CONSTRAINT `taches_IDUTILISATEURS_cible_fkey` FOREIGN KEY (`IDUTILISATEURS_cible`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `taux_horaire_contrat_travail` ADD CONSTRAINT `taux_horaire_contrat_travail_IDCONTRATS_TRAVAIL_fkey` FOREIGN KEY (`IDCONTRATS_TRAVAIL`) REFERENCES `contrats_travail`(`IDCONTRATS_TRAVAIL`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `taux_horaire_contrat_travail` ADD CONSTRAINT `taux_horaire_contrat_travail_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `taux_horaire_contrat_travail` ADD CONSTRAINT `taux_horaire_contrat_travail_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `types_facture` ADD CONSTRAINT `types_facture_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `types_facture` ADD CONSTRAINT `types_facture_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `utilisateurs` ADD CONSTRAINT `utilisateurs_IDCONTACTS_fkey` FOREIGN KEY (`IDCONTACTS`) REFERENCES `contacts`(`IDCONTACTS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `vehicules` ADD CONSTRAINT `vehicules_IDSOCIETES_fkey` FOREIGN KEY (`IDSOCIETES`) REFERENCES `societes`(`IDSOCIETES`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `vehicules` ADD CONSTRAINT `vehicules_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `vehicules` ADD CONSTRAINT `vehicules_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `villes` ADD CONSTRAINT `villes_IDPAYS_fkey` FOREIGN KEY (`IDPAYS`) REFERENCES `pays`(`IDPAYS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `villes` ADD CONSTRAINT `villes_IDUTILISATEURS_modificateur_fkey` FOREIGN KEY (`IDUTILISATEURS_modificateur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `villes` ADD CONSTRAINT `villes_IDUTILISATEURS_createur_fkey` FOREIGN KEY (`IDUTILISATEURS_createur`) REFERENCES `utilisateurs`(`IDUTILISATEURS`) ON DELETE SET NULL ON UPDATE CASCADE;
+
