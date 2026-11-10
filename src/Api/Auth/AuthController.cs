@@ -7,10 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Auth;
 
-// Connexion, renouvellement, déconnexion. Le jeton d'accès est renvoyé dans
-// le corps de la réponse (le front le garde en mémoire) ; le jeton de
-// renouvellement, lui, n'existe que dans un cookie httpOnly, illisible par
-// le JavaScript de la page.
+// jeton d'accès dans le corps, refresh token seulement en cookie httpOnly
 [ApiController]
 [Route("auth")]
 public class AuthController(TokenService tokens, IOptions<AuthOptions> options) : ControllerBase
@@ -20,9 +17,7 @@ public class AuthController(TokenService tokens, IOptions<AuthOptions> options) 
 
     private readonly AuthOptions _options = options.Value;
 
-    // NestJS : POST auth/login (@Public, @Throttle LOGIN_THROTTLE_LIMIT, 200)
-    // Tentatives de connexion : bien plus strictes que la limite globale, pour
-    // freiner le brute force.
+    // limite plus basse contre le brute force
     [AllowAnonymous]
     [LoginThrottle]
     [HttpPost("login")]
@@ -38,15 +33,12 @@ public class AuthController(TokenService tokens, IOptions<AuthOptions> options) 
         }
 
         var user = await tokens.AuthenticateAsync(login, password);
-        // Même message que l'identifiant existe ou non : on ne révèle rien.
+        // même message que le login existe ou non
         if (user is null) throw new UnauthorizedException("Identifiant ou mot de passe incorrect");
         return StartSession(user);
     }
 
-    // NestJS : POST auth/refresh (@Public, 200)
-    // Appelé par le front au chargement de la page et quand le jeton d'accès
-    // expire : échange le cookie de renouvellement contre un nouveau jeton
-    // d'accès, et prolonge le cookie.
+    // au chargement de la page et à l'expiration du jeton, prolonge le cookie
     [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<object> Refresh()
@@ -61,7 +53,6 @@ public class AuthController(TokenService tokens, IOptions<AuthOptions> options) 
         return StartSession(user);
     }
 
-    // NestJS : POST auth/logout (@Public, 200)
     [AllowAnonymous]
     [HttpPost("logout")]
     public object Logout()
@@ -81,10 +72,7 @@ public class AuthController(TokenService tokens, IOptions<AuthOptions> options) 
         return new { accessToken, login = user.Sub };
     }
 
-    // COOKIE_SAMESITE (lax par défaut) / COOKIE_SECURE : le front et l'API sur
-    // le même site (ex. localhost, ou app.x.be + api.x.be) fonctionnent avec les
-    // valeurs par défaut. Front et API sur des domaines différents demandent
-    // COOKIE_SAMESITE=none, qui impose HTTPS.
+    // domaines différents : COOKIE_SAMESITE=none (donc HTTPS)
     private CookieOptions RefreshCookieOptions() => new()
     {
         HttpOnly = true,

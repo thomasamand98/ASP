@@ -7,23 +7,17 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Api.Tests;
 
-// Tests du socle à travers le pipeline HTTP complet (sans base de données :
-// seules des routes qui n'y accèdent pas sont appelées). La comparaison
-// endpoint par endpoint avec le backend NestJS se fait avec tools/compare.mjs
-// et tools/compare-writes.mjs, sur une base de développement.
+// pipeline HTTP complet, sans base : routes sans accès BDD seulement
 public class ApiFactory : WebApplicationFactory<Program>
 {
     public ApiFactory()
     {
-        // Base volontairement injoignable et secret fixe : les tests ne
-        // dépendent d'aucun fichier .env.
+        // base injoignable exprès, pas besoin de .env
         Environment.SetEnvironmentVariable("DATABASE_URL", "mysql://test:test@127.0.0.1:9/test");
         Environment.SetEnvironmentVariable("JWT_SECRET", "secret-de-test-secret-de-test-secret-de-test");
         Environment.SetEnvironmentVariable("LOGIN_THROTTLE_LIMIT", "3");
         Environment.SetEnvironmentVariable("CORS_ORIGIN", "");
-        // Un proxy de confiance : chaque test se présente avec sa propre
-        // adresse (X-Forwarded-For) et dispose de ses propres compteurs de
-        // limitation de débit.
+        // une IP par test (X-Forwarded-For), donc compteurs de limitation séparés
         Environment.SetEnvironmentVariable("TRUST_PROXY", "1");
     }
 }
@@ -44,7 +38,7 @@ public class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Une_route_protegee_sans_jeton_repond_401_au_format_NestJS()
+    public async Task Une_route_protegee_sans_jeton_repond_401_avec_le_format_d_erreur()
     {
         var response = await Client().GetAsync("pays");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -75,13 +69,11 @@ public class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Contains("samesite=lax", cookie, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("max-age=28800", cookie, StringComparison.OrdinalIgnoreCase);
 
-        // Le jeton d'accès ouvre les routes protégées.
         var ping = new HttpRequestMessage(HttpMethod.Get, "performance/ping");
         ping.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.accessToken);
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(ping)).StatusCode);
 
-        // Le cookie de renouvellement rouvre une session ; il ne sert pas de
-        // jeton d'accès (audience différente).
+        // cookie de refresh refusé comme jeton d'accès (audience différente)
         var refreshToken = cookie.Split(';')[0]["refresh_token=".Length..];
         var refresh = new HttpRequestMessage(HttpMethod.Post, "auth/refresh");
         refresh.Headers.Add("Cookie", $"refresh_token={refreshToken}");
@@ -144,8 +136,7 @@ public class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Les_tentatives_de_connexion_sont_limitees()
     {
-        // LOGIN_THROTTLE_LIMIT=3 pour les tests : la 4e tentative de la même
-        // adresse dans la minute est refusée.
+        // LOGIN_THROTTLE_LIMIT=3, 4e tentative refusée
         var client = Client();
         Task<HttpResponseMessage> SendAsync() => client.PostAsJsonAsync("auth/login", new { login = "bob", password = "x" });
 
@@ -160,7 +151,7 @@ public class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 public class JsonConfigTests
 {
     [Fact]
-    public void Serialise_comme_le_backend_NestJS()
+    public void Serialise_au_format_attendu_par_le_front()
     {
         var json = JsonSerializer.Serialize(
             new

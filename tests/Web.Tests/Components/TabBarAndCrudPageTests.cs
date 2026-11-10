@@ -56,7 +56,7 @@ public class CrudPageTests : BunitContext
         public string Nom { get; set; } = "";
     }
 
-    // GET /items : liste initiale.
+    // GET /items : liste initiale
     private sealed class FakeApi : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
@@ -67,7 +67,7 @@ public class CrudPageTests : BunitContext
     }
 
     private readonly List<string> _supprimes = [];
-    // Fiche ouverte dans un onglet de l'application (mode de vue par défaut).
+    // fiche en onglet (vue par défaut)
     private (string Label, RenderFragment Content)? _ongletOuvert;
     private readonly ApiList<Item> _liste;
 
@@ -97,7 +97,7 @@ public class CrudPageTests : BunitContext
             .Add(c => c.Update, (id, dto) => Task.FromResult(new Item(id, dto.Nom)))
             .Add(c => c.Remove, id =>
             {
-                // « Bravo » est encore référencé ailleurs : l'API refuse.
+                // Bravo encore référencé, refusé
                 if (id == "2") throw new ApiException("Élément utilisé", 409);
                 _supprimes.Add(id);
                 return Task.CompletedTask;
@@ -150,7 +150,7 @@ public class CrudPageTests : BunitContext
 
         page.WaitForAssertion(() => Assert.Equal(["Bravo"], Noms(page)));
         Assert.Equal(["1", "3"], _supprimes.Order());
-        // La ligne en échec reste sélectionnée et l'échec est annoncé.
+        // ligne en échec toujours sélectionnée
         Assert.Contains("selected", page.Find(".data-table tbody tr").ClassName);
         var alerte = JSInterop.VerifyInvoke("horizon.alert").Arguments[0] as string;
         Assert.Equal("1 suppression(s) sur 3 ont échoué : Élément utilisé", alerte);

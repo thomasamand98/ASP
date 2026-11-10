@@ -1,5 +1,4 @@
-# Contexte de construction des images (racine du dépôt) : seuls
-# Directory.Build.props et src/ sont utiles.
+# seuls Directory.Build.props et src/ servent aux images
 .git
 **/bin
 **/obj

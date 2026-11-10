@@ -6,18 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Points;
 
-// ===== SERVICE =====
 public class PointService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Point> Projections = new()
     {
         ["societes"] = ids => p => p.IDSOCIETES != null && ids.Contains(p.IDSOCIETES.Value),
         ["contacts"] = ids => p => p.PointContacts.Any(pc => pc.IDCONTACTS != null && ids.Contains(pc.IDCONTACTS.Value)),
     };
 
-    // page/pageSize optionnels : omis, toute la table.
     public async Task<object> GetPointsAsync(int? page, int? pageSize, string? search, Projection? projection, CancellationToken ct)
     {
         var query = db.Point
@@ -30,10 +26,7 @@ public class PointService(AppDbContext db)
         return new { points, total };
     }
 
-    // Fiche complète : tous les champs scripturables du point, le contact par
-    // défaut résolu, la totalité des contacts rattachés (PointContacts) et les
-    // plages horaires — sans relation (IDLIENS générique), lues à part et
-    // renvoyées en « HH:MM ».
+    // plages horaires sans FK (IDLIENS générique), lues à part, en HH:MM
     public async Task<object> GetPointAsync(long id, CancellationToken ct)
     {
         var point = await db.Point.AsNoTracking().Include(p => p.Adresse).Include(p => p.ContactDefauts).Where(p => p.IDPOINTS == id).FirstOrThrowAsync(ct);
@@ -76,14 +69,11 @@ public class PointService(AppDbContext db)
         };
     }
 
-    // L'adresse éventuellement saisie est créée dans `adresses` puis liée.
     public async Task<object> CreatePointAsync(CreatePointDto dto, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var idAdresses = await Adresses.SaveAsync(db, null, Adresses.Pick(dto), ct);
-        // IDADRESSES/IDSOCIETES/IDCONTACTS_DEFAUTS ont un défaut DB de 0, qui
-        // viole leur contrainte de clé étrangère quand ils sont omis — mis
-        // explicitement à NULL.
+        // NULL explicite, défaut DB à 0 (FK)
         var point = new Point { IDADRESSES = idAdresses, IDSOCIETES = null, IDCONTACTS_DEFAUTS = null, Date_heure_creation = DateTime.UtcNow };
         Assign(point, dto);
         db.Point.Add(point);
@@ -93,7 +83,6 @@ public class PointService(AppDbContext db)
         return await ListSelect(db.Point.Where(p => p.IDPOINTS == point.IDPOINTS)).FirstOrThrowAsync(ct);
     }
 
-    // L'adresse liée est mise à jour, ou créée si le point n'en avait pas.
     public async Task<object> UpdatePointAsync(long id, UpdatePointDto dto, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -110,8 +99,7 @@ public class PointService(AppDbContext db)
 
     public Task DeletePointAsync(long id, CancellationToken ct) => db.Point.Where(p => p.IDPOINTS == id).DeleteOrThrowAsync(ct);
 
-    // Un contact peut en théorie être lié plusieurs fois au même point
-    // (aucune contrainte d'unicité) : tous ses liens sont mis à jour.
+    // pas de contrainte d'unicité, donc tous les liens du contact
     public async Task UpdatePointContactAsync(long pointId, long contactId, UpdatePointContactDto dto, CancellationToken ct)
     {
         var links = await db.PointContact.Where(pc => pc.IDPOINTS == pointId && pc.IDCONTACTS == contactId).ToListAsync(ct);
@@ -120,13 +108,10 @@ public class PointService(AppDbContext db)
         await db.SaveChangesAsync(ct);
     }
 
-    // Retire le contact du point — le contact lui-même est conservé.
+    // supprime juste le lien, pas le contact
     public Task RemovePointContactAsync(long pointId, long contactId, CancellationToken ct) =>
         db.PointContact.Where(pc => pc.IDPOINTS == pointId && pc.IDCONTACTS == contactId).ExecuteDeleteAsync(ct);
 
-    // Seuls les IDs ont besoin d'être convertis (vide ou absent : inchangé).
-    // Les champs d'adresse vont dans la table `adresses`, les plages horaires
-    // dans `grilles_horaires`.
     private static void Assign(Point p, CreatePointDto dto)
     {
         dto.Libelle.Apply(v => p.Libelle = v);
@@ -139,7 +124,6 @@ public class PointService(AppDbContext db)
         if (dto.IDCONTACTS_DEFAUTS is { IsSet: true, Value.Length: > 0 }) p.IDCONTACTS_DEFAUTS = Dto.Id(dto.IDCONTACTS_DEFAUTS.Value);
     }
 
-    // Remplace toutes les plages horaires du point.
     private async Task ReplaceHorairesAsync(long pointId, List<HorairePointDto> horaires, CancellationToken ct)
     {
         await db.GrilleHoraire.Where(h => h.IDLIENS == pointId).ExecuteDeleteAsync(ct);
@@ -171,39 +155,28 @@ public class PointService(AppDbContext db)
     });
 }
 
-// ===== CONTROLLER =====
 public class PointController(PointService service) : ApiControllerBase
 {
-    // NestJS : GET points
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
     [HttpGet("points")]
     public Task<object> GetPoints([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetPointsAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET points/:id
     [HttpGet("points/{id}")]
     public Task<object> GetPoint(string id, CancellationToken ct) => service.GetPointAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST points
     [HttpPost("points")]
     public Task<IActionResult> CreatePoint([Body] CreatePointDto dto, CancellationToken ct) => Created201(service.CreatePointAsync(dto, ct));
 
-    // NestJS : PATCH points/:id
     [HttpPatch("points/{id}")]
     public Task<object> UpdatePoint(string id, [Body] UpdatePointDto dto, CancellationToken ct) => service.UpdatePointAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE points/:id
     [HttpDelete("points/{id}")]
     public Task DeletePoint(string id, CancellationToken ct) => service.DeletePointAsync(Params.ParseId(id), ct);
 
-    // NestJS : PATCH points/:id/contacts/:contactId
-    // Lien d'un contact avec le point (onglet Contacts de la fiche Point).
     [HttpPatch("points/{id}/contacts/{contactId}")]
     public Task UpdatePointContact(string id, string contactId, [Body] UpdatePointContactDto dto, CancellationToken ct) =>
         service.UpdatePointContactAsync(Params.ParseId(id), Params.ParseId(contactId), dto, ct);
 
-    // NestJS : DELETE points/:id/contacts/:contactId
-    // Retire le contact du point — le contact lui-même est conservé.
     [HttpDelete("points/{id}/contacts/{contactId}")]
     public Task RemovePointContact(string id, string contactId, CancellationToken ct) =>
         service.RemovePointContactAsync(Params.ParseId(id), Params.ParseId(contactId), ct);

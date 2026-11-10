@@ -1,6 +1,5 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Points (GET /points et /points/:id).
 public sealed record Point
 {
     public string IDPOINTS { get; init; } = "";
@@ -29,8 +28,7 @@ public sealed record PointDetail
     public string? IDCONTACTS_DEFAUTS { get; init; }
     public SocieteContactNom? ContactDefauts { get; init; }
     public List<PointContact> PointContacts { get; init; } = [];
-    // Plages d'ouverture (table grilles_horaires) : Jour_semaine 1 = lundi …
-    // 7 = dimanche, heures en « HH:MM ».
+    // Jour_semaine 1 = lundi, heures en HH:MM
     public List<PointHoraire> Horaires { get; init; } = [];
 }
 

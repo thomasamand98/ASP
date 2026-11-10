@@ -1,9 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un contact.
-// IDADRESSES n'en fait pas partie : il est géré par le serveur (voir
-// Common/Adresses.cs). Personne_physique/Adresse_entreprise sont des codes
-// 0/1 (pas des booléens).
+// IDADRESSES géré côté serveur (Common/Adresses.cs)
 public class CreateContactDto : IAdresseFields
 {
     [Text] public Opt<string> Civilite { get; set; }
@@ -17,17 +14,13 @@ public class CreateContactDto : IAdresseFields
     [Num] public Opt<double> Personne_physique { get; set; }
     [Num] public Opt<double> Adresse_entreprise { get; set; }
     [Text] public Opt<string> description_telephone { get; set; }
-    // Société principale du contact (liste « Société » de la fiche) : lien
-    // SocieteContacts avec sa fonction/service, géré à part du contact
-    // lui-même. Vide en modification : retire la société principale.
+    // société principale (SocieteContacts), vide en modif = retirée
     [Id] public Opt<string> IDSOCIETES { get; set; }
     [Text] public Opt<string> Fonction_contact { get; set; }
     [Text] public Opt<string> Service_bureau { get; set; }
-    // Création depuis la fiche Point : le contact est créé lié à ce point
-    // (PointContacts). Ignoré en modification.
+    // création depuis la fiche Point, ignoré en modif
     [Id] public Opt<string> IDPOINTS { get; set; }
-    // Adresse propre du contact (table `adresses`, liée par IDADRESSES) :
-    // champs aplatis, enregistrés à part par le service.
+    // adresse aplatie, enregistrée à part dans `adresses`
     [Text] public Opt<string> Adresse1 { get; set; }
     [Text] public Opt<string> Adresse2 { get; set; }
     [Text] public Opt<string> Adresse3 { get; set; }

@@ -6,10 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Commandes;
 
-// ===== SERVICE =====
-// Pas de forme séparée pour le détail : la liste contient déjà tous les
-// champs scripturables du modèle Commande. Le « client » (Contrat → Societe)
-// est résolu en 2 sauts ; la « marchandise » / « unité » par WithMarchandiseAsync.
 public class CommandeService(AppDbContext db)
 {
     private sealed class Row
@@ -34,16 +30,12 @@ public class CommandeService(AppDbContext db)
         public string? Instruction { get; init; }
     }
 
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Commande> Projections = new()
     {
         ["contrats"] = ids => c => c.IDCONTRATS != null && ids.Contains(c.IDCONTRATS.Value),
         ["marchandises"] = ids => c => c.Contrat!.Prestations.Any(p => ids.Contains(p.Marchandise!.IDMARCHANDISES)),
     };
 
-    // page/pageSize optionnels : omis, toute la table. `period` : commandes
-    // dont la Date_commande tombe dans la période.
     public async Task<object> GetCommandesAsync(int? page, int? pageSize, string? search, Projection? projection, Period? period, CancellationToken ct)
     {
         var query = db.Commande
@@ -68,9 +60,7 @@ public class CommandeService(AppDbContext db)
 
     public async Task<object> CreateCommandeAsync(CreateCommandeDto dto, CancellationToken ct)
     {
-        // IDCONTRATS/IDPRESTATIONS/IDUTILISATEURS_* ont un défaut DB de 0, qui
-        // viole leur contrainte de clé étrangère quand ils sont omis — mis
-        // explicitement à NULL.
+        // 0 par défaut en base, viole les FK
         var commande = new Commande { IDCONTRATS = null, IDPRESTATIONS = null, IDUTILISATEURS_createur = null, IDUTILISATEURS_modificateur = null };
         Assign(commande, dto);
         db.Commande.Add(commande);
@@ -88,8 +78,6 @@ public class CommandeService(AppDbContext db)
 
     public Task DeleteCommandeAsync(long id, CancellationToken ct) => db.Commande.Where(c => c.IDCOMMANDES == id).DeleteOrThrowAsync(ct);
 
-    // Seuls les IDs ont besoin d'être convertis ; "" retire le lien (NULL : 0
-    // violerait la clé étrangère). Une date vidée est enregistrée NULL.
     private static void Assign(Commande c, CreateCommandeDto dto)
     {
         dto.Date_commande.ApplyDate(v => c.Date_commande = v, dateOnly: true);
@@ -124,10 +112,7 @@ public class CommandeService(AppDbContext db)
         Instruction = c.Instruction,
     });
 
-    // Marchandise et unité d'une commande : toujours celles de la prestation
-    // de son contrat (commande → contrat → prestation → IDMARCHANDISES /
-    // Unite), comme dans WinDev — chaque contrat n'a qu'une prestation (la
-    // première par Ordre puis id). Ajoutées à plat (Marchandise, Unite).
+    // marchandise/unité = celles de la 1re prestation du contrat, comme WinDev
     private async Task<List<object>> WithMarchandiseAsync(List<Row> rows, CancellationToken ct)
     {
         var contratIds = rows.Where(r => r.HasContrat).Select(r => r.IDCONTRATS).Distinct().ToList();
@@ -136,7 +121,7 @@ public class CommandeService(AppDbContext db)
             : await db.Prestation.Where(p => contratIds.Contains(p.IDCONTRATS))
                 .Select(p => new { p.IDCONTRATS, p.Ordre, p.IDPRESTATIONS, p.Unite, HasMarchandise = p.Marchandise != null, p.Marchandise!.Nom_marchandise })
                 .ToListAsync(ct);
-        // Ordre croissant, NULL en premier (tri MySQL), puis id.
+        // NULL en premier comme MySQL, puis id
         var first = prestations.GroupBy(p => p.IDCONTRATS!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(p => p.Ordre.HasValue).ThenBy(p => p.Ordre).ThenBy(p => p.IDPRESTATIONS).First());
 
@@ -165,27 +150,20 @@ public class CommandeService(AppDbContext db)
     }
 }
 
-// ===== CONTROLLER =====
 public class CommandeController(CommandeService service) : ApiControllerBase
 {
-    // NestJS : GET commandes
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
-    // ?from=&to= (AAAA-MM-JJ, inclus) : commandes dont la Date_commande tombe
-    // dans la période, absents = toutes.
+    // from/to inclus, sur Date_commande
     [HttpGet("commandes")]
     public Task<object> GetCommandes([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, [FromQuery] string? from, [FromQuery] string? to, CancellationToken ct) =>
         service.GetCommandesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), Params.ParsePeriod(from, to), ct);
 
-    // NestJS : POST commandes
     [HttpPost("commandes")]
     public Task<IActionResult> CreateCommande([Body] CreateCommandeDto dto, CancellationToken ct) => Created201(service.CreateCommandeAsync(dto, ct));
 
-    // NestJS : PATCH commandes/:id
     [HttpPatch("commandes/{id}")]
     public Task<object> UpdateCommande(string id, [Body] UpdateCommandeDto dto, CancellationToken ct) =>
         service.UpdateCommandeAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE commandes/:id
     [HttpDelete("commandes/{id}")]
     public Task DeleteCommande(string id, CancellationToken ct) => service.DeleteCommandeAsync(Params.ParseId(id), ct);
 }

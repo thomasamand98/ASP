@@ -6,18 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Conditions;
 
-// ===== SERVICE =====
-// Conditions CMR d'un contrat (table conditions_cmr) : lignes « libellé +
-// case à cocher » affichées dans la fiche contrat. Pas de lecture ici : les
-// conditions d'un contrat sont renvoyées avec la fiche contrat
-// (GET /contrats/:id).
+// pas de GET, renvoyées avec la fiche contrat
 public class ConditionCmrService(AppDbContext db)
 {
     public async Task<object> CreateConditionCmrAsync(CreateConditionCmrDto dto, CancellationToken ct)
     {
-        // IDUTILISATEURS_createur/modificateur ont un défaut DB de 0, qui viole
-        // leur contrainte de clé étrangère quand ils sont omis — mis
-        // explicitement à NULL.
+        // défaut DB à 0, casse la FK
         var conditionCmr = new ConditionCmr
         {
             IDCONTRATS = Dto.IdOrNull(dto.IDCONTRATS),
@@ -52,20 +46,16 @@ public class ConditionCmrService(AppDbContext db)
             .FirstOrThrowAsync(ct);
 }
 
-// ===== CONTROLLER =====
 public class ConditionCmrController(ConditionCmrService service) : ApiControllerBase
 {
-    // NestJS : POST conditions-cmr
     [HttpPost("conditions-cmr")]
     public Task<IActionResult> CreateConditionCmr([Body] CreateConditionCmrDto dto, CancellationToken ct) =>
         Created201(service.CreateConditionCmrAsync(dto, ct));
 
-    // NestJS : PATCH conditions-cmr/:id
     [HttpPatch("conditions-cmr/{id}")]
     public Task<object> UpdateConditionCmr(string id, [Body] UpdateConditionCmrDto dto, CancellationToken ct) =>
         service.UpdateConditionCmrAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE conditions-cmr/:id
     [HttpDelete("conditions-cmr/{id}")]
     public Task DeleteConditionCmr(string id, CancellationToken ct) => service.DeleteConditionCmrAsync(Params.ParseId(id), ct);
 }

@@ -6,13 +6,11 @@ using MySql.Data.MySqlClient;
 
 namespace Api.Tests.Common;
 
-// Portage de backend/src/common/all-exceptions.filter.spec.ts : les erreurs
-// Prisma y sont remplacées par les erreurs MySQL équivalentes.
 public class ExceptionMiddlewareTests
 {
     private static (int Status, string Message) Run(Exception exception) => ExceptionMiddleware.Translate(exception, NullLogger.Instance);
 
-    // MySqlException n'a pas de constructeur public portant le code d'erreur.
+    // pas de constructeur public avec le code d'erreur
     private static MySqlException MySqlError(int number)
     {
         const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -33,10 +31,10 @@ public class ExceptionMiddlewareTests
     }
 
     [Theory]
-    [InlineData(1062, 409)] // doublon (Prisma P2002)
-    [InlineData(1451, 409)] // ligne encore référencée (P2003)
-    [InlineData(1452, 409)] // référence introuvable (P2003)
-    [InlineData(1406, 400)] // valeur trop longue (P2000)
+    [InlineData(1062, 409)] // doublon
+    [InlineData(1451, 409)] // ligne encore référencée
+    [InlineData(1452, 409)] // référence introuvable
+    [InlineData(1406, 400)] // valeur trop longue
     public void Traduit_les_erreurs_MySQL_previsibles_sans_exposer_de_detail(int number, int expected)
     {
         var (status, message) = Run(new DbUpdateException("échec", MySqlError(number)));

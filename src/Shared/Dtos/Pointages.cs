@@ -1,10 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un pointage.
-// IDPERSONNELS/IDType_Statut sont des strings côté JSON, les Date_*/Heure_*
-// des strings — converties par le service. Nuitee est un code 0/1 (pas un
-// booléen). Heure_Stanby n'est PAS nullable en base — un défaut 00:00 est
-// appliqué par le service si omis.
+// Heure_Stanby non nullable en base, 00:00 si absent
 public class CreatePointageDto
 {
     [Id] public Opt<string> IDPERSONNELS { get; set; }

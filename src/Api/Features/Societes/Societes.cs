@@ -7,11 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Societes;
 
-// ===== SERVICE =====
 public class SocieteService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Societe> Projections = new()
     {
         ["contrats"] = ids => s => s.Contrats.Any(c => ids.Contains(c.IDCONTRATS)),
@@ -21,7 +18,6 @@ public class SocieteService(AppDbContext db)
         ["points"] = ids => s => s.Points.Any(p => ids.Contains(p.IDPOINTS)),
     };
 
-    // page/pageSize optionnels : omis, toute la table.
     public async Task<object> GetSocietesAsync(int? page, int? pageSize, string? search, Projection? projection, CancellationToken ct)
     {
         var query = db.Societe
@@ -34,9 +30,6 @@ public class SocieteService(AppDbContext db)
         return new { societes, total };
     }
 
-    // Fiche complète : la société, son adresse, ses contacts liés, et les
-    // données de facturation du client/fournisseur liés (avec leur adresse de
-    // facturation, résolue à part).
     public async Task<object> GetSocieteAsync(long id, CancellationToken ct)
     {
         var societe = await db.Societe.Where(s => s.IDSOCIETES == id)
@@ -154,8 +147,7 @@ public class SocieteService(AppDbContext db)
         dto.Archive.ApplyInt(v => s.Archive = v);
     }
 
-    // Client lié : créé si la société n'en a pas et qu'un numéro de client est
-    // fourni, mis à jour sinon. Renvoie son id (null : aucun client).
+    // créé seulement si numéro de client fourni, null = pas de client
     private async Task<long?> UpsertClientAsync(Client? current, CreateSocieteDto dto, CancellationToken ct)
     {
         if (current is null && string.IsNullOrEmpty(dto.Client_Numero_client.OrDefault)) return null;
@@ -163,13 +155,12 @@ public class SocieteService(AppDbContext db)
         var client = current ?? new Client { IDUTILISATEURS_createur = null, IDUTILISATEURS_modificateur = null };
         dto.Client_Numero_client.Apply(v => client.Numero_client = v);
         dto.Client_Delai_paiement.Apply(v => client.Delai_paiement = v);
-        // Taux vide ou absent : inchangé.
+        // vide ou absent = inchangé
         if (dto.Client_Taux_tva is { IsSet: true, Value.Length: > 0 }) client.Taux_tva = decimal.Parse(dto.Client_Taux_tva.Value, CultureInfo.InvariantCulture);
         dto.Client_E_mail_comptabilite.Apply(v => client.E_mail_comptabilite = v);
         dto.Client_Facture_mail.ApplyInt(v => client.Facture_mail = v);
         dto.Client_Adresse_facturation_societe.ApplyInt(v => client.Adresse_facturation_societe = v);
-        // Comportement du backend d'origine : le contact comptabilité est remis
-        // à NULL dès qu'il n'est pas envoyé (ou vide).
+        // pas envoyé ou vide = NULL, contrairement aux autres champs
         client.IDCONTACTS_Comptabilite = Dto.IdOrNull(dto.Client_IDCONTACTS_Comptabilite);
         client.IDADRESSES_facturation = idAdresses;
         if (current is null) db.Client.Add(client);
@@ -198,28 +189,22 @@ public class SocieteService(AppDbContext db)
     }
 }
 
-// ===== CONTROLLER =====
 public class SocieteController(SocieteService service) : ApiControllerBase
 {
-    // NestJS : GET societes
     [HttpGet("societes")]
     public Task<object> GetSocietes([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetSocietesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET societes/:id
     [HttpGet("societes/{id}")]
     public Task<object> GetSociete(string id, CancellationToken ct) => service.GetSocieteAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST societes
     [HttpPost("societes")]
     public Task<IActionResult> CreateSociete([Body] CreateSocieteDto dto, CancellationToken ct) => Created201(service.CreateSocieteAsync(dto, ct));
 
-    // NestJS : PATCH societes/:id
     [HttpPatch("societes/{id}")]
     public Task<object> UpdateSociete(string id, [Body] UpdateSocieteDto dto, CancellationToken ct) =>
         service.UpdateSocieteAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE societes/:id
     [HttpDelete("societes/{id}")]
     public Task DeleteSociete(string id, CancellationToken ct) => service.DeleteSocieteAsync(Params.ParseId(id), ct);
 }

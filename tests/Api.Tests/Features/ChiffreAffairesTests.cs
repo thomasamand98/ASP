@@ -3,7 +3,6 @@ using Api.Features.Statistiques;
 
 namespace Api.Tests.Features;
 
-// Portage de backend/src/statistique/chiffre-affaires.spec.ts.
 public class ChiffreAffairesTests
 {
     private static DateTime D(string iso) => DateTime.Parse(iso, System.Globalization.CultureInfo.InvariantCulture);
@@ -47,16 +46,14 @@ public class ChiffreAffairesTests
     [InlineData(1.005, 1.0)] // 1.005 vaut en réalité 1.00499999999999989…
     [InlineData(2.5, 2.5)]
     [InlineData(10.125, 10.13)]
-    [InlineData(-10.125, -10.12)] // Math.round : la demie vers le haut
+    [InlineData(-10.125, -10.12)] // demie arrondie vers le haut
     public void Arrondit_au_centime_comme_Math_round(double value, double expected)
     {
         Assert.Equal(expected, ChiffreAffaires.ArrondiCentimes(value));
     }
 
-    // Le générateur du test de transfert doit produire les mêmes données que
-    // le backend NestJS (valeurs relevées sur celui-ci).
     [Fact]
-    public void Le_jeu_de_donnees_de_transfert_est_identique_a_celui_de_NestJS()
+    public void Le_jeu_de_donnees_de_transfert_est_stable()
     {
         var lignes = PerformanceService.GenererLignes(1024);
         Assert.Equal(

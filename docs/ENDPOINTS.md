@@ -1,15 +1,18 @@
-# Endpoints : correspondance NestJS → ASP.NET Core
+# Endpoints : correspondance NestJS / ASP.NET Core
 
-Généré par `node tools/list-endpoints.mjs` — ne pas modifier à la main.
+Liste sortie pendant la migration par `tools/list-endpoints.mjs` (le script
+n'existe plus). Elle date d'avant le retrait des endpoints qu'aucun écran
+n'appelait (`/auth/me`, `/clients`, `/fournisseurs`, etc.), donc elle n'est
+plus à jour : pour la liste actuelle, voir `/swagger` avec l'API en dev.
 
-117 endpoints. Toutes les routes exigent un jeton d'accès
-(`Authorization: Bearer …`), sauf `POST /auth/login`, `POST /auth/refresh` et
-`POST /auth/logout`. Un `POST` répond 201 (sauf les trois routes `/auth`, qui
-répondent 200) ; un `DELETE` répond 200 sans corps.
+117 endpoints à l'époque. Tout demande un jeton d'accès
+(`Authorization: Bearer ...`) sauf `POST /auth/login`, `POST /auth/refresh` et
+`POST /auth/logout`. Un `POST` renvoie 201 (200 pour les trois routes
+`/auth`), un `DELETE` renvoie 200 sans corps.
 
-La colonne « Vérifié » est à cocher pendant la recette manuelle ; la
-comparaison automatique avec NestJS se fait avec `tools/compare.mjs` (lectures)
-et `tools/compare-writes.mjs` (écritures).
+La colonne « Vérifié » servait à la recette manuelle. La comparaison
+automatique avec NestJS passait par `tools/compare.mjs` (lectures) et
+`tools/compare-writes.mjs` (écritures), supprimés depuis.
 
 | Vérifié | Verbe | Route | NestJS | ASP.NET Core |
 |---|---|---|---|---|

@@ -8,29 +8,21 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Features.Mistral;
 
-// Extraction structurée demandée en plus de l'OCR : `Schema` est un JSON
-// Schema (objet racine) que Mistral remplit à partir du document entier,
-// `Prompt` une consigne optionnelle pour guider ce remplissage.
+// Schema : JSON Schema rempli par Mistral sur tout le document, Prompt optionnel
 public record OcrAnnotation(JsonObject Schema, string? Prompt);
 
-// Erreur renvoyée par l'API Mistral (statut HTTP non réussi).
 public class MistralException(int statusCode, string body) : Exception($"Mistral {statusCode} : {body}")
 {
     public int StatusCode { get; } = statusCode;
     public string Body { get; } = body;
 }
 
-// ===== SERVICE =====
-// Appelle l'API REST de Mistral (il n'existe pas de SDK .NET officiel ; le
-// backend NestJS utilisait @mistralai/mistralai, qui poste la même requête).
+// appel REST direct, pas de SDK .NET officiel
 public class MistralService(HttpClient http, IOptions<AppOptions> options, ILogger<MistralService> logger)
 {
     public const string OcrUrl = "https://api.mistral.ai/v1/ocr";
 
-    // Traduit une erreur de l'API Mistral en HttpException lisible par le
-    // front — sinon elle serait masquée en « Erreur interne du serveur ». Un
-    // 401/403 de Mistral (clé invalide) devient un 502 : renvoyé tel quel, le
-    // front le prendrait pour une session expirée (voir frontend/src/lib/api.ts).
+    // 401/403 Mistral (clé invalide) en 502, sinon le front croit à une session expirée
     private HttpException ToHttpException(MistralException error)
     {
         logger.LogWarning("Mistral {Status} : {Body}", error.StatusCode, error.Body);
@@ -45,14 +37,7 @@ public class MistralService(HttpClient http, IOptions<AppOptions> options, ILogg
         return new BadGatewayException($"Erreur du service Mistral (statut {error.StatusCode})");
     }
 
-    // Extrait le texte d'un fichier (PDF ou image) par OCR. Le fichier reçu
-    // en binaire est transmis à Mistral en data URI base64, que l'API OCR
-    // accepte directement, sans étape d'upload préalable via son API Files.
-    // Les images passent par un chunk "image_url", les PDF par "document_url".
-    // Renvoie le texte en Markdown (une page par élément, séparées par une
-    // ligne vide) et, si `annotation` est fourni, l'extraction structurée du
-    // document entier guidée par `annotation.Prompt` (JSON conforme à
-    // `annotation.Schema`, déjà parsé).
+    // envoi en data URI base64, pas besoin de passer par l'API Files
     public async Task<object> RunOcrAsync(byte[] file, string mimeType, OcrAnnotation? annotation, CancellationToken ct)
     {
         var dataUri = $"data:{mimeType};base64,{Convert.ToBase64String(file)}";
@@ -62,29 +47,18 @@ public class MistralService(HttpClient http, IOptions<AppOptions> options, ILogg
             ["document"] = mimeType.StartsWith("image/", StringComparison.Ordinal)
                 ? new JsonObject { ["type"] = "image_url", ["image_url"] = dataUri }
                 : new JsonObject { ["type"] = "document_url", ["document_url"] = dataUri },
-            // Tous les paramètres de l'API OCR, avec leur valeur par défaut
-            // (null/false = comportement de l'API quand le champ est absent).
-            // Pages à traiter (index à partir de 0). null = toutes les pages.
+            // tous les paramètres listés avec leur valeur par défaut
             ["pages"] = null,
-            // Renvoie les images extraites en base64 dans page.images.
             ["include_image_base64"] = false,
-            // Nombre max d'images extraites. null = pas de limite.
             ["image_limit"] = null,
-            // Hauteur/largeur min (px) d'une image pour être extraite.
             ["image_min_size"] = null,
-            // Format des tableaux : 'markdown' | 'html'. null = tableaux laissés
-            // dans le markdown de la page.
+            // 'markdown' | 'html', null = tableaux dans le markdown de la page
             ["table_format"] = null,
-            // Sort l'en-tête / le pied de page dans page.header / page.footer.
             ["extract_header"] = false,
             ["extract_footer"] = false,
-            // Boîtes englobantes par paragraphe dans la réponse.
             ["include_blocks"] = false,
-            // Scores de confiance : 'page' | 'word' | 'block'. null = aucun.
+            // 'page' | 'word' | 'block'
             ["confidence_scores_granularity"] = null,
-            // Extraction structurée (json_schema uniquement) : sur chaque image /
-            // boîte englobante, et sur le document entier (avec un prompt
-            // optionnel, qui exige document_annotation_format).
             ["bbox_annotation_format"] = null,
             ["document_annotation_format"] = annotation is null
                 ? null
@@ -128,16 +102,10 @@ public class MistralService(HttpClient http, IOptions<AppOptions> options, ILogg
     }
 }
 
-// ===== CONTROLLER =====
 [Route("mistral")]
 public class MistralController(MistralService service) : ApiControllerBase
 {
-    // NestJS : POST mistral/ocr (multipart, champ « file »)
-    // Upload multipart plutôt qu'une data URI base64 dans le JSON : le fichier
-    // voyage en binaire et n'est pas soumis à la limite de 10 Mo du JSON.
-    // 50 Mo = taille max acceptée par l'API OCR de Mistral ; au-delà, 413.
-    // Champs texte optionnels : « schema » (JSON Schema sous forme de chaîne)
-    // pour l'extraction structurée, et « prompt », la consigne qui la guide.
+    // multipart pour échapper à la limite JSON de 10 Mo, 50 Mo max côté Mistral
     [HttpPost("ocr")]
     public async Task<IActionResult> Ocr(CancellationToken ct)
     {
@@ -155,7 +123,7 @@ public class MistralController(MistralService service) : ApiControllerBase
     {
         if (string.IsNullOrWhiteSpace(schema))
         {
-            // Mistral refuse un prompt d'annotation sans schéma de sortie.
+            // refusé par Mistral sans schéma
             if (!string.IsNullOrWhiteSpace(prompt)) throw new BadRequestException("Un prompt exige un schéma JSON (champ \"schema\")");
             return null;
         }

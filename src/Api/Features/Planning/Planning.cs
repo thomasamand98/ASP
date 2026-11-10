@@ -9,23 +9,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Planning;
 
-// ===== SERVICE =====
-// Données de l'écran Planning : exécutions de la période, commandes à
-// planifier, déchargements en attente et ressources (chauffeurs,
-// remorques).
-//
-// Les formes renvoyées reprennent exactement celles de
-// frontend/src/features/planning/types.ts (dates en ISO, ids en string).
+// dates en ISO, ids en string
 public partial class PlanningService(AppDbContext db)
 {
-    // Au-delà, la requête devient lourde et la grille illisible (même limite
-    // que le frontend, avec un peu de marge).
+    // limite du front + un peu de marge
     private const int MaxRangeDays = 62;
     private const int CommandesLimit = 500;
     private const int DechargementsLimit = 200;
-    // Durée par défaut quand ni l'exécution ni sa prestation routière n'en ont.
+    // si ni l'exécution ni la prestation routière n'ont de durée
     private const int DefaultDurationMinutes = 120;
-    // Couleurs de repli pour une marchandise sans CouleurPlanning.
+    // marchandise sans CouleurPlanning
     private static readonly string[] FallbackColors = ["#8b5cf6", "#10b981", "#f59e0b", "#0ea5e9", "#ef4444", "#64748b", "#a8a26a", "#ec4899"];
 
     private sealed class PrestationRow
@@ -36,7 +29,7 @@ public partial class PlanningService(AppDbContext db)
         public long IDMARCHANDISES { get; init; }
         public string? Nom_marchandise { get; init; }
         public long? CouleurPlanning { get; init; }
-        // Première prestation routière (chargée à part, voir LoadRoutiersAsync).
+        // chargée à part par LoadRoutiersAsync
         public RoutierRow? Routier { get; set; }
     }
 
@@ -80,9 +73,7 @@ public partial class PlanningService(AppDbContext db)
         public PrestationRow? Prestation { get; init; }
     }
 
-    // Tables de correspondance id → libellé, chargées en une requête chacune
-    // (PrestationRoutier → Point et Execution → Vehicule n'ont pas de
-    // relation, les colonnes existent sans clé étrangère).
+    // id vers libellé, colonnes sans FK donc pas de navigation possible
     private sealed record Lookups(Dictionary<long, string> Points, Dictionary<long, string> Immats);
 
     public async Task<object> GetPlanningAsync(string? fromRaw, string? toRaw, string? jourDebutRaw, string? jourFinRaw, CancellationToken ct)
@@ -91,18 +82,16 @@ public partial class PlanningService(AppDbContext db)
         var to = ParseDate(toRaw, "to");
         if (to <= from) throw new BadRequestException("La fin de la période doit être après son début.");
         if ((to - from).TotalMilliseconds > MaxRangeDays * 86_400_000d) throw new BadRequestException($"La période ne peut pas dépasser {MaxRangeDays} jours.");
-        // Colonne DATE : représentée à minuit UTC.
+        // colonne DATE, minuit UTC
         var jourDebut = ParseDate($"{jourDebutRaw ?? "undefined"}T00:00:00Z", "jourDebut");
         var jourFin = ParseDate($"{jourFinRaw ?? "undefined"}T00:00:00Z", "jourFin");
 
-        // Exécutions qui chevauchent la période (une exécution sans date de
-        // fin compte si elle commence dans la période).
+        // chevauchement, sans date de fin : début dans la période
         var executions = await SelectExecutions(db.Execution
                 .Where(e => e.Date_Execution < to && (e.Date_Fin_Execution > from || (e.Date_Fin_Execution == null && e.Date_Execution >= from)))
                 .OrderBy(e => e.Date_Execution))
             .ToListAsync(ct);
-        // Déchargements pas encore datés : créés au chargement (déchargement
-        // différé), ils attendent d'être glissés sur le planning.
+        // déchargements différés pas encore placés sur le planning
         var dechargements = await SelectExecutions(db.Execution
                 .Where(e => e.Execution_dechargement == 1 && e.Date_Execution == null)
                 .OrderBy(e => e.IDEXECUTIONS)
@@ -146,15 +135,14 @@ public partial class PlanningService(AppDbContext db)
                 Societe = c.Societe!.Nom_societe,
             })
             .ToListAsync(ct);
-        // Attelage de référence le plus récent de chaque chauffeur.
+        // attelage de référence le plus récent par chauffeur
         var chauffeurIds = chauffeurs.Select(c => (long?)c.IDCHAUFFEURS).ToList();
         var references = (await db.AttelageReference.Where(a => chauffeurIds.Contains(a.IDCHAUFFEUR))
                 .Select(a => new { a.IDATTELAGE_REFERENCE, a.IDCHAUFFEUR, a.IDTRACTEUR, a.IDREMORQUE })
                 .ToListAsync(ct))
             .GroupBy(a => a.IDCHAUFFEUR!.Value)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.IDATTELAGE_REFERENCE).First());
-        // Remorques : Vehicule.Type n'a pas de correspondance documentée, on
-        // retient les véhicules réellement utilisés comme remorque.
+        // Vehicule.Type pas documenté, on prend ceux déjà attelés en remorque
         var remorquesAttelees = await db.Vehicule.Where(v => v.AttelagesRemorque.Any()).Select(v => v.IDVEHICULES).ToListAsync(ct);
 
         await LoadRoutiersAsync(executions.Select(e => e.Prestation).Concat(dechargements.Select(e => e.Prestation)).Concat(commandes.Select(c => c.Prestation)), ct);
@@ -185,7 +173,7 @@ public partial class PlanningService(AppDbContext db)
                 {
                     id = Text(c.IDCHAUFFEURS),
                     nom = !string.IsNullOrEmpty(nom) ? nom : personnel.Length > 0 ? personnel : $"Chauffeur {c.IDCHAUFFEURS}",
-                    // Chauffeur sans fiche Personnel = chauffeur d'un sous-traitant.
+                    // pas de fiche Personnel = sous-traitant
                     sousTraitant = IsId(c.IDPERSONNELS) ? null : c.Societe,
                     remorqueParDefautId = reference is not null && IsId(reference.IDREMORQUE) ? Text(reference.IDREMORQUE!.Value) : null,
                     tracteurParDefautId = reference is not null && IsId(reference.IDTRACTEUR) ? Text(reference.IDTRACTEUR!.Value) : null,
@@ -203,8 +191,7 @@ public partial class PlanningService(AppDbContext db)
         };
     }
 
-    // Déplacement ou redimensionnement d'une carte : nouvelles dates, et
-    // nouvelle ligne (chauffeur ou remorque) si elle a changé.
+    // déplacement / redimensionnement d'une carte
     public async Task<object> MoveExecutionAsync(long id, MovePlanningExecutionDto dto, CancellationToken ct)
     {
         var start = ParseDate(dto.start.Value, "start");
@@ -231,8 +218,7 @@ public partial class PlanningService(AppDbContext db)
         return await ExecutionViewAsync(id, ct);
     }
 
-    // Commande déposée sur le planning : nouvelle exécution, et une unité de
-    // plus planifiée sur la commande.
+    // commande glissée sur le planning, +1 unité planifiée
     public async Task<object> CreateExecutionAsync(CreatePlanningExecutionDto dto, CancellationToken ct)
     {
         var commandeId = ParseId(dto.commandeId.Value);
@@ -253,8 +239,7 @@ public partial class PlanningService(AppDbContext db)
         commande.QT_planifie = planifie + 1;
         await db.SaveChangesAsync(ct);
         var now = DateTime.UtcNow;
-        // Les colonnes à clé étrangère ont un défaut DB de 0, qui viole la
-        // contrainte (aucune ligne d'id 0) : mises explicitement à NULL.
+        // FK à 0 par défaut en base, on force NULL
         var execution = new Execution
         {
             IDCOMMANDES = commandeId,
@@ -281,8 +266,7 @@ public partial class PlanningService(AppDbContext db)
         return await ExecutionViewAsync(execution.IDEXECUTIONS, ct);
     }
 
-    // « Retirer du planning » : supprime l'exécution et libère l'unité
-    // correspondante sur la commande.
+    // libère aussi l'unité sur la commande
     public async Task DeleteExecutionAsync(long id, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -356,7 +340,6 @@ public partial class PlanningService(AppDbContext db)
         },
     });
 
-    // Première prestation routière de chaque prestation (trajet et durée).
     private async Task LoadRoutiersAsync(IEnumerable<PrestationRow?> prestations, CancellationToken ct)
     {
         var rows = prestations.Where(p => p is not null).Select(p => p!).ToList();
@@ -394,8 +377,6 @@ public partial class PlanningService(AppDbContext db)
             }),
             vehicules.Where(v => !string.IsNullOrEmpty(v.Num_immat)).ToDictionary(v => v.IDVEHICULES, v => v.Num_immat!));
     }
-
-    // --- Conversions vers les formes du frontend ------------------------------
 
     private static object ToExecution(ExecutionRow e, Lookups lookups)
     {
@@ -469,7 +450,6 @@ public partial class PlanningService(AppDbContext db)
         };
     }
 
-    // Champs communs exécution / déchargement : client et référence.
     private static string Client(ExecutionRow e) => e.ContratSociete ?? e.CommandeSociete ?? "Client inconnu";
 
     private static string? Reference(ExecutionRow e) =>
@@ -505,8 +485,7 @@ public partial class PlanningService(AppDbContext db)
         };
     }
 
-    // Statut en texte libre (pas de liste fixée) : on en déduit l'état affiché
-    // sans jamais le réécrire.
+    // texte libre en base, jamais réécrit
     private static string ToStatut(string? statut)
     {
         var s = CombiningMarks().Replace((statut ?? "").Normalize(NormalizationForm.FormD), "").ToLowerInvariant();
@@ -515,17 +494,15 @@ public partial class PlanningService(AppDbContext db)
         return "planifie";
     }
 
-    // Colonne TIME → minutes.
     private static int TimeToMinutes(TimeSpan? time) => time is { } value ? value.Hours * 60 + value.Minutes : 0;
 
     private static double ToNumber(decimal? value) =>
         value is null ? 0 : double.Parse(value.Value.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
 
-    // Les ids sont renvoyés en texte (BigInt côté base).
+    // BIGINT en base
     private static string Text(long id) => id.ToString(CultureInfo.InvariantCulture);
 
-    // Les colonnes d'id héritées de WinDev valent 0 (et non NULL) quand elles
-    // sont vides.
+    // WinDev met 0 et pas NULL quand il n'y a pas de lien
     private static bool IsId(long? value) => value is > 0;
 
     private static bool IsInvoiced(int? facture, long? idFactures) => facture == 1 || IsId(idFactures);
@@ -546,29 +523,21 @@ public partial class PlanningService(AppDbContext db)
     private static partial Regex CombiningMarks();
 }
 
-// ===== CONTROLLER =====
 [Route("planning")]
 public class PlanningController(PlanningService service) : ApiControllerBase
 {
-    // NestJS : GET planning
-    // ?from=<ISO>&to=<ISO> : bornes de la période (to exclu), en instants —
-    // pour les exécutions (colonnes TIMESTAMP).
-    // ?jourDebut=YYYY-MM-DD&jourFin=YYYY-MM-DD : mêmes jours, inclus — pour
-    // les commandes (colonne DATE, sans fuseau horaire).
+    // from/to (to exclu) pour les TIMESTAMP, jourDebut/jourFin (inclus) pour les DATE
     [HttpGet]
     public Task<object> GetPlanning([FromQuery] string? from, [FromQuery] string? to, [FromQuery] string? jourDebut, [FromQuery] string? jourFin, CancellationToken ct) =>
         service.GetPlanningAsync(from, to, jourDebut, jourFin, ct);
 
-    // NestJS : POST planning/executions
     [HttpPost("executions")]
     public Task<IActionResult> CreateExecution([Body] CreatePlanningExecutionDto dto, CancellationToken ct) => Created201(service.CreateExecutionAsync(dto, ct));
 
-    // NestJS : PATCH planning/executions/:id
     [HttpPatch("executions/{id}")]
     public Task<object> MoveExecution(string id, [Body] MovePlanningExecutionDto dto, CancellationToken ct) =>
         service.MoveExecutionAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE planning/executions/:id
     [HttpDelete("executions/{id}")]
     public Task DeleteExecution(string id, CancellationToken ct) => service.DeleteExecutionAsync(Params.ParseId(id), ct);
 }

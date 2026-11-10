@@ -6,14 +6,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace Horizon.Shared;
 
-// Sérialisation JSON identique à celle du backend NestJS/Prisma, dont dépend
-// le front :
-//   - noms de champs tels quels (IDSOCIETES, Nom_societe, accessToken...) —
-//     aucune conversion en camelCase ;
-//   - BigInt (long) → chaîne ;
-//   - Decimal → chaîne sans zéros inutiles (« 21 », « 21.5 ») ;
-//   - dates → ISO 8601 UTC avec millisecondes (« 2026-01-15T00:00:00.000Z »),
-//     heures (colonnes TIME) → même format sur le 1er janvier 1970.
+// noms tels quels, BigInt/Decimal en chaîne, dates ISO UTC avec ms
 public static class JsonConfig
 {
     public static readonly JsonSerializerOptions Options = Configure(new JsonSerializerOptions());
@@ -22,14 +15,13 @@ public static class JsonConfig
     {
         options.PropertyNamingPolicy = null;
         options.DictionaryKeyPolicy = null;
-        // Comme JSON.stringify : accents et « < > & » écrits tels quels.
+        // accents et < > & non échappés, comme JSON.stringify
         options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
         options.Converters.Add(new BigIntConverter());
         options.Converters.Add(new DecimalConverter());
         options.Converters.Add(new IsoDateTimeConverter());
         options.Converters.Add(new TimeConverter());
-        // DTO envoyés par le front : un Opt<T> non affecté est omis (comme un
-        // champ undefined en JavaScript), sinon sa valeur est écrite telle quelle.
+        // Opt<T> non affecté = champ omis
         options.Converters.Add(new OptConverterFactory());
         options.TypeInfoResolver = (options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver()).WithAddedModifier(SkipUnsetOpt);
         return options;
@@ -62,7 +54,7 @@ public static class JsonConfig
 
         public override void Write(Utf8JsonWriter writer, Opt<T> value, JsonSerializerOptions options)
         {
-            // Opt<object> (montants) : la valeur est écrite selon son type réel.
+            // Opt<object> (montants) : selon le type réel
             var boxed = ((IOpt)value).BoxedValue;
             if (boxed is null) writer.WriteNullValue();
             else JsonSerializer.Serialize(writer, boxed, boxed.GetType(), options);
@@ -71,9 +63,7 @@ public static class JsonConfig
 
     public static string FormatDecimal(decimal value) => value.ToString("0.#############################", CultureInfo.InvariantCulture);
 
-    // Date.prototype.toISOString(). Les dates lues en base sont renvoyées
-    // telles quelles, sans conversion de fuseau, et présentées comme de
-    // l'UTC — comme le fait Prisma (voir AppDbContext.WallClockConverter).
+    // heure de la base telle quelle + Z, sans conversion (cf. WallClockConverter)
     public static string FormatDate(DateTime value) => value.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
 
     public static string FormatTime(TimeSpan value) => FormatDate(DateTime.UnixEpoch + value);

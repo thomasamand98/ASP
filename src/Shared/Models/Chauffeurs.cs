@@ -1,7 +1,5 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Chauffeurs (GET /chauffeurs). Archive est un
-// code 0/1.
 public record Chauffeur
 {
     public string IDCHAUFFEURS { get; init; } = "";

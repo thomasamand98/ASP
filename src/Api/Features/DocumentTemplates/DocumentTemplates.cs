@@ -6,16 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.DocumentTemplates;
 
-// ===== SERVICE =====
-// Modèles de document imprimables (table document_templates), créés depuis
-// l'éditeur front et consommés par le moteur de fusion (Features/DocumentMerge).
 public class DocumentTemplateService(AppDbContext db)
 {
     private const string NotFoundMessage = "Modèle de document introuvable";
 
-    // `type` optionnel (ex. "CONTRAT") : ne renvoie que les modèles
-    // utilisables pour ce type de document. Liste sans les contenus HTML
-    // (potentiellement volumineux).
+    // sans le HTML, trop lourd
     public async Task<object> GetDocumentTemplatesAsync(string? type, CancellationToken ct)
     {
         IQueryable<DocumentTemplate> query = db.DocumentTemplate;
@@ -29,7 +24,6 @@ public class DocumentTemplateService(AppDbContext db)
     public async Task<object> GetDocumentTemplateAsync(long id, CancellationToken ct) =>
         await DetailAsync(id, ct) ?? throw new NotFoundException(NotFoundMessage);
 
-    // Renvoie le HTML brut des trois zones, pour le moteur de fusion.
     public async Task<DocumentTemplateContent> GetDocumentTemplateContentAsync(long id, CancellationToken ct) =>
         await db.DocumentTemplate.Where(t => t.IDDOCUMENT_TEMPLATES == id)
             .Select(t => new DocumentTemplateContent(t.Contenu_entete, t.Contenu_html, t.Contenu_pied))
@@ -37,9 +31,7 @@ public class DocumentTemplateService(AppDbContext db)
 
     public async Task<object> CreateDocumentTemplateAsync(CreateDocumentTemplateDto dto, CancellationToken ct)
     {
-        // IDUTILISATEURS_createur/modificateur ont un défaut DB de 0, qui viole
-        // leur contrainte de clé étrangère quand ils sont omis — mis
-        // explicitement à NULL.
+        // défaut DB à 0 (FK)
         var template = new DocumentTemplate
         {
             IDUTILISATEURS_createur = null,
@@ -92,30 +84,22 @@ public class DocumentTemplateService(AppDbContext db)
             .FirstOrDefaultAsync(ct);
 }
 
-// ===== CONTROLLER =====
 public class DocumentTemplateController(DocumentTemplateService service) : ApiControllerBase
 {
-    // NestJS : GET document-templates
-    // ?type=CONTRAT : optionnel, ne renvoie que les modèles utilisables pour
-    // ce type de document.
     [HttpGet("document-templates")]
     public Task<object> GetDocumentTemplates([FromQuery] string? type, CancellationToken ct) => service.GetDocumentTemplatesAsync(type, ct);
 
-    // NestJS : GET document-templates/:id
     [HttpGet("document-templates/{id}")]
     public Task<object> GetDocumentTemplate(string id, CancellationToken ct) => service.GetDocumentTemplateAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST document-templates
     [HttpPost("document-templates")]
     public Task<IActionResult> CreateDocumentTemplate([Body] CreateDocumentTemplateDto dto, CancellationToken ct) =>
         Created201(service.CreateDocumentTemplateAsync(dto, ct));
 
-    // NestJS : PATCH document-templates/:id
     [HttpPatch("document-templates/{id}")]
     public Task<object> UpdateDocumentTemplate(string id, [Body] UpdateDocumentTemplateDto dto, CancellationToken ct) =>
         service.UpdateDocumentTemplateAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE document-templates/:id
     [HttpDelete("document-templates/{id}")]
     public Task DeleteDocumentTemplate(string id, CancellationToken ct) => service.DeleteDocumentTemplateAsync(Params.ParseId(id), ct);
 }

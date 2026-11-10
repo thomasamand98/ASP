@@ -15,7 +15,7 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Features.Performance;
 
-// dureeMs/octets : cumul des exemplaires imprimés de ce contrat.
+// dureeMs/octets cumulés sur tous les exemplaires
 public class ImpressionContrat
 {
     public required string id { get; init; }
@@ -29,19 +29,17 @@ public record EchecImpression(string id, string? numero, string message);
 
 public record AvancementImpression(int faits, int total);
 
-// corps : octets à envoyer tels quels (JSON, compressé ou non).
+// Corps envoyé tel quel, déjà compressé ou non
 public record Transfert(byte[] Corps, int OctetsJson, double GenerationMs, double JsonMs, double CompressionMs);
 
-// Avancement de l'impression de tous les contrats : partagé entre les
-// requêtes (une seule instance), renvoyé par le ping pour l'afficher côté
-// front, et empêche d'en lancer une deuxième.
+// singleton, lu par le ping, une seule impression à la fois
 public class ImpressionState
 {
     private AvancementImpression? _avancement;
 
     public AvancementImpression? Avancement => Volatile.Read(ref _avancement);
 
-    // false si une impression est déjà en cours.
+    // false si déjà en cours
     public bool TryStart() => Interlocked.CompareExchange(ref _avancement, new AvancementImpression(0, 0), null) is null;
 
     public void Set(int faits, int total) => Volatile.Write(ref _avancement, new AvancementImpression(faits, total));
@@ -49,23 +47,7 @@ public class ImpressionState
     public void Clear() => Volatile.Write(ref _avancement, null);
 }
 
-// ===== SERVICE =====
-// Traitements longs pour tester la réactivité de l'application
-// (frontend/src/features/performance/).
-//
-// Traitement fictif, deux façons d'occuper le serveur :
-//   - « attente » : attente asynchrone (comme une requête SQL ou un appel
-//     d'API lent). Le serveur reste libre de servir les autres requêtes.
-//   - « cpu » : calcul synchrone, qui occupe un fil d'exécution pendant toute
-//     la durée. ⚠️ Différence avec le backend NestJS : Node n'a qu'un fil, le
-//     calcul y bloquait toutes les requêtes de tous les utilisateurs ;
-//     ASP.NET Core en a plusieurs, les autres requêtes restent servies.
-//
-// Traitement réel : impression de tous les contrats en PDF (voir
-// ImprimerTousLesContratsAsync), enregistrés sur le serveur.
-//
-// Test de transfert : réponse JSON d'une taille choisie, avec ou sans
-// compression (voir PreparerTransfertAsync).
+// tests de charge : "attente" async, "cpu" bloque un thread (pas tout le serveur)
 public partial class PerformanceService(
     AppDbContext db,
     ContratService contratService,
@@ -75,10 +57,7 @@ public partial class PerformanceService(
     IOptions<AppOptions> options,
     ILogger<PerformanceService> logger)
 {
-    // Sous-répertoire où sont enregistrés les PDF, sous PDF_STORAGE_DIR (par
-    // défaut « storage », relatif au dossier de lancement). Vidé de ses PDF de
-    // contrats puis réécrit à chaque impression : « contrat-<id>.pdf », puis
-    // « contrat-<id>-ex2.pdf », « -ex3 »... pour les exemplaires suivants.
+    // sous PDF_STORAGE_DIR, vidé à chaque impression, contrat-<id>-ex2.pdf etc. pour les exemplaires
     private const string SousRepertoireContrats = "contrats";
 
     public AvancementImpression? GetAvancementImpression() => impression.Avancement;
@@ -104,10 +83,7 @@ public partial class PerformanceService(
         return resultat;
     }
 
-    // Prépare une réponse JSON d'environ `tailleKo` Ko, compressée (gzip) ou
-    // non, et chronomètre chaque étape côté serveur. La génération des données
-    // n'est pas une étape du transfert : elle est mesurée à part pour pouvoir
-    // être retirée du temps total constaté par le navigateur.
+    // génération chronométrée à part pour la retirer du temps vu par le navigateur
     public async Task<Transfert> PreparerTransfertAsync(int tailleKo, bool compression, CancellationToken ct)
     {
         var depart = Stopwatch.GetTimestamp();
@@ -134,19 +110,13 @@ public partial class PerformanceService(
         return new Transfert(corps, json.Length, generationMs, jsonMs, compressionMs);
     }
 
-    // Imprime tous les contrats avec le modèle choisi, en `exemplaires`
-    // exemplaires chacun, l'un après l'autre (la durée de chacun n'est ainsi
-    // pas faussée par les autres), et enregistre chaque PDF sur le serveur.
-    // Chaque exemplaire est une impression complète (lecture en base, fusion,
-    // rendu), pas une copie du fichier : c'est la charge qui est mesurée. Un
-    // contrat en échec n'arrête pas l'impression des suivants : il est listé
-    // dans `echecs`.
+    // séquentiel pour ne pas fausser les durées, chaque exemplaire refait tout (base, fusion, rendu)
     public async Task<object> ImprimerTousLesContratsAsync(long templateId, int exemplaires, CancellationToken ct)
     {
         if (!impression.TryStart()) throw new ConflictException("Une impression de tous les contrats est déjà en cours.");
         try
         {
-            // Modèle inexistant : 404 tout de suite, plutôt qu'un échec par contrat.
+            // 404 direct plutôt qu'un échec par contrat
             await documentTemplateService.GetDocumentTemplateContentAsync(templateId, ct);
 
             var contrats = await db.Contrat.OrderBy(c => c.IDCONTRATS).Select(c => new { c.IDCONTRATS, c.Num_contrat }).ToListAsync(ct);
@@ -155,14 +125,12 @@ public partial class PerformanceService(
             var debut = DateTime.UtcNow;
             var imprimes = new List<ImpressionContrat>();
             var echecs = new List<EchecImpression>();
-            // Une durée par PDF enregistré.
             var durees = new List<double>();
             var faits = 0;
 
             var dossier = Path.Combine(options.Value.StorageRoot, SousRepertoireContrats);
             Directory.CreateDirectory(dossier);
-            // Le dossier ne doit contenir que les PDF de cette impression (sinon
-            // les exemplaires d'un lancement précédent, plus nombreux, y resteraient).
+            // sinon il resterait des exemplaires du lancement précédent
             foreach (var fichier in Directory.EnumerateFiles(dossier).Where(f => FichierContrat().IsMatch(Path.GetFileName(f))).ToList())
             {
                 File.Delete(fichier);
@@ -190,8 +158,7 @@ public partial class PerformanceService(
                 }
                 catch (Exception error) when (error is not OperationCanceledException)
                 {
-                    // Les exemplaires restants de ce contrat échoueraient de la même
-                    // façon : ils sont abandonnés, mais comptés dans l'avancement.
+                    // exemplaires restants abandonnés mais comptés dans l'avancement
                     logger.LogWarning("Impression du contrat {Id} impossible : {Message}", id, Newlines().Replace(error.Message, " | "));
                     echecs.Add(new EchecImpression(id, contrat.Num_contrat, error.Message));
                     faits += exemplaires - imprime.exemplaires;
@@ -204,13 +171,12 @@ public partial class PerformanceService(
             return new
             {
                 dossier,
-                // Nombre de contrats, et d'exemplaires demandés pour chacun.
                 total = contrats.Count,
                 exemplaires,
-                // Nombre de PDF réellement enregistrés (au plus total × exemplaires).
+                // PDF réellement enregistrés
                 impressions = durees.Count,
                 dureeTotaleMs = Math.Truncate((fin - debut).TotalMilliseconds),
-                // Par PDF, sur ceux imprimés avec succès ; null si aucun.
+                // succès seulement, null si aucun
                 dureeMoyenneMs = durees.Count > 0 ? Math.Round(durees.Sum() / durees.Count, MidpointRounding.AwayFromZero) : (double?)null,
                 dureeMinMs = durees.Count > 0 ? durees.Min() : (double?)null,
                 dureeMaxMs = durees.Count > 0 ? durees.Max() : (double?)null,
@@ -232,16 +198,7 @@ public partial class PerformanceService(
     private static readonly string[] Villes = ["Liège", "Namur", "Bruxelles", "Charleroi", "Anvers", "Gand", "Mons", "Arlon", "Luxembourg", "Lille"];
     private static readonly string[] Statuts = ["En cours", "Planifié", "Terminé", "Facturé", "Annulé"];
 
-    // Lignes fictives ressemblant à une liste de l'application (libellés qui se
-    // répètent, identifiants et montants qui varient) : leur JSON se compresse
-    // comme une vraie réponse, ni trop bien (texte identique) ni trop mal
-    // (données aléatoires). Pseudo-aléatoire à graine fixe : même contenu d'un
-    // appel à l'autre, pour comparer les mesures. Chaque ligne est renvoyée
-    // déjà sérialisée en JSON.
-    //
-    // Le générateur est calculé en virgule flottante (double), exactement
-    // comme en JavaScript : le produit dépasse 2^53 et s'arrondit, un calcul
-    // en entiers 64 bits donnerait d'autres données.
+    // graine fixe, en double exprès (produit > 2^53 arrondi, en long on aurait d'autres données)
     public static List<string> GenererLignes(int octetsVoulus)
     {
         double graine = 42;
@@ -252,7 +209,7 @@ public partial class PerformanceService(
         }
 
         var lignes = new List<string>();
-        // 12 : enveloppe {"lignes":[]} ; +1 par ligne : la virgule.
+        // {"lignes":[]} = 12, puis +1 par virgule
         long octets = 12;
         while (octets < octetsVoulus)
         {
@@ -272,8 +229,7 @@ public partial class PerformanceService(
         return lignes;
     }
 
-    // Boucle de calcul volontairement synchrone : occupe son fil d'exécution
-    // jusqu'à la fin de la durée demandée.
+    // synchrone exprès
     private static long CalculerPendant(int dureeMs)
     {
         var finPrevue = Stopwatch.GetTimestamp() + (long)(dureeMs / 1000d * Stopwatch.Frequency);
@@ -284,7 +240,7 @@ public partial class PerformanceService(
             for (var i = 0; i < 10_000; i++) accumulateur += Math.Sqrt(i) * Math.Sin(i);
             iterations++;
         }
-        // Utilise le résultat pour que le calcul ne soit pas éliminé par l'optimiseur.
+        // sinon l'optimiseur vire la boucle
         return double.IsFinite(accumulateur) ? iterations : 0;
     }
 
@@ -295,18 +251,16 @@ public partial class PerformanceService(
     private static partial Regex Newlines();
 }
 
-// ===== CONTROLLER =====
 [Route("performance")]
 public class PerformanceController(PerformanceService service) : ApiControllerBase
 {
     private const int DureeParDefautS = 60;
     private const int DureeMaxS = 300;
     private const int ExemplairesMax = 20;
-    // 50 Mo de JSON : au-delà, la génération occuperait trop le serveur.
+    // 50 Mo
     private const int TailleMaxKo = 51_200;
 
-    // NestJS : POST performance/traitement-long
-    // ?mode=attente|cpu (défaut : attente) &duree=secondes (défaut : 60, max 300).
+    // duree en secondes, 60 par défaut, max 300
     [HttpPost("traitement-long")]
     public async Task<IActionResult> LancerTraitementLong([FromQuery] string? mode, [FromQuery] string? duree, CancellationToken ct)
     {
@@ -319,11 +273,7 @@ public class PerformanceController(PerformanceService service) : ApiControllerBa
         return StatusCode(StatusCodes.Status201Created, await service.LancerTraitementLongAsync(modeTraitement, (int)dureeS * 1000, ct));
     }
 
-    // NestJS : POST performance/impression-contrats
-    // ?templateId= (obligatoire) : modèle de document de type CONTRAT.
-    // &exemplaires= (défaut : 1, max 20) : nombre d'impressions par contrat.
-    // Imprime tous les contrats et enregistre les PDF sur le serveur ; ne
-    // répond qu'à la fin.
+    // ne répond qu'une fois tout imprimé
     [HttpPost("impression-contrats")]
     public async Task<IActionResult> ImprimerTousLesContrats([FromQuery] string? templateId, [FromQuery] string? exemplaires, CancellationToken ct)
     {
@@ -336,13 +286,7 @@ public class PerformanceController(PerformanceService service) : ApiControllerBa
         return StatusCode(StatusCodes.Status201Created, await service.ImprimerTousLesContratsAsync(template, (int)nombre, ct));
     }
 
-    // NestJS : GET performance/transfert
-    // ?taille= (Ko de JSON, 1 à 51 200) &compression=1 (gzip) ou 0 (défaut).
-    // Renvoie le JSON de test ; les mesures du serveur sont dans les en-têtes
-    // X-Perf-* (durées en ms, tailles en octets), exposés au front par
-    // Access-Control-Expose-Headers. Le corps, déjà sérialisé (et compressé),
-    // est envoyé tel quel. Avec Content-Encoding: gzip, le navigateur
-    // décompresse lui-même.
+    // mesures serveur dans les en-têtes X-Perf-* (ms, octets)
     [HttpGet("transfert")]
     public async Task Transfert([FromQuery] string? taille, [FromQuery] string? compression, CancellationToken ct)
     {
@@ -371,10 +315,7 @@ public class PerformanceController(PerformanceService service) : ApiControllerBa
         await Response.Body.WriteAsync(transfert.Corps, ct);
     }
 
-    // NestJS : GET performance/ping
-    // Réponse immédiate : sert à mesurer si le serveur répond encore pendant
-    // un traitement long. `impression` : avancement de l'impression de tous
-    // les contrats en cours, sinon null.
+    // pour voir si le serveur répond encore pendant un traitement long
     [HttpGet("ping")]
     public object Ping() => new { heure = DateTime.UtcNow, impression = service.GetAvancementImpression() };
 

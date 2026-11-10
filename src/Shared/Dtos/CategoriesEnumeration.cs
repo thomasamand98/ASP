@@ -1,8 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier une catégorie
-// d'énumération. Enum_system est un code 0/1 (pas un booléen) : 1 =
-// catégorie utilisée par le code applicatif, non supprimable.
+// Enum_system = 1 : utilisée par le code, non supprimable
 public class CreateCategorieEnumerationDto
 {
     [Text] public Opt<string> Nom { get; set; }

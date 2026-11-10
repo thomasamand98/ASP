@@ -2,10 +2,7 @@ using MySql.Data.MySqlClient;
 
 namespace Api.Configuration;
 
-// Compatibilité avec la configuration du backend NestJS : les mêmes
-// variables d'environnement (et le même fichier .env en développement)
-// alimentent les options de appsettings.json. Un déploiement existant
-// (Cloud Run, Railway) fonctionne donc sans changer ses variables.
+// anciennes variables d'env + .env, déploiements existants inchangés
 public static class LegacyEnvironment
 {
     private static readonly Dictionary<string, string> Mapping = new()
@@ -28,9 +25,7 @@ public static class LegacyEnvironment
     public static void AddLegacyEnvironment(this ConfigurationManager configuration, string contentRoot)
     {
         var values = new Dictionary<string, string?>();
-        // Les variables du fichier .env ne remplacent jamais celles déjà
-        // définies dans l'environnement (comme dotenv).
-        // Fichier cherché dans le projet, puis à la racine du dépôt.
+        // .env du projet ou de la racine, l'environnement prime
         string[] candidates = [".env", "../../.env"];
         var file = ReadDotEnv(candidates.Select(path => Path.GetFullPath(Path.Combine(contentRoot, path))).FirstOrDefault(File.Exists) ?? "");
         foreach (var (name, key) in Mapping)
@@ -60,9 +55,7 @@ public static class LegacyEnvironment
         return result;
     }
 
-    // mysql://utilisateur:motdepasse@hote:3306/base?param=valeur → chaîne de
-    // connexion MySQL. Paramètres reconnus : allowPublicKeyRetrieval, et
-    // socketPath (socket Unix de Cloud SQL).
+    // socketPath : socket Unix de Cloud SQL
     public static string ToConnectionString(string? databaseUrl)
     {
         if (string.IsNullOrWhiteSpace(databaseUrl)) throw new InvalidOperationException("DATABASE_URL absente : aucune requête ne pourra aboutir.");

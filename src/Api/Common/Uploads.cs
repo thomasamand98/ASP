@@ -2,8 +2,7 @@ using System.Text.Json;
 
 namespace Api.Common;
 
-// Fichiers envoyés en multipart/form-data (équivalent de
-// FileInterceptor('file', { limits: { fileSize: 50 Mo, files: 1 } })).
+// un seul fichier "file", 50 Mo max
 public static class Uploads
 {
     public const long MaxFileSize = 50 * 1024 * 1024;
@@ -17,13 +16,11 @@ public static class Uploads
 
     private static readonly IReadOnlyDictionary<string, string> NoFields = new Dictionary<string, string>();
 
-    // Lit le formulaire et son champ « file » (null si absent).
     public static async Task<Form> ReadAsync(HttpRequest request, CancellationToken ct = default)
     {
         if (!request.HasFormContentType)
         {
-            // Corps JSON (sans fichier) : ses champs sont lus comme ceux d'un
-            // formulaire, comme le fait Express.
+            // JSON accepté aussi, lu comme des champs
             var json = await ZodBodyBinder.ReadJsonBodyAsync(request);
             if (json is not { ValueKind: JsonValueKind.Object } body) return new Form(null, NoFields);
             return new Form(null, body.EnumerateObject()
@@ -37,9 +34,7 @@ public static class Uploads
         }
         catch (InvalidDataException)
         {
-            // Envoi trop volumineux : le reste de la requête est lu et ignoré
-            // (comme le fait Express), pour que le client reçoive bien la
-            // réponse 413 au lieu d'une coupure de connexion.
+            // vider le corps, sinon coupure au lieu du 413
             await request.Body.CopyToAsync(Stream.Null, ct);
             throw new PayloadTooLargeException("File too large");
         }

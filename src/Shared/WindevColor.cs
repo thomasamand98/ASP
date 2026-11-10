@@ -3,11 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Horizon.Shared;
 
-// Couleurs WinDev (Marchandise.CouleurPlanning, TypeStatut.CouleurStatut...) :
-// un entier renvoyé par la fonction RGB() de WinDev, R + G×256 + B×65536
-// (ordre BGR d'un COLORREF Windows), entre 0 et 16 777 215. 0 (noir) est la
-// valeur par défaut des colonnes, traitée comme « pas de couleur ».
-// Utilisé par l'API (planning) et par le front (pastilles, sélecteur).
+// couleur WinDev = BGR (R + G*256 + B*65536), 0 = pas de couleur
 public static partial class WindevColor
 {
     public static string? ToHex(long? value)
@@ -16,9 +12,7 @@ public static partial class WindevColor
         return $"#{n & 0xff:x2}{(n >> 8) & 0xff:x2}{(n >> 16) & 0xff:x2}";
     }
 
-    // Entier WinDev reçu en nombre, ou en texte pour les colonnes BigInt
-    // sérialisées → « #rrggbb » ; null si pas de couleur (vide, 0, hors plage,
-    // non entier).
+    // nombre ou texte (BigInt), null si vide, 0 ou invalide
     public static string? ToHex(object? value)
     {
         double n;
@@ -39,8 +33,7 @@ public static partial class WindevColor
         return JsNumber.IsInteger(n) ? ToHex((long)n) : null;
     }
 
-    // « #rrggbb » (valeur d'un <input type="color">) → entier WinDev ; 0 si
-    // la valeur n'est pas une couleur.
+    // depuis un <input type="color">, 0 si invalide
     public static long FromHex(string hex)
     {
         var match = HexPattern().Match(hex);

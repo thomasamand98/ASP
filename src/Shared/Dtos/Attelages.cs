@@ -1,8 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un attelage de
-// référence (table attelages_reference). Les IDs sont des strings côté
-// JSON, "" = aucun lien.
+// table attelages_reference, "" = aucun lien
 public class CreateAttelageDto
 {
     [Id] public Opt<string> IDCHAUFFEUR { get; set; }

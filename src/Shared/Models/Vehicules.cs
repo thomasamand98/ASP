@@ -1,7 +1,6 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Véhicules (GET /vehicules et /vehicules/:id).
-// Type : code de l'énumération « type_vehicule » ; Avec_compresseur : 0/1.
+// Type : code énumération type_vehicule
 public record Vehicule
 {
     public string IDVEHICULES { get; init; } = "";

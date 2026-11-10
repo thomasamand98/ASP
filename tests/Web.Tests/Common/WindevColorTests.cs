@@ -2,7 +2,6 @@ using Horizon.Shared;
 
 namespace Horizon.Web.Tests.Common;
 
-// Repris de frontend/src/lib/windevColor.test.ts.
 public class WindevColorTests
 {
     [Fact]

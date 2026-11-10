@@ -5,8 +5,8 @@ obj/
 .vs/
 TestResults/
 
-# Variables d'environnement locales (voir src/Api/.env.example)
+# env local, cf. src/Api/.env.example
 .env
 
-# Fichiers du serveur (PDF générés, documents joints — voir PDF_STORAGE_DIR)
+# PDF générés et pièces jointes (PDF_STORAGE_DIR)
 storage/

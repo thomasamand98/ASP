@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Types partagés par l'API et le front Blazor : DTO envoyés à l'API,
-       réponses qu'elle renvoie, sérialisation JSON et règles communes.
-       Aucune dépendance à ASP.NET Core : le projet est chargé dans le
-       navigateur (WebAssembly). -->
+  <!-- chargé dans le navigateur (WASM) : pas d'ASP.NET Core ici -->
   <PropertyGroup>
     <RootNamespace>Horizon.Shared</RootNamespace>
   </PropertyGroup>

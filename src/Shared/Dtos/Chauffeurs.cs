@@ -1,8 +1,5 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un chauffeur.
-// IDPERSONNELS/IDSOCIETES sont des strings côté JSON. Archive est un code
-// 0/1 (pas un booléen).
 public class CreateChauffeurDto
 {
     [Text] public Opt<string> Nom_chauffeur { get; set; }

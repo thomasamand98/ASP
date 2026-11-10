@@ -6,18 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Vehicules;
 
-// ===== SERVICE =====
 public class VehiculeService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs). Depuis « attelages » : voir
-    // AttelageProjectionIdsAsync (requête préalable, pas de relation vers
-    // attelages_reference).
+    // attelages : pas de FK, voir AttelageProjectionIdsAsync
     private static readonly ProjectionMap<Vehicule> Projections = new()
     {
         ["societes"] = ids => v => v.IDSOCIETES != null && ids.Contains(v.IDSOCIETES.Value),
     };
 
-    // page/pageSize optionnels : omis, toute la table.
     public async Task<object> GetVehiculesAsync(int? page, int? pageSize, string? search, Projection? projection, CancellationToken ct)
     {
         var query = db.Vehicule.WhereSearch(search, p => v =>
@@ -56,16 +52,13 @@ public class VehiculeService(AppDbContext db)
         return new { vehicules, total };
     }
 
-    // Projection depuis des attelages de référence : leurs tracteurs et
-    // remorques. IDTRACTEUR/IDREMORQUE n'ont pas de relation, les ids sont
-    // donc lus d'abord.
+    // IDTRACTEUR/IDREMORQUE sans FK, ids lus d'abord
     private async Task<List<long>> AttelageProjectionIdsAsync(long[] ids, CancellationToken ct)
     {
         var attelages = await db.AttelageReference.Where(a => ids.Contains(a.IDATTELAGE_REFERENCE)).Select(a => new { a.IDTRACTEUR, a.IDREMORQUE }).ToListAsync(ct);
         return attelages.SelectMany(a => new[] { a.IDTRACTEUR, a.IDREMORQUE }).Where(id => id is > 0).Select(id => id!.Value).ToList();
     }
 
-    // Détail : ajoute les champs scripturables absents de la liste.
     public Task<object> GetVehiculeAsync(long id, CancellationToken ct) =>
         db.Vehicule.Where(v => v.IDVEHICULES == id)
             .Select(v => (object)new
@@ -94,9 +87,7 @@ public class VehiculeService(AppDbContext db)
 
     public async Task<object> CreateVehiculeAsync(CreateVehiculeDto dto, CancellationToken ct)
     {
-        // IDSOCIETES/IDUTILISATEURS_* ont un défaut DB de 0, qui viole leur
-        // contrainte de clé étrangère quand ils sont omis — mis explicitement
-        // à NULL.
+        // défaut DB à 0, incompatible avec la FK
         var vehicule = new Vehicule { IDSOCIETES = null, IDUTILISATEURS_createur = null, IDUTILISATEURS_modificateur = null };
         Assign(vehicule, dto);
         db.Vehicule.Add(vehicule);
@@ -114,8 +105,7 @@ public class VehiculeService(AppDbContext db)
 
     public Task DeleteVehiculeAsync(long id, CancellationToken ct) => db.Vehicule.Where(v => v.IDVEHICULES == id).DeleteOrThrowAsync(ct);
 
-    // Une date vidée ("") est enregistrée NULL. IDSOCIETES "" retire la
-    // société (NULL : 0 violerait la clé étrangère).
+    // "" = NULL, dates comme IDSOCIETES
     private static void Assign(Vehicule v, CreateVehiculeDto dto)
     {
         dto.Type.ApplyInt(x => v.Type = x);
@@ -137,7 +127,6 @@ public class VehiculeService(AppDbContext db)
         dto.Avec_compresseur.ApplyInt(x => v.Avec_compresseur = x);
     }
 
-    // Forme renvoyée par la création et la modification (celle de la liste).
     private Task<object> ListViewAsync(long id, CancellationToken ct) =>
         db.Vehicule.Where(v => v.IDVEHICULES == id)
             .Select(v => (object)new
@@ -160,29 +149,22 @@ public class VehiculeService(AppDbContext db)
             .FirstOrThrowAsync(ct);
 }
 
-// ===== CONTROLLER =====
 public class VehiculeController(VehiculeService service) : ApiControllerBase
 {
-    // NestJS : GET vehicules
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
     [HttpGet("vehicules")]
     public Task<object> GetVehicules([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetVehiculesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET vehicules/:id
     [HttpGet("vehicules/{id}")]
     public Task<object> GetVehicule(string id, CancellationToken ct) => service.GetVehiculeAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST vehicules
     [HttpPost("vehicules")]
     public Task<IActionResult> CreateVehicule([Body] CreateVehiculeDto dto, CancellationToken ct) => Created201(service.CreateVehiculeAsync(dto, ct));
 
-    // NestJS : PATCH vehicules/:id
     [HttpPatch("vehicules/{id}")]
     public Task<object> UpdateVehicule(string id, [Body] UpdateVehiculeDto dto, CancellationToken ct) =>
         service.UpdateVehiculeAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE vehicules/:id
     [HttpDelete("vehicules/{id}")]
     public Task DeleteVehicule(string id, CancellationToken ct) => service.DeleteVehiculeAsync(Params.ParseId(id), ct);
 }

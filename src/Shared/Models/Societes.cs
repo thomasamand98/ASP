@@ -1,6 +1,5 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Sociétés (GET /societes et /societes/:id).
 public record Societe
 {
     public string IDSOCIETES { get; init; } = "";
@@ -11,8 +10,7 @@ public record Societe
     public string? Site_web { get; init; }
 }
 
-// Données de facturation d'un client, résolues dans la fiche Société
-// (adresse de facturation résolue, sans son id).
+// facturation client, adresse résolue sans id
 public sealed record ClientBilling
 {
     public string IDCLIENTS { get; init; } = "";
@@ -56,8 +54,7 @@ public sealed record SocieteDetail : Societe
     public List<SocieteContactLien> SocieteContacts { get; init; } = [];
 }
 
-// Messages envoyés à une société (GET /messages?societeId=), journaux
-// d'envoi en lecture seule.
+// journal d'envoi, lecture seule
 public sealed record MessageRow(string IDMESSAGES, string? Sujet, string? Destinataire, string? Type_message, string? Date_message, string? Heure_message, string? NomContact);
 
 public sealed record MessagesResponse(List<MessageRow> messages);

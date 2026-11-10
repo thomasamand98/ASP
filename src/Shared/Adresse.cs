@@ -1,6 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs d'adresse d'un DTO (tous optionnels, comme en modification partielle).
+// champs d'adresse d'un DTO, tous optionnels
 public interface IAdresseFields
 {
     Opt<string> Adresse1 { get; }

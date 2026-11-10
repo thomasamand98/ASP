@@ -1,8 +1,6 @@
 namespace Horizon.Shared;
 
-// Plage horaire d'ouverture du point (table `grilles_horaires`, liée par
-// IDLIENS = IDPOINTS). Jour_semaine : 1 = lundi … 7 = dimanche (convention
-// WinDev) ; heures en « HH:MM ».
+// grilles_horaires (IDLIENS = IDPOINTS), Jour_semaine 1 = lundi comme WinDev
 public class HorairePointDto : IRefinable
 {
     private const string Hhmm = @"^([01]\d|2[0-3]):[0-5]\d$";
@@ -21,9 +19,6 @@ public class HorairePointDto : IRefinable
     }
 }
 
-// Champs qu'un client peut envoyer pour créer/modifier un point.
-// IDSOCIETES/IDCONTACTS_DEFAUTS sont des strings côté JSON. IDADRESSES est
-// géré par le serveur (voir Common/Adresses.cs). Archive est un code 0/1.
 public class CreatePointDto : IAdresseFields
 {
     [Text] public Opt<string> Libelle { get; set; }
@@ -34,8 +29,7 @@ public class CreatePointDto : IAdresseFields
     [Text] public Opt<string> Lien_googleMap { get; set; }
     [Text] public Opt<string> Instruction { get; set; }
     [Id] public Opt<string> IDCONTACTS_DEFAUTS { get; set; }
-    // Adresse du point (table `adresses`, liée par IDADRESSES) : champs
-    // aplatis, enregistrés à part par le service.
+    // adresse aplatie
     [Text] public Opt<string> Adresse1 { get; set; }
     [Text] public Opt<string> Adresse2 { get; set; }
     [Text] public Opt<string> Adresse3 { get; set; }
@@ -43,15 +37,14 @@ public class CreatePointDto : IAdresseFields
     [Text] public Opt<string> Localite { get; set; }
     [Text] public Opt<string> Pays { get; set; }
     [Text] public Opt<string> Pays_full_name { get; set; }
-    // Plages horaires : remplacent toutes celles du point quand fournies.
+    // si fourni, remplace toutes les plages
     [Nested] public Opt<List<HorairePointDto>> Horaires { get; set; }
 }
 
 [Partial]
 public class UpdatePointDto : CreatePointDto;
 
-// Lien point ↔ contact (table point_contacts), modifié depuis les cartes de
-// l'onglet Contacts de la fiche Point.
+// lien point/contact (point_contacts)
 public class UpdatePointContactDto
 {
     [Num] public Opt<double> Recevoir_Mail_Planning { get; set; }

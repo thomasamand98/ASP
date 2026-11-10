@@ -1,10 +1,6 @@
 namespace Horizon.Shared;
 
-// Catégories de document (constantes DOCUMENT_CATEGORIE_* de WinDev) :
-// valeur de lien_documents.TYPE et de documents.Categorie. Le TYPE dit à quel
-// genre d'enregistrement se rapporte lien_documents.IDReferent (TYPE 6 :
-// IDReferent = IDSOCIETES, TYPE 3 : IDPERSONNELS, TYPE 4 : IDVEHICULES...).
-// Utilisées par l'API (validation) et par le front (onglet Documents des fiches).
+// DOCUMENT_CATEGORIE_* WinDev = lien_documents.TYPE, dit la table de IDReferent (6 société, 3 personnel...)
 public static class DocumentCategorie
 {
     public const int Contrat = 1;

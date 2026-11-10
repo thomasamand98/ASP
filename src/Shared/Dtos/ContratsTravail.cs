@@ -1,11 +1,9 @@
 namespace Horizon.Shared;
 
-// Formes attendues par ContratTravailController (fiche personnel, onglet
-// Contrat). Dates en « AAAA-MM-JJ », taux en nombres (ou strings
-// numériques), Routier/Manutention/Atelier en codes 0/1 comme sur Personnel.
+// onglet Contrat de la fiche personnel, dates en AAAA-MM-JJ
 public class TauxHoraireDto
 {
-    // Absent pour un nouveau taux ; présent pour un taux existant à modifier.
+    // absent = nouveau taux
     [Id] public Opt<string> IDTAUX_HORAIRE { get; set; }
     [Date] public Opt<string> Date_application { get; set; }
     [Amount] public Opt<object> Taux_horaire { get; set; }
@@ -26,7 +24,6 @@ public class ContratTravailDto
     [Num] public Opt<double> Routier { get; set; }
     [Num] public Opt<double> Manutention { get; set; }
     [Num] public Opt<double> Atelier { get; set; }
-    // Liste complète des taux du contrat : ceux absents de la liste sont
-    // supprimés, ceux sans IDTAUX_HORAIRE créés, les autres modifiés.
+    // liste complète, taux absents supprimés
     [Nested] public Opt<List<TauxHoraireDto>> Taux { get; set; }
 }

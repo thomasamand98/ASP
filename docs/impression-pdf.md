@@ -1,108 +1,68 @@
 # Impression PDF
 
-Ce document explique comment un contrat (ou tout autre enregistrement) devient
-un fichier PDF téléchargeable : le modèle de document (mise en page éditée à
-la souris), le moteur de fusion (remplace les champs par les vraies données)
-et le rendu PDF (Chromium headless).
-
-## Sommaire
-
-1. [Vue d'ensemble](#vue-densemble)
-2. [Le modèle de document](#le-modèle-de-document)
-3. [L'éditeur de modèle (frontend)](#léditeur-de-modèle-frontend)
-4. [Le moteur de fusion (backend)](#le-moteur-de-fusion-backend)
-5. [Le rendu PDF (Puppeteer)](#le-rendu-pdf-puppeteer)
-6. [La route d'impression d'un contrat](#la-route-dimpression-dun-contrat)
-7. [Le bouton « Voir le PDF » (frontend)](#le-bouton--voir-le-pdf--frontend)
-8. [Ajouter l'impression à un autre type de document](#ajouter-limpression-à-un-autre-type-de-document)
-9. [Tester](#tester)
-10. [Limites connues](#limites-connues)
+Comment un contrat (ou n'importe quel autre enregistrement) devient un PDF :
+le modèle de document (mis en page à la souris), la fusion (les champs
+remplacés par les vraies données) et le rendu (Chromium headless).
 
 ## Vue d'ensemble
 
 ```
- 1. Un utilisateur crée/édite un modèle dans l'éditeur (souris, glisser-déposer)
-    → du HTML est stocké tel quel en base (3 zones : en-tête / contenu / pied)
+ 1. Un utilisateur crée ou modifie un modèle dans l'éditeur
+    → le HTML est stocké tel quel en base (3 zones : en-tête / contenu / pied)
 
- 2. Un utilisateur clique « Voir le PDF » sur une fiche contrat
+ 2. Il clique sur le bouton PDF d'une fiche contrat
     → GET /contrats/:id/pdf?templateId=X
 
- 3. Backend :
-    ContratController          → charge le contrat + construit le contexte de données
-      → DocumentMergeService   → charge le HTML du modèle (3 zones)
-        → resolveMergeHtml()   → remplace les jetons du HTML par les vraies valeurs
-      → PdfRendererService     → transforme le HTML fini en PDF (Chromium headless)
-    ← Buffer PDF (Content-Type: application/pdf)
+ 3. API :
+    ContratController.GetContratPdf
+      ContratService.GetContratMergeContextAsync   → contexte de données
+      DocumentMergeService.RenderPdfAsync          → charge les 3 zones du modèle
+        MergeHtml.Resolve                          → remplace les jetons par les valeurs
+        PdfRendererService.RenderPdfAsync          → HTML fini vers PDF (Chromium)
+    ← application/pdf
 
- 4. Frontend : télécharge le PDF (avec le jeton d'auth), l'ouvre dans un nouvel onglet
+ 4. Front : télécharge le PDF (avec le jeton) et l'ouvre dans un nouvel onglet
 ```
 
-Trois briques indépendantes, qui ne se connaissent pas entre elles :
+Trois morceaux qui ne se connaissent pas :
 
-| Brique | Rôle | Ne sait rien de |
+| Morceau | Rôle | Ne connaît pas |
 |---|---|---|
-| **Modèle de document** (`document-template`) | Stocke le HTML des 3 zones | La donnée réelle, ni le type de document (contrat, facture…) |
-| **Moteur de fusion** (`document-merge`) | Remplace les jetons par des valeurs, produit le PDF | D'où vient le contexte (contrat, facture…) |
-| **Module métier** (`contrat`, plus tard `facture`…) | Construit le contexte de données, expose la route `/pdf` | Comment le HTML est fusionné ou rendu |
+| Modèle de document (`Features/DocumentTemplates`) | Stocke le HTML des 3 zones | Les données, ni le type de document |
+| Fusion (`Features/DocumentMerge`) | Remplace les jetons, produit le PDF | D'où vient le contexte |
+| Module métier (`Features/Contrats`, plus tard factures...) | Construit le contexte, expose la route `/pdf` | Comment le HTML est fusionné ou rendu |
 
 ## Le modèle de document
 
-Un modèle (`document_templates` en base, `backend/prisma/schema.prisma`) a
-trois zones de HTML **indépendantes**, résolues avec **le même contexte** :
+Table `document_templates` (entité `Data/Entities/DocumentTemplate.cs`). Trois
+zones HTML indépendantes, résolues avec le même contexte :
 
-| Champ | Rôle |
+| Colonne | Rôle |
 |---|---|
-| `Contenu_entete` | Répété en haut de chaque page imprimée (ex. logo) |
-| `Contenu_html` | Le contenu principal, affiché une fois |
-| `Contenu_pied` | Répété en bas de chaque page (ex. CGV, numéro de page) |
-| `Type_document` | Ex. `"CONTRAT"` — filtre les modèles proposés sur la fiche contrat |
+| `Contenu_entete` | Répété en haut de chaque page (logo par ex.) |
+| `Contenu_html` | Contenu principal, affiché une fois |
+| `Contenu_pied` | Répété en bas de chaque page (CGV, numéro de page) |
+| `Type_document` | Par ex. `CONTRAT`, filtre les modèles proposés sur la fiche contrat |
 
-CRUD classique (`backend/src/document-template/`) :
+CRUD classique dans `src/Api/Features/DocumentTemplates/DocumentTemplates.cs` :
+`GET /document-templates` (`?type=CONTRAT` optionnel), `GET /document-templates/:id`
+(avec le HTML), `POST`, `PATCH /document-templates/:id`, `DELETE /document-templates/:id`.
 
-```ts
-// document-template.controller.ts
-@Get('document-templates')              // ?type=CONTRAT (optionnel)
-@Get('document-templates/:id')          // modèle complet (avec le HTML)
-@Post('document-templates')
-@Patch('document-templates/:id')
-@Delete('document-templates/:id')
-```
+## L'éditeur (front)
 
-## L'éditeur de modèle (frontend)
+`src/Web/Features/Documents/DocumentTemplateEditor.razor` : éditeur WYSIWYG
+avec trois zones `contentEditable` et une palette de champs à glisser-déposer
+(`MergeFieldPalette.razor`). Il insère dans le HTML des éléments avec des
+attributs `data-*` que la fusion reconnaît ensuite. Tout ce qui touche au DOM
+sous le curseur (sélection, insertion, glisser-déposer) est en JS dans
+`wwwroot/js/interop.js` (`horizon.docEditor`), appelé via `DocEditorJs.cs`.
 
-`frontend/src/features/documents/DocumentTemplateEditor.tsx` est un éditeur
-WYSIWYG : trois zones `contentEditable`, une palette de champs à glisser-déposer
-(`MergeFieldPalette.tsx`), qui insère dans le HTML des éléments avec des
-attributs `data-*` reconnus plus tard par le moteur de fusion.
+Le catalogue des champs est dans `MergeFields.cs`, un chemin par champ, avec
+les noms des entités de l'API. Un groupe « liste » a un `ListPath` (par ex.
+`Contrat.Prestations[]`) et peut avoir des sous-listes (`Children`, par ex.
+`Contrat.Prestations[].PrestationSupplementaires[]`).
 
-**Le catalogue des champs disponibles** (`mergeFields.ts`) — un chemin par
-champ, qui reprend les noms des modèles Prisma :
-
-```ts
-export const MERGE_FIELD_GROUPS: MergeFieldGroup[] = [
-  {
-    id: 'contrat',
-    label: 'Contrat',
-    fields: [
-      { path: 'Contrat.Num_contrat', label: 'N° contrat', kind: 'text' },
-      { path: 'Contrat.Date_debut', label: 'Date de début', kind: 'date' },
-      // ...
-    ],
-  },
-  {
-    id: 'prestations',
-    label: 'Prestations',
-    listPath: 'Contrat.Prestations[]',       // groupe "liste" = bloc répétable
-    fields: [
-      { path: 'Contrat.Prestations[].Type', label: 'Type', kind: 'text' },
-      { path: 'Contrat.Prestations[].Prix_unitaire', label: 'P.U.', kind: 'number' },
-      // ...
-    ],
-  },
-]
-```
-
-**Un champ simple** se dépose comme un jeton (`domInsert.ts`) :
+Un champ simple est déposé comme un jeton :
 
 ```html
 <span class="dte-chip" data-merge-field="Contrat.Num_contrat" data-kind="text">
@@ -110,9 +70,8 @@ export const MERGE_FIELD_GROUPS: MergeFieldGroup[] = [
 </span>
 ```
 
-**Un groupe "liste"** se dépose comme un tableau répétable — une ligne
-« modèle » (`.dte-repeat-row`) qui sera dupliquée une fois par élément au
-moment de la fusion :
+Un groupe « liste » est déposé comme un tableau répétable. La ligne
+`.dte-repeat-row` sera copiée une fois par élément à la fusion :
 
 ```html
 <div class="dte-repeat" data-repeat-list="Contrat.Prestations[]">
@@ -128,231 +87,137 @@ moment de la fusion :
 </div>
 ```
 
-À la sauvegarde, l'éditeur envoie simplement le HTML de chacune des trois
-zones (`innerHTML` des trois canvas) via `PATCH /document-templates/:id`. Rien
-n'est interprété côté frontend : c'est du HTML brut, stocké tel quel.
+À l'enregistrement, l'éditeur envoie juste le HTML des trois zones par
+`PATCH /document-templates/:id`. Le front n'interprète rien, c'est du HTML
+brut stocké tel quel. Au chargement dans l'éditeur, il passe par
+`TemplateHtmlSanitizer.cs`.
 
-## Le moteur de fusion (backend)
+## La fusion (API)
 
-`backend/src/document-merge/merge-html.ts` — une fonction **pure**, sans accès
-base de données : elle prend le HTML d'un modèle et un objet `MergeContext`
-(déjà construit par l'appelant), et renvoie le HTML fini.
+`src/Api/Features/DocumentMerge/MergeHtml.cs`, méthode
+`MergeHtml.Resolve(templateHtml, context)`. Pas d'accès à la base : elle prend
+le HTML d'un modèle et un contexte déjà construit, et renvoie le HTML fini
+(parsing avec AngleSharp).
 
-```ts
-export type MergeContext = Record<string, unknown>
+1. Les blocs `[data-repeat-list]` sont développés : une copie de
+   `.dte-repeat-row` par élément de la liste pointée, chaque copie résolue
+   contre son élément. Les blocs imbriqués (suppléments d'une prestation)
+   sont gérés.
+2. Chaque `[data-merge-field="Chemin"]` est remplacé par sa valeur formatée.
+3. Les restes de l'éditeur (`contenteditable`, boutons de suppression des
+   jetons...) sont retirés.
 
-export function resolveMergeHtml(templateHtml: string, context: MergeContext): string {
-  // 1. Développe les blocs [data-repeat-list] : une copie de .dte-repeat-row
-  //    par élément du tableau pointé par le chemin (ex. "Contrat.Prestations[]")
-  // 2. Remplace chaque [data-merge-field="Chemin"] par sa valeur formatée
-  //    (résolue contre le contexte, en tenant compte du tableau courant si
-  //    on est à l'intérieur d'un bloc répétable)
-}
-```
+Exemple, avec ce contexte :
 
-Exemple concret : avec ce contexte...
-
-```ts
-const context = {
-  Contrat: {
-    Num_contrat: 'C-2026-042',
-    Prestations: [
-      { Type: 'Transport', Prix_unitaire: 150 },
-      { Type: 'Stockage', Prix_unitaire: 80 },
-    ],
-  },
-}
-```
-
-...le jeton `data-merge-field="Contrat.Num_contrat"` devient `C-2026-042`, et
-la ligne `.dte-repeat-row` du tableau `Contrat.Prestations[]` est dupliquée
-deux fois (une par prestation), chaque copie résolvant ses jetons contre sa
-propre prestation plutôt que contre la liste entière.
-
-`kind` (posé par l'éditeur, voir `data-kind`) contrôle le formatage : les
-dates passent par `toLocaleDateString('fr-BE')`, les nombres (y compris les
-`Decimal` Prisma) par `toLocaleString('fr-BE', { minimumFractionDigits: 2 })`,
-et `kind="image"` remplace le jeton par une vraie balise `<img>`.
-
-**Orchestration** (`document-merge.service.ts`) — charge le modèle, résout les
-trois zones avec le même contexte, délègue le rendu :
-
-```ts
-@Injectable()
-export class DocumentMergeService {
-  constructor(
-    private readonly documentTemplateService: DocumentTemplateService,
-    private readonly pdfRendererService: PdfRendererService,
-  ) {}
-
-  async renderPdf(templateId: bigint, context: MergeContext): Promise<Buffer> {
-    const content = await this.documentTemplateService.getDocumentTemplateContent(templateId)
-    return this.pdfRendererService.renderPdf({
-      headerHtml: content.Contenu_entete ? resolveMergeHtml(content.Contenu_entete, context) : '',
-      bodyHtml: resolveMergeHtml(content.Contenu_html, context),
-      footerHtml: content.Contenu_pied ? resolveMergeHtml(content.Contenu_pied, context) : '',
-    })
+```json
+{
+  "Contrat": {
+    "Num_contrat": "C-2026-042",
+    "Prestations": [
+      { "Type": "Transport", "Prix_unitaire": 150 },
+      { "Type": "Stockage", "Prix_unitaire": 80 }
+    ]
   }
 }
 ```
 
-## Le rendu PDF (Puppeteer)
+le jeton `Contrat.Num_contrat` devient `C-2026-042`, et la ligne du tableau
+`Contrat.Prestations[]` est copiée deux fois, une par prestation.
 
-`backend/src/document-merge/pdf-renderer.service.ts` transforme le HTML fini
-en PDF via une instance **Chromium headless** (Puppeteer) : le vrai moteur de
-mise en page d'un navigateur (sauts de page, tableaux qui continuent sur la
-page suivante...), plutôt qu'une librairie qui approxime le rendu.
+`data-kind` règle le format, à la belge : `date` en `dd/MM/yyyy` (jour dans le
+fuseau du serveur), `number` avec deux décimales, virgule et espace fine
+comme séparateur de milliers, `image` remplace le jeton par une vraie balise
+`<img>` (data URI, pour le logo).
 
-```ts
-@Injectable()
-export class PdfRendererService implements OnModuleDestroy {
-  private browserPromise: Promise<Browser> | null = null
+`DocumentMergeService` (dans `PdfRendererService.cs`) charge le modèle, résout
+les trois zones avec le même contexte et passe le résultat au rendu.
 
-  private getBrowser(): Promise<Browser> {
-    // Une seule instance Chromium, démarrée au premier appel et réutilisée
-    // entre les requêtes (le démarrage prend ~1s, trop lent à refaire à chaque PDF).
-    if (!this.browserPromise) {
-      this.browserPromise = puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
-    }
-    return this.browserPromise
-  }
+## Le rendu (PuppeteerSharp)
 
-  async renderPdf({ headerHtml, bodyHtml, footerHtml }: RenderInput): Promise<Buffer> {
-    const browser = await this.getBrowser()
-    const page = await browser.newPage()
-    try {
-      await page.setContent(`<!doctype html><html><body>${bodyHtml}</body></html>`, { waitUntil: 'load' })
-      return Buffer.from(await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '32mm', bottom: '20mm', left: '16mm', right: '16mm' },
-        displayHeaderFooter: true,
-        headerTemplate: headerHtml,   // rendu dans un cadre isolé (pas d'accès au <style> de la page)
-        footerTemplate: footerHtml,
-      }))
-    } finally {
-      await page.close()
-    }
-  }
-}
-```
+`PdfRendererService` transforme le HTML fini en PDF avec Chromium headless
+(PuppeteerSharp). On a le vrai moteur de mise en page d'un navigateur (sauts
+de page, tableaux sur plusieurs pages...) au lieu d'une lib qui approxime.
 
-Point important : `headerTemplate`/`footerTemplate` sont rendus par Chromium
-dans un cadre **isolé**, sans accès aux styles de la page principale — c'est
-pourquoi le fichier définit deux feuilles de style séparées
-(`BODY_STYLESHEET` et `CHROME_STYLESHEET`) plutôt qu'une seule.
+- Un seul Chromium, lancé à la première demande puis réutilisé. S'il s'arrête,
+  il est relancé et le rendu retenté une fois. En cas d'échec : `503`.
+- A4, marges de 16 mm à gauche et à droite, 32 mm en haut s'il y a un en-tête
+  (18 mm sinon), 20 mm en bas s'il y a un pied (16 mm sinon).
+- Le HTML vient d'un modèle saisi par un utilisateur : JavaScript désactivé et
+  aucune ressource externe chargée (seules les images en `data:` passent).
+- En-tête et pied passent par `HeaderTemplate` / `FooterTemplate`, que Chromium
+  rend dans un cadre isolé sans accès aux styles de la page. D'où deux
+  feuilles de style séparées, `BodyStylesheet` et `ChromeStylesheet`.
+
+Chromium utilisé : `PUPPETEER_EXECUTABLE_PATH` s'il est défini (l'image Docker
+utilise le Chromium de Debian), sinon un Chrome déjà téléchargé par puppeteer
+dans `~/.cache/puppeteer`, sinon PuppeteerSharp en télécharge un à la première
+génération. Chromium est lancé avec `--disable-dev-shm-usage` parce que Docker
+limite `/dev/shm` à 64 Mo, ce qui faisait planter les gros lots.
 
 ## La route d'impression d'un contrat
 
-`backend/src/contrat/contrat.controller.ts` assemble tout, pour un contrat
-donné :
+`ContratController.GetContratPdf` dans `src/Api/Features/Contrats/Contrats.cs` :
+lit `id` et `templateId`, construit le contexte, appelle
+`DocumentMergeService.RenderPdfAsync` et renvoie le PDF en `inline`
+(`contrat-<id>.pdf`).
 
-```ts
-@Get('contrats/:id/pdf')
-async getContratPdf(@Param('id') id: string, @Query('templateId') templateId: string, @Res() res: Response) {
-  if (!templateId) throw new BadRequestException('templateId requis')
-  const context = await this.contratService.getContratMergeContext(BigInt(id))
-  const pdf = await this.documentMergeService.renderPdf(BigInt(templateId), context)
-  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="contrat-${id}.pdf"` })
-  res.send(pdf)
-}
-```
+Le contexte vient de `ContratService.GetContratMergeContextAsync`. Il a les
+mêmes clés racine que `MergeFields.cs` côté front, pour que tout champ posé
+dans l'éditeur se résolve :
 
-`getContratMergeContext` (`contrat.service.ts`) construit le contexte : il
-suit **exactement les mêmes chemins** que `mergeFields.ts` côté frontend, pour
-qu'un champ posé dans l'éditeur se résolve forcément contre quelque chose.
+- `Entite` : notre société (table `entites`) ;
+- `Divers` : `Date_edition` et `CGV_URL` ;
+- `Contrat` : le contrat avec société, type de facture, prestations et
+  suppléments. Les codes d'unité sont traduits en libellés via la catégorie
+  d'énumération `unite_prestation`.
 
-```ts
-async getContratMergeContext(id: bigint): Promise<MergeContext> {
-  const [contrat, entite, { enumerations: unites }] = await Promise.all([
-    this.prisma.contrat.findUniqueOrThrow({ where: { IDCONTRATS: id }, select: contratMergeSelect }),
-    this.entiteService.getEntite(),                                   // "Entite.*" (notre société)
-    this.enumerationService.getEnumerations(undefined, 'unite_prestation'),
-  ])
+## Le bouton PDF (front)
 
-  return {
-    Entite: entite,
-    Divers: { Date_edition: new Date(), CGV_URL: process.env.CGV_URL || null },
-    Contrat: {
-      ...contrat,
-      Prestations: contrat.Prestations.map((p) => ({ ...p /* + libellés d'unité résolus */ })),
-    },
-  }
-}
-```
-
-## Le bouton « Voir le PDF » (frontend)
-
-Un `<a href>` classique ne peut pas envoyer l'en-tête `Authorization` — la
-route est protégée par JWT (voir `docs/securite-authentification.md`). Le
-bouton télécharge donc le PDF via `apiFetch` (authentifié), puis l'ouvre
-depuis un `Blob` :
-
-```tsx
-// frontend/src/features/contrats/ContratPdfButton.tsx
-async function handleView() {
-  const preview = window.open('', '_blank')   // ouvert AVANT l'attente réseau,
-                                                // sinon le navigateur bloque le popup
-  const res = await apiFetch(`contrats/${contratId}/pdf?templateId=${templateId}`)
-  const blob = await res.blob()
-  preview!.location.href = URL.createObjectURL(blob)
-}
-```
+`src/Web/Features/Contrats/ContratPdfButton.razor`. Un `<a href>` ne peut pas
+envoyer `Authorization` et la route est protégée par JWT (voir
+[securite-authentification.md](securite-authentification.md)). Le bouton
+ouvre donc d'abord un onglet vide (pendant le clic, sinon le navigateur bloque
+le popup), télécharge le PDF via `ApiClient`, puis affiche le blob dans cet
+onglet. La liste des modèles proposés est celle de type `CONTRAT`.
 
 ## Ajouter l'impression à un autre type de document
 
-Pour imprimer, par exemple, une facture, sans toucher au moteur de fusion :
+Par exemple une facture, sans toucher à la fusion :
 
-1. **Contexte** : ajouter `getFactureMergeContext(id)` dans `facture.service.ts`,
-   qui renvoie un objet `{ Entite, Divers, Facture: {...} }` (même forme que
-   `getContratMergeContext`).
-2. **Champs de fusion** : ajouter un groupe `"facture"` dans `mergeFields.ts`
-   (`Facture.Num_facture`, `Facture.Lignes[].Prix_unitaire`...), avec des
-   chemins qui correspondent exactement aux clés du contexte ci-dessus.
-3. **Route** : dans `facture.controller.ts`,
+1. Contexte : une méthode `GetFactureMergeContextAsync(id)` dans le service
+   facture, qui renvoie `{ Entite, Divers, Facture: {...} }` (même forme que
+   pour les contrats).
+2. Champs : un groupe `facture` dans `MergeFields.cs` (`Facture.Num_facture`,
+   `Facture.Lignes[].Prix_unitaire`...), avec des chemins qui collent
+   exactement aux clés du contexte.
+3. Route : `GET factures/{id}/pdf` sur le même modèle que `GetContratPdf`
+   (contexte, puis `documentMerge.RenderPdfAsync(templateId, context, ct)`,
+   puis `File(pdf, "application/pdf")`).
+4. Modèle : en créer un avec `Type_document` = `FACTURE` dans l'éditeur. Il
+   apparaîtra dans le sélecteur si la fiche facture a un bouton du même genre
+   que `ContratPdfButton`, filtré sur ce type.
 
-   ```ts
-   @Get('factures/:id/pdf')
-   async getFacturePdf(@Param('id') id: string, @Query('templateId') templateId: string, @Res() res: Response) {
-     const context = await this.factureService.getFactureMergeContext(BigInt(id))
-     const pdf = await this.documentMergeService.renderPdf(BigInt(templateId), context)
-     res.set({ 'Content-Type': 'application/pdf' })
-     res.send(pdf)
-   }
-   ```
-
-4. **Modèle** : créer un modèle avec `Type_document: "FACTURE"` dans l'éditeur —
-   il apparaîtra automatiquement dans le sélecteur si la fiche facture utilise
-   `<ContratPdfButton templates={...} />` (ou un équivalent) filtré sur ce type.
-
-`DocumentMergeService` et `PdfRendererService` n'ont besoin d'aucune
-modification : ils ne connaissent que `MergeContext`, pas la Facture.
+`DocumentMergeService` et `PdfRendererService` ne bougent pas, ils ne
+connaissent que le contexte.
 
 ## Tester
 
 ```bash
-# 1. Lister les modèles disponibles pour les contrats
-curl <API>/document-templates?type=CONTRAT -H "Authorization: Bearer <token>"
+# 1. Modèles disponibles pour les contrats
+curl "<API>/document-templates?type=CONTRAT" -H "Authorization: Bearer <token>"
 
-# 2. Générer le PDF d'un contrat avec un modèle existant
+# 2. PDF d'un contrat avec un modèle existant
 curl -o contrat.pdf "<API>/contrats/8/pdf?templateId=6" -H "Authorization: Bearer <token>"
 
-# 3. Modèle inexistant → 404 propre (pas un 500)
+# 3. Modèle inexistant : 404, pas 500
 curl "<API>/contrats/8/pdf?templateId=999999" -H "Authorization: Bearer <token>"
-# → {"statusCode":404,"message":"Modèle de document introuvable"}
+# {"statusCode":404,"message":"Modèle de document introuvable"}
 ```
 
 ## Limites connues
 
-- **Un seul niveau d'imbrication réellement utilisé** : le moteur de fusion
-  gère les blocs répétables imbriqués (`resolveMergeHtml` est récursif), mais
-  la palette (`mergeFields.ts`) ne dépose aujourd'hui les sous-listes (ex.
-  prestations supplémentaires) que comme blocs **indépendants**, pas imbriqués
-  dans la ligne parente.
-- **Puppeteer nécessite Chromium téléchargé** (`node_modules`/cache
-  Puppeteer) — voir `docs/securite-authentification.md` pour le déploiement
-  Railway ; sur un serveur dédié, prévoir les dépendances système de Chromium
-  headless.
-- **`CGV_URL`** (lien des conditions générales dans le pied de page) est une
-  variable d'environnement backend, sans rapport avec le reste du système de
-  fusion — voir `backend/.env.example`.
+- Sur un serveur sans Docker, prévoir les dépendances système de Chromium
+  headless (ou pointer `PUPPETEER_EXECUTABLE_PATH` sur un Chromium installé).
+- `CGV_URL` (lien des conditions générales en pied de page) est une variable
+  d'environnement de l'API, à part du reste de la fusion. Voir
+  `src/Api/.env.example`.

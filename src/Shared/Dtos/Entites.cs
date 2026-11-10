@@ -1,8 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs scripturables de l'entité (coordonnées de la société courante,
-// paramètres bancaires et SMTP), plus les champs de l'adresse liée, aplatis
-// pour le formulaire mais persistés dans la table `adresses` séparée.
+// adresse aplatie ici mais stockée dans `adresses`
 public class UpdateEntiteDto : IAdresseFields
 {
     [Text] public Opt<string> Nom_societe { get; set; }
@@ -31,9 +29,6 @@ public class UpdateEntiteDto : IAdresseFields
     [Text] public Opt<string> Localite { get; set; }
     [Text] public Opt<string> Pays { get; set; }
     [Text] public Opt<string> Pays_full_name { get; set; }
-    // Logo (voir EntiteForm.tsx, glisser-déposer) : data URI base64
-    // ("data:image/png;base64,...") envoyée telle quelle par le navigateur.
-    // Chaîne vide = supprime le logo (contrairement aux champs mot de passe,
-    // qui eux restent inchangés si vides).
+    // data URI base64, "" = logo supprimé (pas comme les mots de passe)
     [Text] public Opt<string> Logo { get; set; }
 }

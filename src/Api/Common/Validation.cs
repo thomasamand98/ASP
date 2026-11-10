@@ -8,9 +8,6 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Api.Common;
 
-// Lecture et validation des corps de requête contre les DTO de Shared
-// (attributs de champ et Opt<T> : voir Shared/Validation.cs).
-
 public static partial class Zod
 {
     private sealed record Issue(string Path, string Message);
@@ -19,7 +16,6 @@ public static partial class Zod
 
     private static readonly ConcurrentDictionary<Type, FieldInfo[]> Fields = new();
 
-    // Valide `body` (null = corps absent) contre le DTO et le renvoie rempli.
     public static T Parse<T>(JsonElement? body) where T : class, new() => (T)Parse(typeof(T), body);
 
     public static object Parse(Type type, JsonElement? body)
@@ -35,8 +31,7 @@ public static partial class Zod
 
     private static FieldInfo[] FieldsOf(Type type) => Fields.GetOrAdd(type, static t =>
     {
-        // Classe de base d'abord (comme BaseDto.extend({...}) côté zod), puis
-        // ordre de déclaration : c'est l'ordre des messages d'erreur.
+        // base d'abord puis ordre de déclaration (= ordre des messages)
         var hierarchy = new List<Type>();
         for (var current = t; current is not null && current != typeof(object); current = current.BaseType) hierarchy.Insert(0, current);
         return hierarchy
@@ -76,8 +71,7 @@ public static partial class Zod
             var required = field.Attribute.Required && !partial;
             var (isSet, value, fieldFatal) = ParseField(field, raw, required, fieldPath, issues);
             fatal |= fieldFatal;
-            // Une valeur du bon type mais refusée (motif, bornes...) reste
-            // renseignée : les règles Refine la voient, comme avec zod.
+            // refusée mais du bon type : gardée pour Refine
             if (isSet) field.Property.SetValue(instance, Activator.CreateInstance(field.Property.PropertyType, value));
         }
 
@@ -90,19 +84,16 @@ public static partial class Zod
 
     private static string ExpectedObject(JsonElement element) => element.ValueKind == JsonValueKind.Undefined ? "champ obligatoire" : "objet attendu";
 
-    // (envoyé, valeur, erreur de type)
     private static (bool IsSet, object? Value, bool Fatal) ParseField(FieldInfo field, JsonElement? raw, bool required, string path, List<Issue> issues)
     {
         var attribute = field.Attribute;
-        // Erreur de type : le champ reste vide et les règles Refine de l'objet
-        // ne sont pas évaluées.
+        // mauvais type : champ vide, pas de Refine
         (bool, object?, bool) Fail(string message)
         {
             issues.Add(new Issue(path, message));
             return (false, null, true);
         }
 
-        // Valeur du bon type mais refusée : elle reste renseignée.
         (bool, object?, bool) Reject(string message, object value)
         {
             issues.Add(new Issue(path, message));
@@ -119,7 +110,7 @@ public static partial class Zod
         {
             case TextAttribute or IdAttribute or IntegerTextAttribute or DecAttribute or DateAttribute:
             {
-                // numberToString : un nombre est accepté comme texte.
+                // nombre accepté comme texte
                 string text;
                 if (json.ValueKind == JsonValueKind.Number) text = JsNumber.ToString(json.GetDouble());
                 else if (json.ValueKind == JsonValueKind.String) text = json.GetString()!;
@@ -165,7 +156,6 @@ public static partial class Zod
             {
                 if (json.ValueKind != JsonValueKind.Number) return Fail("nombre attendu");
                 var number = json.GetDouble();
-                // Messages de zod pour z.number().int().min().max().
                 if (!JsNumber.IsInteger(number)) issues.Add(new Issue(path, "type invalide"));
                 if (number < strictInt.Min) issues.Add(new Issue(path, $"Number must be greater than or equal to {strictInt.Min}"));
                 if (number > strictInt.Max) issues.Add(new Issue(path, $"Number must be less than or equal to {strictInt.Max}"));
@@ -245,8 +235,7 @@ public static partial class Zod
     private static partial Regex DayPattern();
 }
 
-// `[Body] CreateXDto dto` : lit le corps JSON et le valide (équivalent de
-// `@Body(new ZodBodyPipe(CreateXDto))`).
+// usage : [Body] CreateXDto dto
 [AttributeUsage(AttributeTargets.Parameter)]
 public sealed class BodyAttribute : ModelBinderAttribute
 {
@@ -258,8 +247,7 @@ public sealed class BodyAttribute : ModelBinderAttribute
 
 public sealed class ZodBodyBinder : IModelBinder
 {
-    // Limite du corps JSON (voir main.ts côté NestJS : 10 Mo, pour les logos
-    // envoyés en data URI base64).
+    // 10 Mo, pour les logos en base64
     public const long MaxJsonBodySize = 10 * 1024 * 1024;
 
     public async Task BindModelAsync(ModelBindingContext bindingContext)
@@ -268,7 +256,7 @@ public sealed class ZodBodyBinder : IModelBinder
         bindingContext.Result = ModelBindingResult.Success(Zod.Parse(bindingContext.ModelType, body));
     }
 
-    // null : pas de corps JSON.
+    // null = pas de corps JSON
     public static async Task<JsonElement?> ReadJsonBodyAsync(HttpRequest request)
     {
         if (request.ContentLength > MaxJsonBodySize) throw new JsonBodyTooLargeException();
@@ -295,7 +283,5 @@ public sealed class ZodBodyBinder : IModelBinder
     }
 }
 
-// Corps JSON de plus de 10 Mo. Comme dans le backend d'origine (où l'erreur
-// d'Express n'est pas une HttpException), la réponse est une erreur 500
-// générique, journalisée côté serveur.
+// pas une HttpException : 500 générique voulu
 public sealed class JsonBodyTooLargeException() : Exception("request entity too large");

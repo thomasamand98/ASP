@@ -6,25 +6,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Contacts;
 
-// ===== SERVICE =====
 public class ContactService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Contact> Projections = new()
     {
         ["societes"] = ids => c => c.SocieteContacts.Any(sc => sc.IDSOCIETES != null && ids.Contains(sc.IDSOCIETES.Value)),
         ["points"] = ids => c => c.PointContacts.Any(pc => pc.IDPOINTS != null && ids.Contains(pc.IDPOINTS.Value)),
     };
 
-    // page/pageSize optionnels : omis, toute la table.
-    // societeId optionnel : ne renvoie que les contacts liés à cette société
-    // (onglet Contacts de la fiche Société) — les colonnes Fonction/Service
-    // affichent alors le lien avec CETTE société plutôt que le premier lien
-    // trouvé.
-    // pointId optionnel : ne renvoie que les contacts liés à ce point (onglet
-    // Contacts de la fiche Point), avec leur lien à ce point (PointContacts :
-    // Lien, Recevoir_Mail_Planning).
+    // avec societeId/pointId : infos du lien avec cette société / ce point, pas du 1er lien trouvé
     public async Task<object> GetContactsAsync(int? page, int? pageSize, string? search, long? societeId, Projection? projection, long? pointId, CancellationToken ct)
     {
         IQueryable<Contact> query = db.Contact;
@@ -44,10 +34,7 @@ public class ContactService(AppDbContext db)
         return new { contacts = await ListViewAsync(ids, societeId, pointId, ct), total };
     }
 
-    // Fiche complète : tous les champs scripturables du contact, plus la
-    // totalité de ses rattachements société/point (contrairement à la liste,
-    // qui n'en garde qu'un seul). Le premier lien société est la « société
-    // principale » modifiable dans la fiche.
+    // tous les liens société/point, le 1er lien société = société principale
     public async Task<object> GetContactAsync(long id, CancellationToken ct)
     {
         var contact = await db.Contact.AsNoTracking().Include(c => c.Adresse).Where(c => c.IDCONTACTS == id).FirstOrThrowAsync(ct);
@@ -85,17 +72,12 @@ public class ContactService(AppDbContext db)
         };
     }
 
-    // dto.IDSOCIETES (création depuis la fiche Société) : le contact est créé
-    // directement lié à cette société ; de même pour dto.IDPOINTS (création
-    // depuis la fiche Point). L'adresse éventuellement saisie est créée dans
-    // `adresses` puis liée.
+    // IDSOCIETES / IDPOINTS : création depuis la fiche société ou point, lien créé direct
     public async Task<object> CreateContactAsync(CreateContactDto dto, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var idAdresses = await Adresses.SaveAsync(db, null, Adresses.Pick(dto), ct);
-        // IDADRESSES/IDUTILISATEURS_* ont un défaut DB de 0, qui viole leur
-        // contrainte de clé étrangère quand ils sont omis — mis explicitement
-        // à NULL.
+        // défaut DB à 0, viole la FK
         var contact = new Contact { IDADRESSES = idAdresses, IDUTILISATEURS_createur = null, IDUTILISATEURS_modificateur = null };
         Assign(contact, dto);
         if (!string.IsNullOrEmpty(dto.IDSOCIETES.OrDefault))
@@ -111,7 +93,7 @@ public class ContactService(AppDbContext db)
         }
         if (!string.IsNullOrEmpty(dto.IDPOINTS.OrDefault))
         {
-            // IDSOCIETES a un défaut DB de 0 (clé étrangère) : NULL.
+            // défaut DB à 0 (FK)
             contact.PointContacts.Add(new PointContact { IDPOINTS = Dto.Id(dto.IDPOINTS.Value), IDSOCIETES = null });
         }
         db.Contact.Add(contact);
@@ -120,10 +102,7 @@ public class ContactService(AppDbContext db)
         return (await ListViewAsync([contact.IDCONTACTS], null, null, ct))[0];
     }
 
-    // dto.IDSOCIETES présent : met à jour la « société principale » du
-    // contact (son plus ancien lien SocieteContact) — créée si le contact n'en
-    // a pas, supprimée si la valeur est vide. Les autres liens sont inchangés.
-    // L'adresse liée est mise à jour, ou créée si le contact n'en avait pas.
+    // IDSOCIETES touche seulement la société principale (plus ancien lien), "" = suppression du lien
     public async Task<object> UpdateContactAsync(long id, UpdateContactDto dto, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -161,9 +140,7 @@ public class ContactService(AppDbContext db)
 
     private static string? NullIfEmpty(Opt<string> value) => string.IsNullOrEmpty(value.OrDefault) ? null : value.Value;
 
-    // Champs du contact lui-même. IDSOCIETES/Fonction_contact/Service_bureau
-    // appartiennent au lien SocieteContact, IDPOINTS au lien PointContact ; les
-    // champs d'adresse vont dans la table `adresses`.
+    // hors liens société/point et adresse, gérés à part
     private static void Assign(Contact c, CreateContactDto dto)
     {
         dto.Civilite.Apply(v => c.Civilite = v);
@@ -179,11 +156,7 @@ public class ContactService(AppDbContext db)
         dto.description_telephone.Apply(v => c.description_telephone = v);
     }
 
-    // Forme « liste » des contacts demandés, dans l'ordre des ids. Un contact
-    // peut être lié à plusieurs sociétés (table de jointure SocieteContacts) —
-    // on ne garde que la première (le plus ancien lien, le même que la
-    // « société principale » de la fiche), éventuellement restreinte à la
-    // société demandée ; idem pour le lien au point demandé.
+    // un seul lien société par contact : le plus ancien, ou celui de la société demandée
     private async Task<List<object>> ListViewAsync(List<long> ids, long? societeId, long? pointId, CancellationToken ct)
     {
         var keys = ids.Cast<long?>().ToList();
@@ -232,29 +205,22 @@ public class ContactService(AppDbContext db)
     }
 }
 
-// ===== CONTROLLER =====
 public class ContactController(ContactService service) : ApiControllerBase
 {
-    // NestJS : GET contacts
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
     [HttpGet("contacts")]
     public Task<object> GetContacts([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? societeId, [FromQuery] string? via, [FromQuery] string? ids, [FromQuery] string? pointId, CancellationToken ct) =>
         service.GetContactsAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Params.ParseOptionalId(societeId), Projection.Parse(via, ids), Params.ParseOptionalId(pointId), ct);
 
-    // NestJS : GET contacts/:id
     [HttpGet("contacts/{id}")]
     public Task<object> GetContact(string id, CancellationToken ct) => service.GetContactAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST contacts
     [HttpPost("contacts")]
     public Task<IActionResult> CreateContact([Body] CreateContactDto dto, CancellationToken ct) => Created201(service.CreateContactAsync(dto, ct));
 
-    // NestJS : PATCH contacts/:id
     [HttpPatch("contacts/{id}")]
     public Task<object> UpdateContact(string id, [Body] UpdateContactDto dto, CancellationToken ct) =>
         service.UpdateContactAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE contacts/:id
     [HttpDelete("contacts/{id}")]
     public Task DeleteContact(string id, CancellationToken ct) => service.DeleteContactAsync(Params.ParseId(id), ct);
 }

@@ -11,20 +11,14 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Features.Contrats;
 
-// ===== SERVICE =====
 public class ContratService(AppDbContext db, EntiteService entiteService, IOptions<AppOptions> options)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Contrat> Projections = new()
     {
         ["societes"] = ids => c => c.IDSOCIETES != null && ids.Contains(c.IDSOCIETES.Value),
         ["commandes"] = ids => c => c.Commandes.Any(x => ids.Contains(x.IDCOMMANDES)),
     };
 
-    // page/pageSize optionnels : omis, toute la table. societeId optionnel :
-    // ne renvoie que les contrats de cette société — alimente l'onglet
-    // « Contrats / Offres » de la fiche Société (SocieteForm.tsx).
     public async Task<object> GetContratsAsync(int? page, int? pageSize, long? societeId, string? search, Projection? projection, CancellationToken ct)
     {
         IQueryable<Contrat> query = db.Contrat;
@@ -47,12 +41,7 @@ public class ContratService(AppDbContext db, EntiteService entiteService, IOptio
         return new { prestations };
     }
 
-    // Fiche complète : tous les champs scripturables du contrat, plus le type
-    // de facture et la marchandise résolus, le client de la société (numéro
-    // client affiché dans la fiche) et les listes liées des onglets de la
-    // fiche (conditions CMR, prestations, factures).
-    // `Chiffre_affaires` (bloc « Chiffres clé ») : somme HT des factures du
-    // contrat, hors proformas (pas de vraies factures).
+    // Chiffre_affaires : somme HT des factures hors proformas
     public async Task<object> GetContratAsync(long id, CancellationToken ct)
     {
         var c = await db.Contrat.AsNoTracking().AsSplitQuery()
@@ -125,16 +114,7 @@ public class ContratService(AppDbContext db, EntiteService entiteService, IOptio
         };
     }
 
-    // Contexte de données pour la fusion PDF (voir DocumentMergeService,
-    // appelé par ContratController.GetContratPdf) : même forme, mêmes clés
-    // racine (Entite/Contrat/Divers) que
-    // frontend/src/features/documents/mergeFields.ts, pour que les chemins
-    // posés par l'éditeur s'y résolvent directement.
-    //
-    // Unite (Prestations/PrestationSupplementaires) est un code numérique de
-    // la catégorie d'énumération « unite_prestation » — résolu ici en libellé,
-    // pour ne pas imprimer un code brut. Type n'a pas d'équivalent connu :
-    // imprimé tel quel.
+    // clés racine Entite/Contrat/Divers = chemins utilisés par l'éditeur de modèles
     public async Task<Dictionary<string, object?>> GetContratMergeContextAsync(long id, CancellationToken ct)
     {
         var contrat = await db.Contrat.AsNoTracking().AsSplitQuery()
@@ -203,9 +183,7 @@ public class ContratService(AppDbContext db, EntiteService entiteService, IOptio
 
     public async Task<object> CreateContratAsync(CreateContratDto dto, CancellationToken ct)
     {
-        // IDSOCIETES/IDTYPES_FACTURE/IDMARCHANDISES/IDUTILISATEURS_* ont un
-        // défaut DB de 0, qui viole leur contrainte de clé étrangère quand ils
-        // sont omis — mis explicitement à NULL.
+        // défaut DB à 0 sur toutes ces FK
         var contrat = new Contrat
         {
             IDSOCIETES = null,
@@ -230,8 +208,7 @@ public class ContratService(AppDbContext db, EntiteService entiteService, IOptio
 
     public Task DeleteContratAsync(long id, CancellationToken ct) => db.Contrat.Where(c => c.IDCONTRATS == id).DeleteOrThrowAsync(ct);
 
-    // Champ absent = inchangé ; chaîne vide = effacé (NULL), pour que la fiche
-    // puisse vider une date de fin, une société, un type de facture...
+    // absent = inchangé, "" = NULL
     private static void Assign(Contrat c, CreateContratDto dto)
     {
         dto.Num_contrat.Apply(v => c.Num_contrat = v);
@@ -259,7 +236,7 @@ public class ContratService(AppDbContext db, EntiteService entiteService, IOptio
     {
         c.IDCONTRATS,
         c.Num_contrat,
-        // Numéro affiché « Num_contrat.Version_contrat » (ex. 1764.24/01).
+        // affiché Num_contrat.Version_contrat, ex. 1764.24/01
         c.Version_contrat,
         c.Description_projet,
         c.Date_debut,
@@ -269,27 +246,19 @@ public class ContratService(AppDbContext db, EntiteService entiteService, IOptio
     });
 }
 
-// ===== CONTROLLER =====
 public class ContratController(ContratService service, DocumentMergeService documentMerge) : ApiControllerBase
 {
-    // NestJS : GET contrats
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
-    // ?societeId=X optionnel : ne renvoie que les contrats de cette société.
     [HttpGet("contrats")]
     public Task<object> GetContrats([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? societeId, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetContratsAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), Params.ParseOptionalId(societeId), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET contrats/:id
     [HttpGet("contrats/{id}")]
     public Task<object> GetContrat(string id, CancellationToken ct) => service.GetContratAsync(Params.ParseId(id), ct);
 
-    // NestJS : GET contrats/:id/prestations
-    // Prestations du contrat, pour le sélecteur de la fiche commande.
+    // pour le sélecteur de la fiche commande
     [HttpGet("contrats/{id}/prestations")]
     public Task<object> GetContratPrestations(string id, CancellationToken ct) => service.GetContratPrestationsAsync(Params.ParseId(id), ct);
 
-    // NestJS : GET contrats/:id/pdf?templateId=
-    // PDF du contrat, fusionné avec le modèle choisi.
     [HttpGet("contrats/{id}/pdf")]
     public async Task<IActionResult> GetContratPdf(string id, [FromQuery] string? templateId, CancellationToken ct)
     {
@@ -301,16 +270,13 @@ public class ContratController(ContratService service, DocumentMergeService docu
         return File(pdf, "application/pdf");
     }
 
-    // NestJS : POST contrats
     [HttpPost("contrats")]
     public Task<IActionResult> CreateContrat([Body] CreateContratDto dto, CancellationToken ct) => Created201(service.CreateContratAsync(dto, ct));
 
-    // NestJS : PATCH contrats/:id
     [HttpPatch("contrats/{id}")]
     public Task<object> UpdateContrat(string id, [Body] UpdateContratDto dto, CancellationToken ct) =>
         service.UpdateContratAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE contrats/:id
     [HttpDelete("contrats/{id}")]
     public Task DeleteContrat(string id, CancellationToken ct) => service.DeleteContratAsync(Params.ParseId(id), ct);
 }

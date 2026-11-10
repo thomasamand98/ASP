@@ -6,14 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Personnels;
 
-// ===== SERVICE =====
-// Contrats de travail (table contrats_travail) d'un personnel, chacun avec
-// l'historique de ses taux horaires (taux_horaire_contrat_travail) : un taux
-// s'applique à partir de sa Date_application, le plus récent passé étant en
-// vigueur (voir PointageService.GetFeuilleAsync).
+// taux en vigueur = le plus récent dont la Date_application est passée
 public class ContratTravailService(AppDbContext db)
 {
-    // Plus récent en premier.
+    // plus récent en premier
     public async Task<object> GetContratsAsync(long personnelId, CancellationToken ct)
     {
         var ids = await db.ContratTravail.Where(c => c.IDPERSONNELS == personnelId)
@@ -25,8 +21,7 @@ public class ContratTravailService(AppDbContext db)
 
     public async Task<object> CreateContratAsync(long personnelId, ContratTravailDto dto, CancellationToken ct)
     {
-        // IDSOCIETES/IDUTILISATEURS_* ont un défaut DB de 0, qui viole leur
-        // contrainte de clé étrangère — mis à NULL.
+        // défaut DB à 0 incompatible avec la FK
         var contrat = new ContratTravail
         {
             IDPERSONNELS = personnelId,
@@ -42,7 +37,7 @@ public class ContratTravailService(AppDbContext db)
         return (await ViewAsync([contrat.IDCONTRATS_TRAVAIL], ct))[0];
     }
 
-    // Les taux envoyés remplacent ceux du contrat (voir ContratTravailDto.Taux).
+    // les taux envoyés remplacent tous ceux du contrat
     public async Task<object> UpdateContratAsync(long id, ContratTravailDto dto, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -69,8 +64,7 @@ public class ContratTravailService(AppDbContext db)
                 await db.SaveChangesAsync(ct);
             }
         }
-        // Les champs du contrat sont validés avant sa lecture, comme dans le
-        // backend d'origine (date invalide : 400 avant 404).
+        // date invalide : 400 avant 404
         Assign(new ContratTravail(), dto);
         var contrat = await db.ContratTravail.Where(c => c.IDCONTRATS_TRAVAIL == id).FirstOrThrowAsync(ct);
         Assign(contrat, dto);
@@ -89,8 +83,7 @@ public class ContratTravailService(AppDbContext db)
         await tx.CommitAsync(ct);
     }
 
-    // Un taux déjà utilisé par un résumé de pointage n'est pas supprimé : la
-    // paie calculée avec lui en dépend.
+    // taux déjà utilisé par un résumé de pointage gardé, la paie en dépend
     private async Task DeleteTauxAsync(List<long> ids, CancellationToken ct)
     {
         if (ids.Count == 0) return;
@@ -100,7 +93,7 @@ public class ContratTravailService(AppDbContext db)
         await db.TauxHoraireContratTravail.Where(t => ids.Contains(t.IDTAUX_HORAIRE)).ExecuteDeleteAsync(ct);
     }
 
-    // Champs non envoyés laissés tels quels ; textes vides → NULL.
+    // absent = inchangé, "" = NULL
     private static void Assign(ContratTravail c, ContratTravailDto dto)
     {
         static string? TrimOrNull(string value) => value.Trim().Length > 0 ? value.Trim() : null;
@@ -121,7 +114,7 @@ public class ContratTravailService(AppDbContext db)
         return taux;
     }
 
-    // Tous les taux sont réécrits : un taux non envoyé vaut 0.
+    // taux non envoyé = 0
     private static void AssignTaux(TauxHoraireContratTravail t, TauxHoraireDto dto)
     {
         t.Taux_horaire = ToRate(dto.Taux_horaire, nameof(dto.Taux_horaire));
@@ -148,8 +141,6 @@ public class ContratTravailService(AppDbContext db)
         return index < 0 ? text : $"{text[..index]}.{text[(index + 1)..]}";
     }
 
-    // Contrats demandés, dans l'ordre des ids, avec leur société et leurs
-    // taux (le plus récent en premier).
     private async Task<List<object>> ViewAsync(List<long> ids, CancellationToken ct)
     {
         var keys = ids.Cast<long?>().ToList();
@@ -208,26 +199,19 @@ public class ContratTravailService(AppDbContext db)
     }
 }
 
-// ===== CONTROLLER =====
-// Contrats de travail d'un personnel et leurs taux horaires (onglet Contrat
-// de la fiche personnel).
 public class ContratTravailController(ContratTravailService service) : ApiControllerBase
 {
-    // NestJS : GET personnel/:id/contrats-travail
     [HttpGet("personnel/{id}/contrats-travail")]
     public Task<object> GetContrats(string id, CancellationToken ct) => service.GetContratsAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST personnel/:id/contrats-travail
     [HttpPost("personnel/{id}/contrats-travail")]
     public Task<IActionResult> CreateContrat(string id, [Body] ContratTravailDto dto, CancellationToken ct) =>
         Created201(service.CreateContratAsync(Params.ParseId(id), dto, ct));
 
-    // NestJS : PATCH contrats-travail/:id
     [HttpPatch("contrats-travail/{id}")]
     public Task<object> UpdateContrat(string id, [Body] ContratTravailDto dto, CancellationToken ct) =>
         service.UpdateContratAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE contrats-travail/:id
     [HttpDelete("contrats-travail/{id}")]
     public Task DeleteContrat(string id, CancellationToken ct) => service.DeleteContratAsync(Params.ParseId(id), ct);
 }

@@ -2,7 +2,6 @@ using Api.Common;
 
 namespace Api.Tests.Common;
 
-// Portage de backend/src/common/params.spec.ts.
 public class ParamsTests
 {
     [Fact]

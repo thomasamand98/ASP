@@ -10,8 +10,7 @@ namespace Horizon.Web.Tests.Components;
 
 public class AuthGateTests : BunitContext
 {
-    // API simulée : /auth/refresh répond 401 (pas de cookie), /auth/login
-    // ouvre une session.
+    // refresh en 401 (pas de cookie), login OK
     private sealed class FakeApi : HttpMessageHandler
     {
         public List<string> Calls { get; } = [];

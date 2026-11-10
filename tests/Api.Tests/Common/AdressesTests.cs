@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Tests.Common;
 
-// Portage de backend/src/common/adresse.spec.ts.
 public class AdressesTests
 {
     private static AppDbContext NewDb() =>
@@ -48,7 +47,7 @@ public class AdressesTests
     public async Task Modification_d_une_fiche_sans_adresse_cree_puis_renvoie_le_nouvel_id()
     {
         await using var db = NewDb();
-        // 0 est le défaut des colonnes IDADRESSES : équivaut à « aucune ».
+        // 0 = défaut des colonnes IDADRESSES, donc aucune
         var id = await Adresses.SaveAsync(db, 0, new() { ["CP"] = "4000" });
         Assert.NotNull(id);
         Assert.Equal("4000", (await db.Adresse.SingleAsync()).CP);

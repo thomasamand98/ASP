@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Tests de composants Razor (rendu, événements, services simulés). -->
     <PackageReference Include="bunit" Version="2.11.3" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

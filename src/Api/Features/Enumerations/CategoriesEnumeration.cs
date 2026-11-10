@@ -6,11 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Enumerations;
 
-// ===== SERVICE =====
-// Catégories d'énumérations (table categories_enumeration) : chacune regroupe
-// une liste de valeurs (voir EnumerationService). `_count.Enumerations` évite
-// au frontend un appel par catégorie pour afficher le nombre de valeurs dans
-// la liste de gauche.
+// _count pour éviter un appel par catégorie
 public class CategorieEnumerationService(AppDbContext db)
 {
     public async Task<object> GetCategoriesEnumerationAsync(CancellationToken ct)
@@ -21,8 +17,7 @@ public class CategorieEnumerationService(AppDbContext db)
 
     public async Task<object> CreateCategorieEnumerationAsync(CreateCategorieEnumerationDto dto, CancellationToken ct)
     {
-        // IDUTILISATEURS_createur a un défaut DB de 0, qui viole sa contrainte
-        // de clé étrangère quand il est omis — mis explicitement à NULL.
+        // défaut DB à 0, viole la FK
         var categorie = new CategorieEnumeration
         {
             IDUTILISATEURS_createur = null,
@@ -44,9 +39,7 @@ public class CategorieEnumerationService(AppDbContext db)
         return await ViewAsync(id, ct);
     }
 
-    // Refuse de supprimer une catégorie système ou encore utilisée : les
-    // énumérations qui y sont liées perdraient leur rattachement (clé
-    // étrangère) et le code applicatif s'appuie sur les catégories système.
+    // catégories système utilisées par le code
     public async Task DeleteCategorieEnumerationAsync(long id, CancellationToken ct)
     {
         var categorie = await db.CategorieEnumeration
@@ -72,24 +65,19 @@ public class CategorieEnumerationService(AppDbContext db)
         Select(db.CategorieEnumeration.Where(c => c.IDCATEGORIES_ENUMERATION == id)).FirstOrThrowAsync(ct);
 }
 
-// ===== CONTROLLER =====
 public class CategorieEnumerationController(CategorieEnumerationService service) : ApiControllerBase
 {
-    // NestJS : GET categories-enumeration
     [HttpGet("categories-enumeration")]
     public Task<object> GetCategoriesEnumeration(CancellationToken ct) => service.GetCategoriesEnumerationAsync(ct);
 
-    // NestJS : POST categories-enumeration
     [HttpPost("categories-enumeration")]
     public Task<IActionResult> CreateCategorieEnumeration([Body] CreateCategorieEnumerationDto dto, CancellationToken ct) =>
         Created201(service.CreateCategorieEnumerationAsync(dto, ct));
 
-    // NestJS : PATCH categories-enumeration/:id
     [HttpPatch("categories-enumeration/{id}")]
     public Task<object> UpdateCategorieEnumeration(string id, [Body] UpdateCategorieEnumerationDto dto, CancellationToken ct) =>
         service.UpdateCategorieEnumerationAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE categories-enumeration/:id
     [HttpDelete("categories-enumeration/{id}")]
     public Task DeleteCategorieEnumeration(string id, CancellationToken ct) => service.DeleteCategorieEnumerationAsync(Params.ParseId(id), ct);
 }

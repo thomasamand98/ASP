@@ -6,18 +6,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Marchandises;
 
-// ===== SERVICE =====
 public class MarchandiseService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Marchandise> Projections = new()
     {
         ["commandes"] = ids => m => m.Prestations.Any(p => p.Commandes.Any(c => ids.Contains(c.IDCOMMANDES))),
     };
 
-    // page/pageSize optionnels : omis, toute la table. Fournis, la requête est
-    // découpée et `total` est renvoyé pour le calcul du nombre de pages.
     public async Task<object> GetMarchandisesAsync(int? page, int? pageSize, string? search, Projection? projection, CancellationToken ct)
     {
         var query = db.Marchandise
@@ -38,7 +33,6 @@ public class MarchandiseService(AppDbContext db)
         return new { marchandises, total };
     }
 
-    // Détail : ajoute les deux champs scripturables absents de la liste.
     public Task<object> GetMarchandiseAsync(long id, CancellationToken ct) =>
         db.Marchandise.Where(m => m.IDMARCHANDISES == id)
             .Select(m => (object)new
@@ -55,8 +49,7 @@ public class MarchandiseService(AppDbContext db)
 
     public async Task<object> CreateMarchandiseAsync(CreateMarchandiseDto dto, CancellationToken ct)
     {
-        // IDDECHETS a un défaut DB de 0, qui viole sa contrainte de clé
-        // étrangère quand il est omis — mis explicitement à NULL.
+        // défaut DB à 0, viole la FK
         var marchandise = new Marchandise { IDDECHETS = null };
         Assign(marchandise, dto);
         db.Marchandise.Add(marchandise);
@@ -75,9 +68,7 @@ public class MarchandiseService(AppDbContext db)
     public Task DeleteMarchandiseAsync(long id, CancellationToken ct) =>
         db.Marchandise.Where(m => m.IDMARCHANDISES == id).DeleteOrThrowAsync(ct);
 
-    // Seuls les IDs ont besoin d'être convertis. IDDECHETS "" retire le déchet
-    // lié (NULL : 0 violerait la clé étrangère) ; CouleurPlanning "0" efface la
-    // couleur (défaut WinDev), vide ou absent la laisse inchangée.
+    // CouleurPlanning "0" = pas de couleur (défaut WinDev)
     private static void Assign(Marchandise m, CreateMarchandiseDto dto)
     {
         dto.Nom_marchandise.Apply(v => m.Nom_marchandise = v);
@@ -87,7 +78,6 @@ public class MarchandiseService(AppDbContext db)
         dto.Archive.ApplyInt(v => m.Archive = v);
     }
 
-    // Forme renvoyée par la création et la modification (celle de la liste).
     private Task<object> ListViewAsync(long id, CancellationToken ct) =>
         db.Marchandise.Where(m => m.IDMARCHANDISES == id)
             .Select(m => (object)new
@@ -101,30 +91,23 @@ public class MarchandiseService(AppDbContext db)
             .FirstOrThrowAsync(ct);
 }
 
-// ===== CONTROLLER =====
 public class MarchandiseController(MarchandiseService service) : ApiControllerBase
 {
-    // NestJS : GET marchandises
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
     [HttpGet("marchandises")]
     public Task<object> GetMarchandises([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetMarchandisesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET marchandises/:id
     [HttpGet("marchandises/{id}")]
     public Task<object> GetMarchandise(string id, CancellationToken ct) => service.GetMarchandiseAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST marchandises
     [HttpPost("marchandises")]
     public Task<IActionResult> CreateMarchandise([Body] CreateMarchandiseDto dto, CancellationToken ct) =>
         Created201(service.CreateMarchandiseAsync(dto, ct));
 
-    // NestJS : PATCH marchandises/:id
     [HttpPatch("marchandises/{id}")]
     public Task<object> UpdateMarchandise(string id, [Body] UpdateMarchandiseDto dto, CancellationToken ct) =>
         service.UpdateMarchandiseAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE marchandises/:id
     [HttpDelete("marchandises/{id}")]
     public Task DeleteMarchandise(string id, CancellationToken ct) => service.DeleteMarchandiseAsync(Params.ParseId(id), ct);
 }

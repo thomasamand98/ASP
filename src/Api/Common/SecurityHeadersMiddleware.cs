@@ -1,9 +1,5 @@
 namespace Api.Common;
 
-// En-têtes de sécurité HTTP : les mêmes que ceux posés par helmet côté
-// NestJS (`helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } })`).
-// Cross-Origin-Resource-Policy est en « cross-origin » : le front, servi
-// depuis une autre origine, lit les réponses de l'API.
 public class SecurityHeadersMiddleware(RequestDelegate next)
 {
     private const string ContentSecurityPolicy =
@@ -12,7 +8,7 @@ public class SecurityHeadersMiddleware(RequestDelegate next)
     public Task InvokeAsync(HttpContext context)
     {
         var headers = context.Response.Headers;
-        // La page Swagger (développement) embarque ses propres scripts.
+        // scripts inline de Swagger
         if (!context.Request.Path.StartsWithSegments("/swagger")) headers.ContentSecurityPolicy = ContentSecurityPolicy;
         headers["Cross-Origin-Opener-Policy"] = "same-origin";
         headers["Cross-Origin-Resource-Policy"] = "cross-origin";

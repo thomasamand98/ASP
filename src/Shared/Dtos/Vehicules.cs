@@ -1,8 +1,5 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un véhicule.
-// IDSOCIETES est une string côté JSON et les Date_* des strings ISO.
-// Avec_compresseur est un code 0/1 (pas un booléen).
 public class CreateVehiculeDto
 {
     [Num] public Opt<double> Type { get; set; }

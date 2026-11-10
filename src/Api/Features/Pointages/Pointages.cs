@@ -7,21 +7,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Pointages;
 
-// ===== SERVICE =====
 public partial class PointageService(AppDbContext db)
 {
-    // Au-delà, la feuille devient illisible (même ordre de grandeur qu'un mois
-    // ou deux).
+    // au-delà la feuille est illisible
     private const int MaxFeuilleDays = 93;
 
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Pointage> Projections = new()
     {
         ["personnel"] = ids => p => p.IDPERSONNELS != null && ids.Contains(p.IDPERSONNELS.Value),
     };
 
-    // page/pageSize optionnels : omis, toute la table.
     public async Task<object> GetPointagesAsync(int? page, int? pageSize, string? search, Projection? projection, CancellationToken ct)
     {
         var query = db.Pointage
@@ -34,8 +29,7 @@ public partial class PointageService(AppDbContext db)
         return new { pointage, total };
     }
 
-    // Tous les statuts, archivés compris : le formulaire masque les archivés
-    // sauf celui déjà porté par le pointage modifié, pour ne pas le perdre.
+    // archivés compris, le formulaire peut avoir besoin de celui du pointage en cours
     public async Task<object> GetStatutsAsync(CancellationToken ct)
     {
         var statuts = await db.TypeStatut.OrderBy(s => s.Ordre).ThenBy(s => s.Libelle_generique)
@@ -44,10 +38,7 @@ public partial class PointageService(AppDbContext db)
         return new { statuts };
     }
 
-    // Pointages d'un salarié du jour `fromRaw` au jour `toRaw` inclus
-    // (Date_application est une colonne DATE, représentée à minuit UTC), et
-    // le taux horaire en vigueur à la fin de la période : le plus récent de
-    // ses contrats de travail dont la date d'application est passée.
+    // taux = celui en vigueur à la fin de la période
     public async Task<object> GetFeuilleAsync(string? personnelIdRaw, string? fromRaw, string? toRaw, CancellationToken ct)
     {
         if (personnelIdRaw is null || !Digits().IsMatch(personnelIdRaw)) throw new BadRequestException("Salarié invalide.");
@@ -57,8 +48,7 @@ public partial class PointageService(AppDbContext db)
         if ((to - from).TotalDays >= MaxFeuilleDays) throw new BadRequestException($"La période ne peut pas dépasser {MaxFeuilleDays} jours.");
         var personnelId = Dto.Id(personnelIdRaw);
 
-        // Fiche complète, plus la couleur et le caractère « travaillé » du
-        // statut pour l'affichage.
+        // + couleur et "travaillé" du statut
         var pointages = await db.Pointage
             .Where(p => p.IDPERSONNELS == personnelId && p.Date_application >= from && p.Date_application <= to)
             .OrderBy(p => p.Date_application).ThenBy(p => p.Date_heure_debut).ThenBy(p => p.IDPOINTAGES)
@@ -101,7 +91,6 @@ public partial class PointageService(AppDbContext db)
         return new { pointages, taux };
     }
 
-    // Détail : ajoute les pauses, absentes du tableau mais scripturables.
     public Task<object> GetPointageAsync(long id, CancellationToken ct) =>
         db.Pointage.Where(p => p.IDPOINTAGES == id)
             .Select(p => (object)new
@@ -128,9 +117,7 @@ public partial class PointageService(AppDbContext db)
 
     public async Task<object> CreatePointageAsync(CreatePointageDto dto, CancellationToken ct)
     {
-        // IDPERSONNELS/IDType_Statut/IDUTILISATEURS_* ont un défaut DB de 0,
-        // qui viole leur contrainte de clé étrangère quand ils sont omis — mis
-        // explicitement à NULL. Heure_Stanby : 00:00 par défaut.
+        // défaut DB à 0 sur les FK, d'où les NULL
         var pointage = new Pointage
         {
             IDPERSONNELS = null,
@@ -147,7 +134,7 @@ public partial class PointageService(AppDbContext db)
 
     public async Task<object> UpdatePointageAsync(long id, UpdatePointageDto dto, CancellationToken ct)
     {
-        // Les dates et heures sont validées avant la lecture (400 avant 404).
+        // validation avant lecture : 400 avant 404
         Assign(new Pointage(), dto);
         var pointage = await db.Pointage.Where(p => p.IDPOINTAGES == id).FirstOrThrowAsync(ct);
         Assign(pointage, dto);
@@ -157,16 +144,9 @@ public partial class PointageService(AppDbContext db)
 
     public Task DeletePointageAsync(long id, CancellationToken ct) => db.Pointage.Where(p => p.IDPOINTAGES == id).DeleteOrThrowAsync(ct);
 
-    // Les IDs et les dates / heures sont convertis ici ; le formulaire envoie :
-    //   - Date_application : un jour « AAAA-MM-JJ » (colonne DATE → minuit UTC) ;
-    //   - Date_heure_debut / fin : un instant ISO ;
-    //   - Heure_* / pauses : « HH:MM », ou un datetime du 01/01/1970 (colonne
-    //     TIME).
-    // Un champ vide ("") efface la valeur (NULL). Heure_Stanby n'est pas
-    // nullable : vide, il vaut 00:00.
+    // Heure_* et pauses : "HH:MM" ou datetime du 01/01/1970, "" = NULL
     private static void Assign(Pointage p, CreatePointageDto dto)
     {
-        // Même ordre de validation que le backend d'origine.
         var standby = ToTime(dto.Heure_Stanby, "Heure_Stanby");
         if (dto.IDPERSONNELS is { IsSet: true, Value.Length: > 0 }) p.IDPERSONNELS = Dto.Id(dto.IDPERSONNELS.Value);
         if (dto.IDType_Statut is { IsSet: true, Value.Length: > 0 }) p.IDType_Statut = Dto.Id(dto.IDType_Statut.Value);
@@ -183,7 +163,7 @@ public partial class PointageService(AppDbContext db)
         ToTime(dto.Heure_jour, "Heure_jour").Apply(v => p.Heure_jour = v);
         ToTime(dto.Debut_pause, "Debut_pause").Apply(v => p.Debut_pause = v);
         ToTime(dto.Fin_Pause, "Fin_Pause").Apply(v => p.Fin_Pause = v);
-        // NOT NULL : vidé, il revient à 00:00 plutôt que de faire échouer l'écriture.
+        // NOT NULL, vide = 00:00
         standby.Apply(v => p.Heure_Stanby = v ?? TimeSpan.Zero);
         dto.Nuitee.ApplyInt(v => p.Nuitee = v);
         dto.Remarque.Apply(v => p.Remarque = v);
@@ -232,42 +212,30 @@ public partial class PointageService(AppDbContext db)
     private static partial Regex HhMm();
 }
 
-// ===== CONTROLLER =====
 public class PointageController(PointageService service) : ApiControllerBase
 {
-    // NestJS : GET pointage
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
     [HttpGet("pointage")]
     public Task<object> GetPointages([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetPointagesAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET pointage/statuts
-    // Liste des statuts de pointage (table types_statut) pour le sélecteur du
-    // formulaire.
     [HttpGet("pointage/statuts")]
     public Task<object> GetStatuts(CancellationToken ct) => service.GetStatutsAsync(ct);
 
-    // NestJS : GET pointage/feuille
-    // Feuille de pointage d'un salarié : ses pointages du jour `from` au jour
-    // `to` (inclus, AAAA-MM-JJ) et ses taux horaires.
+    // from/to inclus
     [HttpGet("pointage/feuille")]
     public Task<object> GetFeuille([FromQuery] string? personnelId, [FromQuery] string? from, [FromQuery] string? to, CancellationToken ct) =>
         service.GetFeuilleAsync(personnelId, from, to, ct);
 
-    // NestJS : GET pointage/:id
     [HttpGet("pointage/{id}")]
     public Task<object> GetPointage(string id, CancellationToken ct) => service.GetPointageAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST pointage
     [HttpPost("pointage")]
     public Task<IActionResult> CreatePointage([Body] CreatePointageDto dto, CancellationToken ct) => Created201(service.CreatePointageAsync(dto, ct));
 
-    // NestJS : PATCH pointage/:id
     [HttpPatch("pointage/{id}")]
     public Task<object> UpdatePointage(string id, [Body] UpdatePointageDto dto, CancellationToken ct) =>
         service.UpdatePointageAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE pointage/:id
     [HttpDelete("pointage/{id}")]
     public Task DeletePointage(string id, CancellationToken ct) => service.DeletePointageAsync(Params.ParseId(id), ct);
 }

@@ -6,13 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Entites;
 
-// ===== SERVICE =====
-// Ressource singleton : une seule ligne dans la table `entites`.
+// une seule ligne en base, pas d'id dans les routes
 public class EntiteService(AppDbContext db)
 {
-    // Les mots de passe SMTP ne sont jamais renvoyés : seul un indicateur
-    // « défini » l'est. Le logo (data URI stockée en binaire) est renvoyé en
-    // texte.
+    // mots de passe SMTP jamais renvoyés, juste *_defini
     public async Task<object> GetEntiteAsync(CancellationToken ct)
     {
         var entite = await db.Entite.AsNoTracking().OrderBy(e => e.IDSignaletique).FirstOrThrowAsync(ct);
@@ -70,10 +67,10 @@ public class EntiteService(AppDbContext db)
             dto.Utilisateur_SMTP.Apply(v => entite.Utilisateur_SMTP = v);
             dto.TypeConnexion_SMTP.ApplyInt(v => entite.TypeConnexion_SMTP = v);
             dto.Utilisateur_smtp_planning.Apply(v => entite.Utilisateur_smtp_planning = v);
-            // Mots de passe : un champ vide laisse la valeur en place.
+            // vide = inchangé
             if (!string.IsNullOrEmpty(dto.MDP_SMTP.OrDefault)) entite.MDP_SMTP = dto.MDP_SMTP.Value;
             if (!string.IsNullOrEmpty(dto.MDP_SMTP_Planning.OrDefault)) entite.MDP_SMTP_Planning = dto.MDP_SMTP_Planning.Value;
-            // Logo : chaîne vide = suppression.
+            // "" = suppression du logo
             dto.Logo.Apply(v => entite.Logo = v.Length > 0 ? Encoding.UTF8.GetBytes(v) : null);
             if (idAdresses != currentAdresse) entite.IDADRESSES = idAdresses;
             await db.SaveChangesAsync(ct);
@@ -84,15 +81,11 @@ public class EntiteService(AppDbContext db)
     }
 }
 
-// ===== CONTROLLER =====
-// Ressource singleton (une seule ligne en base) — pas d'id dans les routes.
 public class EntiteController(EntiteService service) : ApiControllerBase
 {
-    // NestJS : GET entite
     [HttpGet("entite")]
     public Task<object> GetEntite(CancellationToken ct) => service.GetEntiteAsync(ct);
 
-    // NestJS : PATCH entite
     [HttpPatch("entite")]
     public Task<object> UpdateEntite([Body] UpdateEntiteDto dto, CancellationToken ct) => service.UpdateEntiteAsync(dto, ct);
 }

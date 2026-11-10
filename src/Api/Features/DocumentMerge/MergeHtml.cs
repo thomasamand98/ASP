@@ -7,11 +7,7 @@ using Api.Common;
 
 namespace Api.Features.DocumentMerge;
 
-// Moteur de fusion : résout, dans le HTML d'un modèle de document, les jetons
-// de fusion ([data-merge-field]) et les blocs répétables ([data-repeat-list])
-// posés par l'éditeur du front (frontend/src/features/documents/) contre un
-// contexte de données. Logique pure, sans base de données — équivalent de
-// merge-html.ts (cheerio) côté NestJS.
+// remplace [data-merge-field] et développe [data-repeat-list] avec le contexte
 public static class MergeHtml
 {
     private sealed record Scope(string Prefix, object? Value);
@@ -19,7 +15,7 @@ public static class MergeHtml
     private static readonly NumberFormatInfo FrBeNumbers = new()
     {
         NumberDecimalSeparator = ",",
-        // Espace fine insécable, comme toLocaleString('fr-BE').
+        // espace fine insécable (format fr-BE)
         NumberGroupSeparator = " ",
         NumberGroupSizes = [3],
     };
@@ -33,7 +29,7 @@ public static class MergeHtml
         ExpandRepeats(document, root, rootScope);
         ResolveChips(document, root, rootScope);
 
-        // Chrome de l'éditeur, inutile à l'impression.
+        // inutile à l'impression
         foreach (var element in root.QuerySelectorAll("[contenteditable]")) element.RemoveAttribute("contenteditable");
         foreach (var element in root.QuerySelectorAll("[data-chip-remove]")) element.Remove();
         foreach (var element in root.QuerySelectorAll("[data-repeat-list]"))
@@ -44,9 +40,7 @@ public static class MergeHtml
         return root.InnerHtml;
     }
 
-    // Valeur désignée par un chemin pointé (« Contrat.Societe.Nom_societe »).
-    // Une liste rencontrée en chemin est traversée : le résultat est alors la
-    // liste des valeurs de chaque élément. « [] » en fin de segment est ignoré.
+    // une liste en chemin donne la liste des valeurs, "[]" en fin de segment ignoré
     private static object? GetNested(object? value, string dottedPath)
     {
         if (dottedPath.Length == 0) return value;
@@ -78,8 +72,7 @@ public static class MergeHtml
         return value.GetType().GetProperty(key, BindingFlags.Public | BindingFlags.Instance)?.GetValue(value);
     }
 
-    // Le chemin est résolu dans la portée la plus proche dont le préfixe
-    // correspond (élément courant d'un bloc répétable), sinon à la racine.
+    // portée la plus proche qui matche le préfixe, sinon racine
     private static object? ResolvePath(List<Scope> scopes, string path)
     {
         for (var i = scopes.Count - 1; i >= 0; i--)
@@ -99,7 +92,7 @@ public static class MergeHtml
             DateTime utc;
             if (raw is DateTime date) utc = DateTime.SpecifyKind(date, DateTimeKind.Utc);
             else if (!JsDate.TryParse(text, out utc)) return text;
-            // toLocaleDateString('fr-BE') : jour dans le fuseau du serveur.
+            // jour dans le fuseau du serveur
             return TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.Local).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
         }
         if (kind == "number")
@@ -121,7 +114,7 @@ public static class MergeHtml
         return text;
     }
 
-    // Texte d'une valeur ; un objet ou une liste ne s'imprime pas.
+    // objet ou liste : rien
     private static string ToText(object? raw) => raw switch
     {
         string text => text,
@@ -167,10 +160,7 @@ public static class MergeHtml
         }
     }
 
-    // Développe les blocs répétables de premier niveau : la ligne modèle
-    // (.dte-repeat-row) est copiée une fois par élément de la liste, chaque
-    // copie étant résolue avec cet élément comme portée (blocs imbriqués
-    // compris).
+    // une copie de .dte-repeat-row par élément, résolue avec l'élément comme portée
     private static void ExpandRepeats(IDocument document, IElement root, List<Scope> scopes)
     {
         var topLevelBlocks = root.QuerySelectorAll("[data-repeat-list]")

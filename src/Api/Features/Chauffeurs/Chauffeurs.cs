@@ -6,14 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Chauffeurs;
 
-// ===== SERVICE =====
-// Pas de forme séparée pour le détail : le modèle Chauffeur est petit — la
-// société et le personnel liés sont résolus directement (colonnes
-// « Société » / « Lien personnel » du tableau).
 public class ChauffeurService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Chauffeur> Projections = new()
     {
         ["societes"] = ids => c => c.IDSOCIETES != null && ids.Contains(c.IDSOCIETES.Value),
@@ -21,8 +15,7 @@ public class ChauffeurService(AppDbContext db)
         ["attelages"] = ids => c => c.AttelageReferences.Any(a => ids.Contains(a.IDATTELAGE_REFERENCE)),
     };
 
-    // page/pageSize optionnels : omis, toute la table. `archive` : true =
-    // archivés, false = non archivés (NULL compris), null = tous.
+    // archive null = tous, false inclut les NULL
     public async Task<object> GetChauffeursAsync(int? page, int? pageSize, string? search, Projection? projection, bool? archive, CancellationToken ct)
     {
         var query = db.Chauffeur
@@ -43,9 +36,7 @@ public class ChauffeurService(AppDbContext db)
 
     public async Task<object> CreateChauffeurAsync(CreateChauffeurDto dto, CancellationToken ct)
     {
-        // IDPERSONNELS/IDSOCIETES ont un défaut DB de 0, qui viole leur
-        // contrainte de clé étrangère quand ils sont omis — mis explicitement
-        // à NULL.
+        // défaut DB à 0, viole la FK
         var chauffeur = new Chauffeur { IDPERSONNELS = null, IDSOCIETES = null };
         Assign(chauffeur, dto);
         db.Chauffeur.Add(chauffeur);
@@ -63,8 +54,7 @@ public class ChauffeurService(AppDbContext db)
 
     public Task DeleteChauffeurAsync(long id, CancellationToken ct) => db.Chauffeur.Where(c => c.IDCHAUFFEURS == id).DeleteOrThrowAsync(ct);
 
-    // Seuls les IDs ont besoin d'être convertis. Un id "" retire le lien
-    // (NULL : 0 violerait la clé étrangère).
+    // "" = NULL (FK)
     private static void Assign(Chauffeur c, CreateChauffeurDto dto)
     {
         dto.Nom_chauffeur.Apply(v => c.Nom_chauffeur = v);
@@ -89,26 +79,19 @@ public class ChauffeurService(AppDbContext db)
     });
 }
 
-// ===== CONTROLLER =====
 public class ChauffeurController(ChauffeurService service) : ApiControllerBase
 {
-    // NestJS : GET chauffeurs
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
-    // ?archive=0|1 : non archivés / archivés, absent = tous.
     [HttpGet("chauffeurs")]
     public Task<object> GetChauffeurs([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, [FromQuery] string? archive, CancellationToken ct) =>
         service.GetChauffeursAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), Params.ParseArchive(archive), ct);
 
-    // NestJS : POST chauffeurs
     [HttpPost("chauffeurs")]
     public Task<IActionResult> CreateChauffeur([Body] CreateChauffeurDto dto, CancellationToken ct) => Created201(service.CreateChauffeurAsync(dto, ct));
 
-    // NestJS : PATCH chauffeurs/:id
     [HttpPatch("chauffeurs/{id}")]
     public Task<object> UpdateChauffeur(string id, [Body] UpdateChauffeurDto dto, CancellationToken ct) =>
         service.UpdateChauffeurAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE chauffeurs/:id
     [HttpDelete("chauffeurs/{id}")]
     public Task DeleteChauffeur(string id, CancellationToken ct) => service.DeleteChauffeurAsync(Params.ParseId(id), ct);
 }

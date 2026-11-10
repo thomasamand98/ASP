@@ -13,30 +13,18 @@ namespace Api.Features.LienDocuments;
 
 public record FichierDocument(byte[] Contenu, string NomFichier);
 
-// ===== SERVICE =====
-// Documents joints à une fiche (onglets « Documents » des fiches Société,
-// Personnel, Véhicule — voir frontend/src/features/liens-documents/).
-//
-// Deux tables : `documents` décrit le fichier, `lien_documents` le rattache
-// à un enregistrement — TYPE (voir DocumentCategorie) dit de quelle table
-// vient IDReferent. Un même document peut avoir plusieurs liens.
-//
-// Le contenu du fichier est enregistré sur disque, pas en base
-// (Document_physique reste vide) : documents.Emplacement garde son chemin,
-// relatif au dossier de stockage (PDF_STORAGE_DIR).
+// fichiers sur disque (PDF_STORAGE_DIR), TYPE = table de IDReferent
 public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> options)
 {
     private const string SousRepertoireDocuments = "documents";
 
-    // Tailles des colonnes VARCHAR.
+    // tailles des VARCHAR
     private const int MaxNom = 100;
     private const int MaxExtension = 50;
 
     private string RacineStockage => options.Value.StorageRoot;
 
-    // Chemin absolu d'un Emplacement, ou null s'il sort du dossier de stockage
-    // (chemin absolu d'un poste WinDev, « .. ») : rien n'est lu ni supprimé
-    // en dehors de ce dossier.
+    // null si hors du dossier de stockage (vieux chemins WinDev absolus, "..")
     private string? CheminFichier(string? emplacement)
     {
         if (string.IsNullOrEmpty(emplacement)) return null;
@@ -51,7 +39,7 @@ public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> o
             .OrderByDescending(l => l.Date_heure_creation)
             .Select(l => new { l.IDLIEN_DOCUMENTS, l.IDDOCUMENTS, l.Nom_lien, l.Date_heure_creation })
             .ToListAsync(ct);
-        // Pas de relation entre les deux tables : jointure faite ici.
+        // pas de FK entre les deux tables
         var ids = liens.Where(l => l.IDDOCUMENTS is not null).Select(l => l.IDDOCUMENTS!).ToList();
         var documents = ids.Count == 0
             ? []
@@ -78,14 +66,11 @@ public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> o
         };
     }
 
-    // Enregistre le fichier sur disque, puis crée le document et son lien. Le
-    // fichier est nommé d'après l'identifiant du document (pas d'après son nom
-    // d'origine) : deux fichiers de même nom ne s'écrasent pas.
+    // fichier nommé d'après l'id du document, pour éviter les collisions de noms
     public async Task<object> CreateLienDocumentAsync(int type, long referentId, byte[] contenu, string originalName, CancellationToken ct)
     {
         var nomFichier = originalName.Length > MaxNom ? originalName[^MaxNom..] : originalName;
-        // L'extension finit dans un nom de fichier sur disque : lettres et
-        // chiffres seulement, sinon aucune.
+        // extension alphanumérique seulement, sinon aucune
         var extensionBrute = ExtName(nomFichier).TrimStart('.').ToLowerInvariant();
         var extension = SafeExtension().IsMatch(extensionBrute) ? extensionBrute[..Math.Min(extensionBrute.Length, MaxExtension)] : "";
         var id = RandomNumberGenerator.GetBytes(32);
@@ -98,8 +83,7 @@ public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> o
         try
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
-            // IDUTILISATEURS_createur/modificateur ont un défaut DB de 0, qui viole
-            // leur contrainte de clé étrangère : mis à null explicitement.
+            // défaut DB à 0, viole la FK
             db.Document.Add(new Document
             {
                 Date_heure_creation = maintenant,
@@ -160,8 +144,7 @@ public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> o
         }
     }
 
-    // Supprime le lien ; le document et son fichier ne sont supprimés que s'il
-    // n'est plus rattaché à aucune autre fiche.
+    // document + fichier supprimés seulement s'il n'a plus aucun lien
     public async Task DeleteLienDocumentAsync(long id, CancellationToken ct)
     {
         var lien = await db.LienDocument.Where(l => l.IDLIEN_DOCUMENTS == id).Select(l => new { l.IDDOCUMENTS }).FirstOrDefaultAsync(ct)
@@ -188,8 +171,7 @@ public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> o
         if (chemin is not null) File.Delete(chemin);
     }
 
-    // path.extname de Node : extension du dernier segment, point compris ;
-    // vide pour un nom sans point ou commençant par un point.
+    // point compris, vide si pas de point ou nom commençant par un point
     public static string ExtName(string path)
     {
         var name = path[(path.LastIndexOfAny(['/', '\\']) + 1)..];
@@ -201,7 +183,6 @@ public partial class LienDocumentService(AppDbContext db, IOptions<AppOptions> o
     private static partial Regex SafeExtension();
 }
 
-// ===== CONTROLLER =====
 public class LienDocumentController(LienDocumentService service) : ApiControllerBase
 {
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
@@ -213,9 +194,7 @@ public class LienDocumentController(LienDocumentService service) : ApiController
         return (int)type;
     }
 
-    // NestJS : GET lien-documents
-    // ?type=6&referentId=X (obligatoires) : documents liés à cet
-    // enregistrement — voir DocumentCategorie pour les types.
+    // type : voir DocumentCategorie
     [HttpGet("lien-documents")]
     public Task<object> GetLiensDocuments([FromQuery] string? type, [FromQuery] string? referentId, CancellationToken ct)
     {
@@ -223,9 +202,7 @@ public class LienDocumentController(LienDocumentService service) : ApiController
         return service.GetLiensDocumentsAsync(ParseType(type), referent, ct);
     }
 
-    // NestJS : POST lien-documents (multipart, champ « file »)
-    // Champs texte « type » et « referentId » envoyés avec le fichier. Limite
-    // de 50 Mo ; au-delà, 413.
+    // 50 Mo max, sinon 413
     [HttpPost("lien-documents")]
     public async Task<IActionResult> CreateLienDocument(CancellationToken ct)
     {
@@ -236,10 +213,7 @@ public class LienDocumentController(LienDocumentService service) : ApiController
         return StatusCode(StatusCodes.Status201Created, await service.CreateLienDocumentAsync(type, referent, form.File.Buffer, form.File.OriginalName, ct));
     }
 
-    // NestJS : GET lien-documents/:id/fichier
-    // Envoie le contenu du fichier tel quel. `attachment` + `nosniff` : un
-    // fichier déposé (HTML, SVG...) n'est jamais interprété par le navigateur
-    // s'il est ouvert directement depuis l'API.
+    // attachment + nosniff, sinon un HTML/SVG déposé s'exécuterait dans le navigateur
     [HttpGet("lien-documents/{id}/fichier")]
     public async Task<IActionResult> GetFichier(string id, CancellationToken ct)
     {
@@ -249,12 +223,10 @@ public class LienDocumentController(LienDocumentService service) : ApiController
         return File(fichier.Contenu, ContentTypeOf(fichier.NomFichier));
     }
 
-    // NestJS : DELETE lien-documents/:id
     [HttpDelete("lien-documents/{id}")]
     public Task DeleteLienDocument(string id, CancellationToken ct) => service.DeleteLienDocumentAsync(Params.ParseId(id), ct);
 
-    // Type MIME d'après l'extension, comme res.type() d'Express (jeu de
-    // caractères précisé pour les types texte).
+    // charset utf-8 ajouté pour les types texte
     private static string ContentTypeOf(string nomFichier)
     {
         var extension = LienDocumentService.ExtName(nomFichier);
@@ -262,7 +234,7 @@ public class LienDocumentController(LienDocumentService service) : ApiController
         return type.StartsWith("text/", StringComparison.Ordinal) || type is "application/json" or "application/javascript" ? $"{type}; charset=utf-8" : type;
     }
 
-    // encodeURIComponent de JavaScript.
+    // garde !'()* non encodés, comme encodeURIComponent
     private static string EncodeUriComponent(string value) =>
         Uri.EscapeDataString(value).Replace("%21", "!").Replace("%27", "'").Replace("%28", "(").Replace("%29", ")").Replace("%2A", "*");
 }

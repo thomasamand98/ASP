@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Horizon.Web.Tests.Components;
 
-// Garde des modifications non enregistrées : service + dialogue.
+// garde modifs non enregistrées : service + dialogue
 public class UnsavedChangesTests : BunitContext
 {
     private readonly UnsavedChangesService _service = new();
@@ -48,7 +48,7 @@ public class UnsavedChangesTests : BunitContext
         dialog.FindAll(".unsaved-actions button")[0].Click();
         Assert.True(await leave);
         Assert.Equal(0, _saves);
-        // Le garde abandonné ne bloque plus, même si la valeur reste modifiée.
+        // garde abandonné : ne bloque plus
         Assert.False(_guard.IsDirty());
     }
 

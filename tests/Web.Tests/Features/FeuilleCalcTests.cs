@@ -3,10 +3,9 @@ using Horizon.Web.Features.Pointages;
 
 namespace Horizon.Web.Tests.Features;
 
-// Repris de frontend/src/features/pointage/feuille.test.ts.
 public class FeuilleCalcTests
 {
-    // Colonne TIME telle que renvoyée par l'API.
+    // colonne TIME telle que renvoyée par l'API
     private static string Time(string hhmm) => $"1970-01-01T{hhmm}:00.000Z";
 
     [Fact]
@@ -55,7 +54,7 @@ public class FeuilleCalcTests
         Assert.Equal(0, FeuilleCalc.WorkedMinutes(p));
     }
 
-    // Samedi 19 et dimanche 20 septembre 2026, lundi 21 sans pointage.
+    // sam. 19 et dim. 20/09/2026, lun. 21 sans pointage
     private static readonly DateTime[] Jours = [new(2026, 9, 19), new(2026, 9, 20), new(2026, 9, 21)];
 
     private static readonly PointageFeuille[] Pointages =

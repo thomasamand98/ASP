@@ -9,7 +9,6 @@ using Api.Features.Points;
 
 namespace Api.Tests.Common;
 
-// Portage de backend/src/common/validation.spec.ts (ZodBodyPipe).
 public class ValidationTests
 {
     private static JsonElement? Json(string? json) => json is null ? null : JsonDocument.Parse(json).RootElement.Clone();
@@ -33,7 +32,7 @@ public class ValidationTests
     [Fact]
     public void Accepte_les_conversions_tolerees()
     {
-        // nombre ↔ texte, booléen → 0/1
+        // nombre/texte interchangeables, booléen en 0/1
         var dto = Parse<CreateChauffeurDto>("""{ "Telephone": 471000000, "IDSOCIETES": 12, "Archive": true }""");
         Assert.Equal("471000000", dto.Telephone.Value);
         Assert.Equal("12", dto.IDSOCIETES.Value);
@@ -75,7 +74,7 @@ public class ValidationTests
         Assert.Equal(
             "« Nom » : champ obligatoire. « Type_document » : valeur non autorisée (CONTRAT).",
             MessageOf<CreateDocumentTemplateDto>("""{ "Type_document": "FACTURE", "Contenu_html": "" }"""));
-        // En modification ([Partial]), plus aucun champ n'est obligatoire.
+        // [Partial] : plus rien d'obligatoire
         Assert.False(Parse<UpdateDocumentTemplateDto>("{}").Nom.IsSet);
     }
 
@@ -116,7 +115,6 @@ public class ValidationTests
     [Fact]
     public void Evalue_les_regles_entre_champs_quand_les_types_sont_bons()
     {
-        // Mêmes messages que zod pour z.number().int().min(1).max(7) et .refine().
         Assert.Equal(
             "« Horaires.0.Jour_semaine » : Number must be less than or equal to 7. « Horaires.0.Heure_debut » : heure « HH:MM » attendue. "
             + "« Horaires.0.Heure_fin » : la fin doit suivre le début. « Horaires.1.Jour_semaine » : champ obligatoire. « Horaires.1.Heure_debut » : texte attendu. "

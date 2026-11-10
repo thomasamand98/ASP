@@ -5,13 +5,7 @@ using MySql.Data.MySqlClient;
 
 namespace Api.Common;
 
-// Format d'erreur unique pour toute l'API : { statusCode, message }
-// (équivalent de AllExceptionsFilter côté NestJS). Les erreurs volontaires
-// (HttpException : 400, 401, 404, 409, 429...) gardent leur message ; les
-// erreurs MySQL prévisibles (doublon, référence invalide, valeur trop
-// longue...) sont traduites en statut et message clairs ; toute autre erreur
-// (bug...) est journalisée côté serveur et renvoyée au client sans le moindre
-// détail interne.
+// { statusCode, message } partout, 500 sans détail pour l'inattendu
 public partial class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
 {
     public const string RecordNotFoundMessage = "Enregistrement introuvable.";
@@ -29,7 +23,7 @@ public partial class ExceptionMiddleware(RequestDelegate next, ILogger<Exception
             var (status, message) = Translate(exception, logger);
             if (context.Response.HasStarted)
             {
-                // La réponse est déjà partie : on ne peut plus qu'interrompre.
+                // trop tard pour répondre
                 context.Abort();
                 return;
             }
@@ -47,7 +41,7 @@ public partial class ExceptionMiddleware(RequestDelegate next, ILogger<Exception
     {
         if (exception is HttpException http) return (http.StatusCode, http.Message);
 
-        // Corps illisible ou trop gros, rejeté par Kestrel.
+        // corps illisible ou trop gros (Kestrel)
         if (exception is BadHttpRequestException bad)
         {
             return bad.StatusCode == StatusCodes.Status413PayloadTooLarge
@@ -57,8 +51,7 @@ public partial class ExceptionMiddleware(RequestDelegate next, ILogger<Exception
 
         if (IsDatabaseUnavailable(exception))
         {
-            // Journalisé en erreur avec le détail : c'est la seule trace de la
-            // cause réelle (mot de passe, socket, base...).
+            // seule trace de la vraie cause
             logger.LogError("Base de données indisponible : {Detail}", OneLine(exception.ToString()));
             return (StatusCodes.Status503ServiceUnavailable, DatabaseUnavailableMessage);
         }
@@ -71,27 +64,22 @@ public partial class ExceptionMiddleware(RequestDelegate next, ILogger<Exception
 
         if (FindMySqlException(exception) is { } mysql && MySqlErrors.TryGetValue(mysql.Number, out var known))
         {
-            // Journalisé en avertissement : utile pour repérer un appel du front
-            // qui vise un id disparu ou une contrainte non anticipée.
             logger.LogWarning("MySQL {Code} {Detail}", mysql.Number, mysql.Message);
             return known;
         }
 
-        // Sur une seule ligne : Cloud Logging crée une entrée par ligne, et le
-        // détail utile (table ou colonne absente...) serait séparé de l'en-tête.
+        // une ligne, sinon Cloud Logging découpe en plusieurs entrées
         logger.LogError("{Detail}", OneLine(exception.ToString()));
         return (StatusCodes.Status500InternalServerError, InternalErrorMessage);
     }
 
-    // Codes d'erreur MySQL correspondant aux erreurs Prisma traduites par le
-    // backend NestJS (P2000, P2002, P2003).
     private static readonly Dictionary<int, (int Status, string Message)> MySqlErrors = new()
     {
-        // P2000 — ER_DATA_TOO_LONG
+        // ER_DATA_TOO_LONG
         [1406] = (StatusCodes.Status400BadRequest, "Une valeur est trop longue pour son champ."),
-        // P2002 — ER_DUP_ENTRY
+        // ER_DUP_ENTRY
         [1062] = (StatusCodes.Status409Conflict, "Un enregistrement avec cette valeur existe déjà."),
-        // P2003 — ER_ROW_IS_REFERENCED(_2), ER_NO_REFERENCED_ROW(_2)
+        // ER_NO_REFERENCED_ROW(_2), ER_ROW_IS_REFERENCED(_2)
         [1216] = (StatusCodes.Status409Conflict, ForeignKeyMessage),
         [1217] = (StatusCodes.Status409Conflict, ForeignKeyMessage),
         [1451] = (StatusCodes.Status409Conflict, ForeignKeyMessage),
@@ -100,9 +88,7 @@ public partial class ExceptionMiddleware(RequestDelegate next, ILogger<Exception
 
     private const string ForeignKeyMessage = "Opération impossible : un enregistrement lié est introuvable ou encore utilisé ailleurs.";
 
-    // Base injoignable ou qui refuse la connexion (identifiants, base absente,
-    // serveur arrêté, trop de connexions...) : ce n'est pas un bug de l'API
-    // mais une indisponibilité, d'où un 503 plutôt qu'un 500.
+    // base injoignable, mauvais identifiants, trop de connexions... : 503
     private static readonly HashSet<int> UnavailableCodes = [1040, 1042, 1044, 1045, 1049, 1129, 1130, 1203, 2002, 2003, 2006, 2013];
 
     private static bool IsDatabaseUnavailable(Exception exception)

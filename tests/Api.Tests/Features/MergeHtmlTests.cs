@@ -2,7 +2,6 @@ using Api.Features.DocumentMerge;
 
 namespace Api.Tests.Features;
 
-// Portage de backend/src/document-merge/merge-html.spec.ts.
 public class MergeHtmlTests
 {
     private static string Chip(string path, string? kind = null) =>
@@ -16,7 +15,7 @@ public class MergeHtmlTests
             new { Contrat = new { Num_contrat = "C-42", Date = new DateTime(2026, 9, 25), Total = 1234.5m } });
         Assert.Contains("C-42", html);
         Assert.Contains("25/09/2026", html);
-        // Séparateur de milliers : espace fine insécable, comme fr-BE côté Node.
+        // milliers fr-BE : espace fine insécable
         Assert.Contains("1 234,50", html);
         Assert.DoesNotContain("data-merge-field", html);
         Assert.DoesNotContain("contenteditable", html);

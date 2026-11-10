@@ -1,18 +1,9 @@
-# Application complète en local : base MySQL, API et front.
-#   docker compose up --build
-# puis ouvrir http://localhost:8080 (API sur http://localhost:3000).
-#
-# Au premier démarrage, MySQL crée une base vide avec les scripts de
-# db/schema (voir docs/base-de-donnees.md). Les données restent dans le volume
-# `db-data` ; `docker compose down -v` repart d'une base vide.
-#
-# Valeurs surchargeables dans un fichier .env à côté de ce fichier (ou dans
-# l'environnement) : MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, JWT_SECRET,
-# MISTRAL_API_KEY, LOGIN_SCREEN, et API_URL / CORS_ORIGIN pour atteindre la
-# pile autrement que par http://localhost:8080 (127.0.0.1, IP du poste sur le
-# réseau local) — les deux vont de pair.
+# docker compose up --build : front sur :8080, API sur :3000
+# overrides possibles dans .env : MYSQL_*, JWT_SECRET, MISTRAL_API_KEY, LOGIN_SCREEN
+# hors localhost:8080, changer API_URL et CORS_ORIGIN ensemble
 
 services:
+  # base vide au 1er lancement (db/schema), reset avec down -v
   db:
     image: mysql:8.4
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
@@ -40,8 +31,7 @@ services:
       DATABASE_URL: mysql://horizon:${MYSQL_PASSWORD:-horizon}@db:3306/horizon
       PORT: "3000"
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
-      # Vide : un secret temporaire est généré, les sessions sont perdues à
-      # chaque redémarrage de l'API.
+      # vide = secret temporaire, sessions perdues au redémarrage
       JWT_SECRET: ${JWT_SECRET:-}
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
     volumes:

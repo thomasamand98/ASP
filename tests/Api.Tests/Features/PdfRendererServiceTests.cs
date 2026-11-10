@@ -4,13 +4,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Api.Tests.Features;
 
-// Portage de backend/src/document-merge/pdf-renderer.service.spec.ts.
 public class PdfRendererServiceTests
 {
     private static readonly RenderInput Input = new("", "<p>Contrat</p>", "");
 
-    // Faux Chromium : `render` décide du résultat de chaque génération,
-    // `connected` indique s'il tourne encore au moment de l'échec.
+    // faux Chromium, `connected` = encore vivant au moment de l'échec
     private sealed class FakeBrowser(Func<Task<byte[]>> render, bool connected = true) : IPdfBrowser
     {
         public bool IsConnected => connected;
@@ -25,8 +23,7 @@ public class PdfRendererServiceTests
 
     private static Task<byte[]> Fail() => Task.FromException<byte[]>(new InvalidOperationException("Protocol error: Target closed"));
 
-    // Lanceur qui renvoie les navigateurs fournis, dans l'ordre (le dernier
-    // est réutilisé), et compte les lancements.
+    // navigateurs dans l'ordre, le dernier réutilisé
     private static (PdfRendererService Service, Func<int> Launches) Service(params Func<Task<IPdfBrowser>>[] launches)
     {
         var count = 0;

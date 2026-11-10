@@ -2,7 +2,6 @@ using Horizon.Web.Common;
 
 namespace Horizon.Web.Tests.Common;
 
-// Repris de frontend/src/features/planning/dateUtils.test.ts.
 public class DateUtilsTests
 {
     [Fact]
@@ -41,9 +40,9 @@ public class DateUtilsTests
         var lanes = DateUtils.LayoutLanes([("a", 0, 60), ("b", 30, 90), ("c", 60, 120), ("d", 200, 260)]);
         Assert.Equal((0, 2), lanes["a"]);
         Assert.Equal((1, 2), lanes["b"]);
-        // c réutilise le couloir de a, terminé avant son début.
+        // c reprend le couloir de a, déjà fini
         Assert.Equal((0, 2), lanes["c"]);
-        // d ne chevauche rien : seul dans son groupe.
+        // d seul dans son groupe
         Assert.Equal((0, 1), lanes["d"]);
     }
 }

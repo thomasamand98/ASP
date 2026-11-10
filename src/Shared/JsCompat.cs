@@ -3,8 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Horizon.Shared;
 
-// Reproduit Number(texte) de JavaScript, utilisé par le backend NestJS pour
-// lire les paramètres numériques (pagination, quantités...).
+// Number(texte) JS, pour les paramètres numériques
 public static partial class JsNumber
 {
     public static double Parse(string? raw)
@@ -30,7 +29,7 @@ public static partial class JsNumber
 
     public static bool IsInteger(double value) => double.IsFinite(value) && Math.Floor(value) == value;
 
-    // String(nombre) de JavaScript pour les valeurs courantes.
+    // String(nombre) JS, cas courants
     public static string ToString(double value)
     {
         if (IsInteger(value) && Math.Abs(value) < 1e21) return value.ToString("0", CultureInfo.InvariantCulture);
@@ -44,10 +43,7 @@ public static partial class JsNumber
     private static partial Regex DecimalLiteral();
 }
 
-// Reproduit Date.parse de JavaScript pour les formats ISO 8601 : une date
-// seule est en UTC, une date-heure sans fuseau est en heure locale du
-// serveur. Les autres formats (hérités, propres à V8) sont lus au mieux par
-// DateTime.Parse.
+// Date.parse JS : date seule en UTC, date-heure sans fuseau en heure locale
 public static partial class JsDate
 {
     public static bool TryParse(string? raw, out DateTime utc)
@@ -74,7 +70,7 @@ public static partial class JsDate
 
         if (m.Groups["z"].Success)
         {
-            // Z ou décalage explicite.
+            // Z ou décalage explicite
         }
         else if (m.Groups["sign"].Success)
         {

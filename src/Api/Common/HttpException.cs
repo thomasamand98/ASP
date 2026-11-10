@@ -1,7 +1,6 @@
 namespace Api.Common;
 
-// Erreurs volontaires de l'API (équivalent des HttpException de NestJS) :
-// traduites par ExceptionMiddleware en { statusCode, message }.
+// message renvoyé tel quel au client
 public class HttpException(int statusCode, string message) : Exception(message)
 {
     public int StatusCode { get; } = statusCode;
@@ -25,6 +24,5 @@ public class BadGatewayException(string message) : HttpException(StatusCodes.Sta
 
 public class ServiceUnavailableException(string message) : HttpException(StatusCodes.Status503ServiceUnavailable, message);
 
-// Équivalent de l'erreur Prisma P2025 (findUniqueOrThrow, update ou delete
-// d'un enregistrement absent).
+// ligne absente (lecture, update, delete)
 public class RecordNotFoundException() : NotFoundException(ExceptionMiddleware.RecordNotFoundMessage);

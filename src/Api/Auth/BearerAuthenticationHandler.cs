@@ -6,10 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Auth;
 
-// Équivalent du guard global JwtAuthGuard : toute route exige un jeton
-// d'accès valide dans l'en-tête `Authorization: Bearer <jeton>`, sauf celles
-// marquées [AllowAnonymous] (la politique d'autorisation par défaut, déclarée
-// dans Program.cs, exige un utilisateur authentifié).
 public class BearerAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,

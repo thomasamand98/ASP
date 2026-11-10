@@ -6,20 +6,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Personnels;
 
-// ===== SERVICE =====
 public class PersonnelService(AppDbContext db)
 {
-    // Projection (voir Common/Projection.cs) : pour chaque table source, les
-    // lignes de cette table liées aux ids sélectionnés.
     private static readonly ProjectionMap<Personnel> Projections = new()
     {
         ["chauffeurs"] = ids => p => p.Chauffeurs.Any(c => ids.Contains(c.IDCHAUFFEURS)),
         ["pointage"] = ids => p => p.Pointages.Any(x => ids.Contains(x.IDPOINTAGES)),
-        // Attelages de référence : liés au salarié via sa fiche chauffeur.
+        // via la fiche chauffeur du salarié
         ["attelages"] = ids => p => p.Chauffeurs.Any(c => c.AttelageReferences.Any(a => ids.Contains(a.IDATTELAGE_REFERENCE))),
     };
 
-    // page/pageSize optionnels : omis, toute la table.
     public async Task<object> GetPersonnelsAsync(int? page, int? pageSize, string? search, Projection? projection, CancellationToken ct)
     {
         var query = db.Personnel
@@ -32,9 +28,7 @@ public class PersonnelService(AppDbContext db)
         return new { personnel, total };
     }
 
-    // Détail : ajoute les champs scripturables absents de la liste. Pas de
-    // relation entre Personnel et Adresse (colonne IDADRESSES sans clé
-    // déclarée) : l'adresse est lue à part.
+    // IDADRESSES sans FK, adresse lue à part
     public async Task<object> GetPersonnelAsync(long id, CancellationToken ct)
     {
         var p = await db.Personnel.AsNoTracking().Where(x => x.IDPERSONNELS == id).FirstOrThrowAsync(ct);
@@ -78,12 +72,9 @@ public class PersonnelService(AppDbContext db)
         };
     }
 
-    // L'adresse éventuellement saisie est créée dans `adresses` puis liée.
     public async Task<object> CreatePersonnelAsync(CreatePersonnelDto dto, CancellationToken ct)
     {
-        // IDADRESSES/IDUTILISATEURS_* ont un défaut DB de 0, qui viole leur
-        // contrainte de clé étrangère quand ils sont omis — mis explicitement
-        // à NULL.
+        // défaut DB à 0, viole la FK
         var personnel = new Personnel { IDUTILISATEURS_createur = null, IDUTILISATEURS_modificateur = null };
         Assign(personnel, dto);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -94,10 +85,9 @@ public class PersonnelService(AppDbContext db)
         return await ListSelect(db.Personnel.Where(p => p.IDPERSONNELS == personnel.IDPERSONNELS)).FirstOrThrowAsync(ct);
     }
 
-    // L'adresse liée est mise à jour, ou créée si le personnel n'en avait pas.
     public async Task<object> UpdatePersonnelAsync(long id, UpdatePersonnelDto dto, CancellationToken ct)
     {
-        // Les dates sont vérifiées avant toute lecture (400 avant 404).
+        // 400 avant 404
         var probe = new Personnel();
         Assign(probe, dto);
 
@@ -114,11 +104,7 @@ public class PersonnelService(AppDbContext db)
 
     public Task DeletePersonnelAsync(long id, CancellationToken ct) => db.Personnel.Where(p => p.IDPERSONNELS == id).DeleteOrThrowAsync(ct);
 
-    // Sont convertis ici :
-    //   - les Date_* : le formulaire envoie un jour « AAAA-MM-JJ » (colonne
-    //     DATE → minuit UTC) ; vide = effacé (NULL) ;
-    //   - les textes vides : le formulaire envoie "" pour un champ non rempli,
-    //     enregistré NULL comme le faisait WinDev (pas de "" parasites).
+    // "" = NULL, textes comme dates, comme le faisait WinDev
     private static void Assign(Personnel p, CreatePersonnelDto dto)
     {
         static void Text(Opt<string> value, Action<string?> assign)
@@ -176,34 +162,27 @@ public class PersonnelService(AppDbContext db)
         p.Date_validite_selection_medicale,
         p.Date_validite_carte_chauffeur,
         p.Num_service_social,
-        // Adresse « Email planning » affichée sur la fiche chauffeur liée.
+        // "Email planning" de la fiche chauffeur
         p.E_mail_professionnel,
     });
 }
 
-// ===== CONTROLLER =====
 public class PersonnelController(PersonnelService service) : ApiControllerBase
 {
-    // NestJS : GET personnel
-    // ?page=1&pageSize=25 : optionnels — omis, renvoie toute la table.
     [HttpGet("personnel")]
     public Task<object> GetPersonnels([FromQuery] string? page, [FromQuery] string? pageSize, [FromQuery] string? search, [FromQuery] string? via, [FromQuery] string? ids, CancellationToken ct) =>
         service.GetPersonnelsAsync(Params.ParsePage(page), Params.ParsePageSize(pageSize), search, Projection.Parse(via, ids), ct);
 
-    // NestJS : GET personnel/:id
     [HttpGet("personnel/{id}")]
     public Task<object> GetPersonnel(string id, CancellationToken ct) => service.GetPersonnelAsync(Params.ParseId(id), ct);
 
-    // NestJS : POST personnel
     [HttpPost("personnel")]
     public Task<IActionResult> CreatePersonnel([Body] CreatePersonnelDto dto, CancellationToken ct) => Created201(service.CreatePersonnelAsync(dto, ct));
 
-    // NestJS : PATCH personnel/:id
     [HttpPatch("personnel/{id}")]
     public Task<object> UpdatePersonnel(string id, [Body] UpdatePersonnelDto dto, CancellationToken ct) =>
         service.UpdatePersonnelAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE personnel/:id
     [HttpDelete("personnel/{id}")]
     public Task DeletePersonnel(string id, CancellationToken ct) => service.DeletePersonnelAsync(Params.ParseId(id), ct);
 }

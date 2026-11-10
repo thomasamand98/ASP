@@ -4,14 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Common;
 
-// Adresses liées par IDADRESSES (table `adresses`). Règle commune à toutes
-// les fiches : l'utilisateur saisit les champs d'adresse, jamais l'id.
-//   - création de la fiche : une ligne `adresses` est créée avec les valeurs
-//     saisies (sauf adresse entièrement vide) et son id est affecté à la fiche ;
-//   - modification : la ligne pointée par l'IDADRESSES de la fiche est mise à
-//     jour (créée puis affectée si la fiche n'en avait pas encore).
-
-// Forme renvoyée au front (équivalent de adresseSelect).
 public record AdresseView(string? Adresse1, string? Adresse2, string? Adresse3, string? CP, string? Localite, string? Pays, string? Pays_full_name)
 {
     public static AdresseView? From(Adresse? a) =>
@@ -22,7 +14,7 @@ public static class Adresses
 {
     public static readonly string[] FieldNames = ["Adresse1", "Adresse2", "Adresse3", "CP", "Localite", "Pays", "Pays_full_name"];
 
-    // Seuls les champs envoyés ; texte vide enregistré NULL.
+    // seulement les champs envoyés, vide = NULL
     public static Dictionary<string, string?> Pick(IAdresseFields? source)
     {
         var data = new Dictionary<string, string?>();
@@ -41,9 +33,7 @@ public static class Adresses
         return data;
     }
 
-    // Crée ou met à jour l'adresse d'une fiche et renvoie l'IDADRESSES à lui
-    // affecter. `currentId` : IDADRESSES actuel de la fiche (null/0 = aucun —
-    // 0 est le défaut DB des colonnes IDADRESSES). Aucun champ envoyé : inchangé.
+    // currentId 0 = pas d'adresse (défaut en base)
     public static async Task<long?> SaveAsync(AppDbContext db, long? currentId, Dictionary<string, string?> data, CancellationToken ct = default)
     {
         var id = currentId is null or 0 ? null : currentId;
@@ -56,9 +46,9 @@ public static class Adresses
             await db.SaveChangesAsync(ct);
             return id;
         }
-        // Une adresse entièrement vide n'est pas créée.
+        // pas d'adresse vide
         if (!data.Values.Any(value => !string.IsNullOrWhiteSpace(value))) return null;
-        // IDUTILISATEURS_* ont un défaut DB de 0 (clé étrangère) : NULL.
+        // NULL, le défaut 0 casserait la FK
         var created = new Adresse { Date_heure_creation = DateTime.UtcNow, IDUTILISATEURS_createur = null, IDUTILISATEURS_modificateur = null };
         Assign(created, data);
         db.Adresse.Add(created);

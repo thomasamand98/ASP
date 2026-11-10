@@ -1,6 +1,5 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Personnel (GET /personnel et /personnel/:id).
 public record Personnel
 {
     public string IDPERSONNELS { get; init; } = "";
@@ -40,13 +39,10 @@ public sealed record PersonnelDetail : Personnel
     public string? Date_validite_carte_identite { get; init; }
     public string? Date_validite_A1 { get; init; }
     public string? Date_validite_SIPSI { get; init; }
-    // Adresse liée par IDADRESSES (table `adresses`).
     public AdresseView? Adresse { get; init; }
 }
 
-// Contrats de travail d'un personnel (GET /personnel/:id/contrats-travail),
-// avec leurs taux horaires du plus récent au plus ancien (Decimal en texte,
-// ex. « 13.400000 »).
+// taux du plus récent au plus ancien, en texte ("13.400000")
 public sealed record TauxHoraire(string IDTAUX_HORAIRE, string? Date_application, string? Taux_horaire, string? Taux_horaire_supplementaire,
     string? Taux_horaire_nuitee, string? Taux_nuitee, string? Taux_samedi, string? Taux_cheque_repas, string Taux_stanby);
 

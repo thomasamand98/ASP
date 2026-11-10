@@ -8,19 +8,14 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Auth;
 
-// Limite propre aux tentatives de connexion (LOGIN_THROTTLE_LIMIT).
+// LOGIN_THROTTLE_LIMIT au lieu de la limite globale
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class LoginThrottleAttribute : Attribute;
 
-// Routes exclues de la limitation (réponse 404 des routes inconnues).
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public sealed class SkipThrottleAttribute : Attribute;
 
-// Limitation de débit : reprend l'algorithme de @nestjs/throttler (stockage
-// en mémoire). Chaque couple (route, adresse IP) dispose de THROTTLE_LIMIT
-// requêtes par minute ; au-delà, la route répond 429 pendant une minute à
-// cette adresse. Placée avant l'authentification : elle freine aussi les
-// requêtes sans jeton.
+// en mémoire, par (route, IP) : au-delà de la limite, 429 pendant 1 min
 public class ThrottleMiddleware(RequestDelegate next, IOptions<AuthOptions> options, TimeProvider time)
 {
     public const string ErrorMessage = "Trop de requêtes, veuillez réessayer dans quelques instants";
@@ -28,8 +23,7 @@ public class ThrottleMiddleware(RequestDelegate next, IOptions<AuthOptions> opti
 
     private sealed class Record
     {
-        // Une échéance par requête comptée : elle cesse de compter une
-        // minute après son arrivée.
+        // échéance de chaque requête (arrivée + 1 min)
         public readonly Queue<long> Hits = new();
         public long ExpiresAt;
         public long BlockExpiresAt;
@@ -98,7 +92,7 @@ public class ThrottleMiddleware(RequestDelegate next, IOptions<AuthOptions> opti
 
     private static long SecondsUntil(long instant, long now) => (long)Math.Ceiling((instant - now) / 1000d);
 
-    // Retire les compteurs inactifs, au plus une fois par minute.
+    // compteurs inactifs, une fois par minute max
     private void Sweep(long now)
     {
         var last = Interlocked.Read(ref _lastSweep);
@@ -114,8 +108,7 @@ public class ThrottleMiddleware(RequestDelegate next, IOptions<AuthOptions> opti
         }
     }
 
-    // Les adresses IPv6 sont regroupées par sous-réseau /56, comme le fait
-    // @nestjs/throttler : un même client dispose de tout un préfixe.
+    // IPv6 regroupées par /56 (un client a souvent tout le préfixe)
     private static string NormalizeIp(IPAddress? address)
     {
         if (address is null) return "";

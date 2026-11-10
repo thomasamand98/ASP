@@ -2,8 +2,7 @@ using Horizon.Web.Common;
 
 namespace Horizon.Web.Tests.Common;
 
-// Valeurs relevées sur le graphique d'origine (Recharts) du tableau de bord,
-// à 1 043 px de large.
+// valeurs de référence, graphique à 1 043 px
 public class ChartMathTests
 {
     [Fact]
@@ -20,7 +19,7 @@ public class ChartMathTests
     [Fact]
     public void BarPosition_reprend_largeur_et_ecart_des_barres()
     {
-        // 12 mois sur 955 px, 4 séries, 18 % de marge, 2 px entre barres.
+        // 12 mois sur 955 px, 4 séries, 18 % de marge, 2 px entre barres
         var band = 955d / 12;
         var (offset, size) = ChartMath.BarPosition(band, 4, 0, 0.18, 2, 28);
         Assert.Equal(11, size);
@@ -31,7 +30,7 @@ public class ChartMathTests
     [Fact]
     public void VisibleXTicks_garde_premiere_et_derniere_et_saute_ce_qui_chevauche()
     {
-        // 46 jours sur 955 px : une étiquette sur deux, plus la dernière.
+        // 46 jours : une étiquette sur deux + la dernière
         var band = 955d / 46;
         var centers = Enumerable.Range(0, 46).Select(i => 80 + (i + 0.5) * band).ToList();
         var widths = Enumerable.Repeat(31.453125, 46).ToList();

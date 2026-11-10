@@ -7,8 +7,7 @@ namespace Api.Features.DocumentMerge;
 
 public record RenderInput(string HeaderHtml, string BodyHtml, string FooterHtml);
 
-// Navigateur capable de produire un PDF (Chromium en production, un faux
-// dans les tests).
+// Chromium en prod, faux navigateur dans les tests
 public interface IPdfBrowser : IAsyncDisposable
 {
     bool IsConnected { get; }
@@ -16,11 +15,7 @@ public interface IPdfBrowser : IAsyncDisposable
     Task<byte[]> RenderAsync(RenderInput input);
 }
 
-// Rendu PDF d'un document fusionné, via un Chromium sans interface
-// (PuppeteerSharp, équivalent de puppeteer côté NestJS). Une seule instance
-// de Chromium est lancée à la première demande puis réutilisée ; si elle
-// s'arrête, elle est relancée et le rendu retenté une fois. Tout échec est
-// renvoyé en 503, sans détail interne.
+// un seul Chromium partagé, relancé + 1 retry s'il tombe, sinon 503
 public partial class PdfRendererService(ILogger<PdfRendererService> logger, Func<Task<IPdfBrowser>>? launcher = null) : IAsyncDisposable
 {
     public const string UnavailableMessage = "Génération du PDF impossible pour le moment, réessayez dans quelques instants.";
@@ -46,13 +41,13 @@ public partial class PdfRendererService(ILogger<PdfRendererService> logger, Func
         try
         {
             var browser = await _launch();
-            // Chromium arrêté : on l'oublie, la demande suivante le relancera.
+            // relancé à la prochaine demande
             browser.Disconnected += () => Forget(holder.Task);
             holder.SetResult(browser);
         }
         catch (Exception error)
         {
-            // Lancement raté : idem.
+            // idem si le lancement échoue
             Forget(holder.Task);
             holder.SetException(error);
         }
@@ -103,7 +98,7 @@ public partial class PdfRendererService(ILogger<PdfRendererService> logger, Func
         }
         catch
         {
-            // Arrêt de l'application : rien à faire de plus.
+            // arrêt de l'appli
         }
         GC.SuppressFinalize(this);
     }
@@ -114,11 +109,9 @@ public partial class PdfRendererService(ILogger<PdfRendererService> logger, Func
     private static partial Regex Newlines();
 }
 
-// Chromium piloté par PuppeteerSharp.
 public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
 {
-    // Feuille de style du corps du document : reprend les classes produites
-    // par l'éditeur du front (frontend/src/features/documents/).
+    // classes produites par l'éditeur de modèles
     private const string BodyStylesheet = """
 
           * { box-sizing: border-box; }
@@ -149,8 +142,7 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
 
         """;
 
-    // En-tête et pied de page : rendus par Chromium dans la marge, avec leur
-    // propre feuille de style (celle du corps ne s'y applique pas).
+    // en-tête/pied rendus dans la marge, sans la feuille du corps
     private const string ChromeStylesheet = """
 
           * { box-sizing: border-box; font: 8px/1.4 'Segoe UI', Arial, sans-serif; color: #444; }
@@ -173,9 +165,7 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
         var launched = await Puppeteer.LaunchAsync(new LaunchOptions
         {
             Headless = true,
-            // --disable-dev-shm-usage : Docker plafonne /dev/shm à 64 Mo, ce
-            // qui fait tomber le rendu sur un gros lot (impression de tous les
-            // contrats) ; Chromium passe alors par /tmp.
+            // /dev/shm limité à 64 Mo sous Docker, plantait sur l'impression de tous les contrats
             Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
             ExecutablePath = await FindChromiumAsync(),
         });
@@ -184,9 +174,7 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
         return wrapper;
     }
 
-    // Chromium à utiliser : PUPPETEER_EXECUTABLE_PATH (image Docker), sinon
-    // celui déjà téléchargé par puppeteer (npm) sur ce poste, sinon un
-    // téléchargement par PuppeteerSharp à la première génération.
+    // PUPPETEER_EXECUTABLE_PATH (Docker), sinon cache local, sinon téléchargement
     private static async Task<string> FindChromiumAsync()
     {
         var configured = Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH");
@@ -210,9 +198,7 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
         var page = await browser.NewPageAsync();
         try
         {
-            // Le HTML vient d'un modèle saisi par un utilisateur : aucun script
-            // n'est exécuté et aucune ressource externe n'est chargée (seules
-            // les images intégrées en data: passent).
+            // HTML saisi par l'utilisateur : pas de JS, rien d'externe à part les data:
             await page.SetJavaScriptEnabledAsync(false);
             await page.SetRequestInterceptionAsync(true);
             page.Request += (_, e) =>
@@ -248,7 +234,7 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
             }
             catch
             {
-                // Page déjà fermée (Chromium arrêté).
+                // déjà fermée
             }
         }
     }
@@ -259,15 +245,7 @@ public sealed class ChromiumBrowser(IBrowser browser) : IPdfBrowser
     public async ValueTask DisposeAsync() => await browser.CloseAsync();
 }
 
-// Point d'entrée du moteur de fusion : assemble le modèle
-// (DocumentTemplateService) et un contexte de données déjà construit par
-// l'appelant (voir ContratService.GetContratMergeContextAsync) pour produire
-// un PDF. Ne connaît rien du contrat, de la facture ou de tout autre type
-// d'enregistrement.
-//
-// Un modèle a trois zones indépendantes : en-tête et pied de page (répétés
-// sur chaque page imprimée) et le contenu principal (affiché une fois). Les
-// trois sont résolues avec exactement le même contexte.
+// générique, le contexte est construit par l'appelant (ex. GetContratMergeContextAsync)
 public class DocumentMergeService(DocumentTemplates.DocumentTemplateService templates, PdfRendererService renderer)
 {
     public async Task<byte[]> RenderPdfAsync(long templateId, object? context, CancellationToken ct)

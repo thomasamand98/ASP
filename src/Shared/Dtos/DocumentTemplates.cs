@@ -1,12 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un modèle de
-// document. Mêmes clés que DocumentTemplate côté frontend (voir
-// frontend/src/features/documents/types.ts). Type_document désigne le type
-// d'enregistrement pour lequel le modèle est utilisable (ex. "CONTRAT") —
-// une liste fermée connue du code, pas une catégorie d'énumération éditable
-// par l'utilisateur. Contenu_entete/Contenu_pied : en-tête et pied de page,
-// répétés sur chaque page à l'impression — optionnels.
+// Type_document : liste fixée dans le code ("CONTRAT"...), pas une énumération
 public class CreateDocumentTemplateDto
 {
     public const string TypeContrat = "CONTRAT";
@@ -22,6 +16,5 @@ public class CreateDocumentTemplateDto
 [Partial]
 public class UpdateDocumentTemplateDto : CreateDocumentTemplateDto;
 
-// Les trois zones d'un modèle (voir DocumentTemplateEditor.tsx : en-tête /
-// contenu / pied, chacune éditée indépendamment).
+// en-tête, contenu, pied
 public record DocumentTemplateContent(string? Contenu_entete, string Contenu_html, string? Contenu_pied);

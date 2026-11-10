@@ -1,6 +1,4 @@
--- Historique des migrations EF Core : inscrit la migration Baseline, qui ne
--- crée rien (le schéma vient des scripts précédents). Équivaut à
--- `dotnet ef database update` sur cette base (voir docs/base-de-donnees.md).
+-- migration EF Baseline marquée comme appliquée
 
 CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
     `MigrationId` varchar(150) NOT NULL,

@@ -1,7 +1,6 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Attelages (GET /attelages) : attelages de
-// référence (table attelages_reference), complétés des véhicules.
+// attelages de référence + véhicules
 public sealed record AttelageVehicule(string? Marque, string? Modele, string? Num_immat);
 
 public sealed record AttelageChauffeur(string? Nom_chauffeur);

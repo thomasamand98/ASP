@@ -2,25 +2,22 @@ using System.Globalization;
 
 namespace Api.Features.Statistiques;
 
-// Découpage d'une période en intervalles (jours ou mois) pour le graphe du
-// chiffre d'affaires du tableau de bord — logique pure, sans base de
-// données (voir ChiffreAffairesTests). Toutes les dates sont des jours à
-// minuit UTC, comme les colonnes DATE.
+// dates = jours à minuit UTC (colonnes DATE)
 public static class ChiffreAffaires
 {
     public const string Jour = "jour";
     public const string Mois = "mois";
 
-    // Au-delà de deux mois, un point par jour devient illisible : on passe au mois.
+    // au-delà de 2 mois, un point par mois
     private const int MaxJoursParJour = 62;
 
     public static string GranulariteDe(DateTime from, DateTime to) => (to - from).TotalDays + 1 > MaxJoursParJour ? Mois : Jour;
 
-    // Clé de l'intervalle contenant `date` : « AAAA-MM » ou « AAAA-MM-JJ ».
+    // "AAAA-MM" ou "AAAA-MM-JJ"
     public static string CleIntervalle(DateTime date, string granularite) =>
         date.ToString(granularite == Mois ? "yyyy-MM" : "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    // Clés de tous les intervalles de la période, dans l'ordre (même vides).
+    // intervalles vides compris
     public static List<string> Intervalles(DateTime from, DateTime to, string granularite)
     {
         var cles = new List<string>();
@@ -33,15 +30,14 @@ public static class ChiffreAffaires
         return cles;
     }
 
-    // Même jour décalé de `annees` ans ; un 29 février devient le 28.
+    // 29 février devient 28
     public static DateTime DecalerAnnee(DateTime date, int annees)
     {
         var year = date.Year + annees;
         return new DateTime(year, date.Month, Math.Min(date.Day, DateTime.DaysInMonth(year, date.Month)));
     }
 
-    // Additionne des montants par intervalle. Les montants de N-1 (`decalage` =
-    // 1) sont rangés dans l'intervalle de même rang de la période affichée.
+    // decalage = 1 : montants N-1 rangés sur la période affichée
     public static Dictionary<string, double> CumulerParIntervalle(IEnumerable<(DateTime? Date, double Montant)> lignes, string granularite, int decalage = 0)
     {
         var totaux = new Dictionary<string, double>();
@@ -54,6 +50,6 @@ public static class ChiffreAffaires
         return totaux;
     }
 
-    // Math.round de JavaScript : au centime, la demie arrondie vers le haut.
+    // demi-centime vers le haut, pas d'arrondi bancaire
     public static double ArrondiCentimes(double value) => Math.Floor(value * 100 + 0.5) / 100;
 }

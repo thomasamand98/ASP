@@ -1,8 +1,6 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Marchandises (GET /marchandises et
-// /marchandises/:id). CouleurPlanning : couleur WinDev (BigInt, en texte) ;
-// champs du déchet lié et Is_dechet/Archive : codes 0/1.
+// CouleurPlanning : couleur WinDev en texte
 public record Marchandise
 {
     public string IDMARCHANDISES { get; init; } = "";
@@ -20,7 +18,7 @@ public sealed record MarchandiseDetail : Marchandise
     public double? Archive { get; init; }
 }
 
-// Déchet tel que renvoyé par GET /dechets.
+// GET /dechets
 public sealed record Dechet(string IDDECHETS, string? Code, string? Description_dechet);
 
 public sealed record DechetsResponse(List<Dechet> dechets);

@@ -1,5 +1,4 @@
--- Table document_templates : modèles de document imprimables (voir
--- src/Api/Features/DocumentTemplates et src/Web/Features/Documents).
+-- modèles de document imprimables
 
 CREATE TABLE `document_templates` (
   `IDDOCUMENT_TEMPLATES` BIGINT NOT NULL AUTO_INCREMENT,

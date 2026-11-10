@@ -6,16 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Enumerations;
 
-// ===== SERVICE =====
-// Valeurs d'énumération (table enumerations), chacune rattachée à une
-// catégorie (voir CategorieEnumerationService).
 public class EnumerationService(AppDbContext db)
 {
-    // `categorieId` optionnel : fourni, ne renvoie que les valeurs de cette
-    // catégorie (cas de l'écran Configuration > Enumérations) ; omis, toute la
-    // table. `categorieNom` (ex. « unite_prestation ») fait de même en
-    // désignant la catégorie par son nom technique. Triées par Ordre puis
-    // libellé, comme elles s'affichent dans les listes déroulantes.
+    // tri par Ordre puis libellé, comme les listes déroulantes
     public async Task<object> GetEnumerationsAsync(long? categorieId, string? categorieNom, CancellationToken ct)
     {
         IQueryable<Enumeration> query = db.Enumeration;
@@ -27,9 +20,7 @@ public class EnumerationService(AppDbContext db)
 
     public async Task<object> CreateEnumerationAsync(CreateEnumerationDto dto, CancellationToken ct)
     {
-        // IDUTILISATEURS_createur/modificateur ont un défaut DB de 0, qui viole
-        // leur contrainte de clé étrangère quand ils sont omis — mis
-        // explicitement à NULL (pas encore d'authentification pour les renseigner).
+        // défaut DB à 0 (FK), pas encore d'auth pour les remplir
         var enumeration = new Enumeration
         {
             IDUTILISATEURS_createur = null,
@@ -59,8 +50,6 @@ public class EnumerationService(AppDbContext db)
         await db.Enumeration.Where(e => e.IDENUMERATIONS == id).DeleteOrThrowAsync(ct);
     }
 
-    // Le DTO a les mêmes noms de champs que la table — seul l'id de catégorie
-    // a besoin d'être converti (vide ou absent : inchangé).
     private static void Assign(Enumeration e, CreateEnumerationDto dto)
     {
         if (dto.IDCATEGORIES_ENUMERATION is { IsSet: true, Value.Length: > 0 }) e.IDCATEGORIES_ENUMERATION = Dto.Id(dto.IDCATEGORIES_ENUMERATION.Value);
@@ -77,27 +66,20 @@ public class EnumerationService(AppDbContext db)
     private Task<object> ViewAsync(long id, CancellationToken ct) => Select(db.Enumeration.Where(e => e.IDENUMERATIONS == id)).FirstOrThrowAsync(ct);
 }
 
-// ===== CONTROLLER =====
 public class EnumerationController(EnumerationService service) : ApiControllerBase
 {
-    // NestJS : GET enumerations
-    // ?categorieId=12 ou ?categorie=unite_prestation (nom technique) :
-    // optionnels — omis, renvoie toute la table.
     [HttpGet("enumerations")]
     public Task<object> GetEnumerations([FromQuery] string? categorieId, [FromQuery] string? categorie, CancellationToken ct) =>
         service.GetEnumerationsAsync(Params.ParseOptionalId(categorieId), categorie, ct);
 
-    // NestJS : POST enumerations
     [HttpPost("enumerations")]
     public Task<IActionResult> CreateEnumeration([Body] CreateEnumerationDto dto, CancellationToken ct) =>
         Created201(service.CreateEnumerationAsync(dto, ct));
 
-    // NestJS : PATCH enumerations/:id
     [HttpPatch("enumerations/{id}")]
     public Task<object> UpdateEnumeration(string id, [Body] UpdateEnumerationDto dto, CancellationToken ct) =>
         service.UpdateEnumerationAsync(Params.ParseId(id), dto, ct);
 
-    // NestJS : DELETE enumerations/:id
     [HttpDelete("enumerations/{id}")]
     public Task DeleteEnumeration(string id, CancellationToken ct) => service.DeleteEnumerationAsync(Params.ParseId(id), ct);
 }

@@ -1,8 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un personnel. Les
-// Date_* sont des strings ISO ; IDADRESSES est géré par le serveur (voir
-// Common/Adresses.cs). Routier/Manutention/Atelier sont des codes 0/1.
+// Routier/Manutention/Atelier en 0/1
 public class CreatePersonnelDto : IAdresseFields
 {
     [Text] public Opt<string> Civilite_Personnel { get; set; }
@@ -36,8 +34,7 @@ public class CreatePersonnelDto : IAdresseFields
     [Date] public Opt<string> Date_validite_carte_identite { get; set; }
     [Date] public Opt<string> Date_validite_A1 { get; set; }
     [Date] public Opt<string> Date_validite_SIPSI { get; set; }
-    // Adresse (table `adresses`, liée par IDADRESSES) : champs aplatis,
-    // enregistrés à part par le service — comme pour l'Entité.
+    // adresse aplatie, enregistrée à part
     [Text] public Opt<string> Adresse1 { get; set; }
     [Text] public Opt<string> Adresse2 { get; set; }
     [Text] public Opt<string> Adresse3 { get; set; }

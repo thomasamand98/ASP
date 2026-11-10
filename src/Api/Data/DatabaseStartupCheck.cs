@@ -2,8 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Data;
 
-// Ouvre (puis referme) une connexion au démarrage pour journaliser la cause
-// exacte d'un échec de connexion. Ne bloque jamais le démarrage.
+// juste pour logger la cause exacte, ne bloque pas le démarrage
 public static class DatabaseStartupCheck
 {
     public static async Task LogAsync(WebApplication app)

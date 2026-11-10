@@ -1,8 +1,5 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier une commande.
-// IDCONTRATS/IDPRESTATIONS sont des strings côté JSON et Date_commande une
-// string ISO.
 public class CreateCommandeDto
 {
     [Date] public Opt<string> Date_commande { get; set; }

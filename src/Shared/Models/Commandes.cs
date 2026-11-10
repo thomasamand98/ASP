@@ -1,8 +1,6 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Commandes (GET /commandes). Marchandise et
-// Unite sont résolus par l'API via commande → contrat → prestation ; Unite
-// est un code de l'énumération « unite_prestation ».
+// Marchandise et Unite repris de la prestation du contrat
 public sealed record Commande
 {
     public string IDCOMMANDES { get; init; } = "";
@@ -24,7 +22,7 @@ public sealed record CommandeContrat(string? Num_contrat, string? Version_contra
 
 public sealed record PrestationDescription(string? Description_prestation);
 
-// Prestation proposée dans la fiche commande (GET /contrats/:id/prestations).
+// GET /contrats/:id/prestations
 public sealed record PrestationOption(string IDPRESTATIONS, string? Description_prestation, string? Description_courte);
 
 public sealed record PrestationsResponse(List<PrestationOption> prestations);

@@ -50,7 +50,7 @@ public class DataTableTests : BunitContext
     {
         var table = Rendre();
         table.Find("th .data-table-sort-label").Click();
-        // Tri « text » de TanStack : textes en minuscules, comparés code par code.
+        // tri texte : minuscules, code par code
         Assert.Equal(["argile", "Béton", "Sable"], Noms(table));
         Assert.Contains("▲", table.Find("th .data-table-sort-label").TextContent);
         table.Find("th .data-table-sort-label").Click();
@@ -88,8 +88,7 @@ public class DataTableTests : BunitContext
         Assert.Equal(["1", "3"], _selection.Order());
 
         table.Render(p => p.Add(t => t.SelectedRowIds, _selection));
-        // Le Ctrl+clic a déplacé l'ancre sur la ligne 3 : Maj+clic sélectionne
-        // la plage 2–3 et remplace la sélection.
+        // ancre sur 3 après le Ctrl+clic, Maj+clic remplace par 2-3
         table.FindAll("tbody tr")[1].Click(new MouseEventArgs { ShiftKey = true });
         Assert.Equal(["2", "3"], _selection.Order());
     }
@@ -101,7 +100,7 @@ public class DataTableTests : BunitContext
         table.Find("th .data-table-filter-button").Click();
         table.Find(".data-table-filter-input").Input("a");
         table.Find("thead input[type=checkbox]").Change(true);
-        // « Béton » ne contient pas de « a » : seules les lignes affichées.
+        // pas de "a" dans Béton : lignes affichées seulement
         Assert.Equal(["2", "3"], _selection.Order());
     }
 }

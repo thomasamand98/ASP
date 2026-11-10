@@ -1,8 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier une marchandise.
-// CouleurPlanning et IDDECHETS sont des strings côté JSON. Is_dechet/Archive
-// sont des codes 0/1 (pas des booléens).
+// CouleurPlanning : couleur WinDev en texte
 public class CreateMarchandiseDto
 {
     [Text] public Opt<string> Nom_marchandise { get; set; }

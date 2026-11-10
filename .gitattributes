@@ -1,2 +1,2 @@
-# Scripts exécutés dans les conteneurs Linux : toujours en fins de ligne LF.
+# scripts des conteneurs Linux : LF obligatoire
 *.sh text eol=lf

@@ -6,11 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Statistiques;
 
-// ===== SERVICE =====
-// Chiffre d'affaires du tableau de bord : facturé (factures hors proformas,
-// notes de crédit en négatif) et production (exécutions valorisées au prix
-// de leur prestation, plus leurs suppléments), sur la période demandée et la
-// même période de l'année précédente.
+// facturé : hors proformas, NC en négatif ; production : prix prestation + suppléments
 public class StatistiqueService(AppDbContext db)
 {
     public async Task<object> GetChiffreAffairesAsync(DateTime from, DateTime to, CancellationToken ct)
@@ -71,7 +67,7 @@ public class StatistiqueService(AppDbContext db)
         return executions.Select(e =>
         {
             var prix = e.HasPrestation ? ToNumber(e.Prix_unitaire) : 0;
-            // Facturé à la quantité : celle d'arrivée, à défaut celle de départ.
+            // qté d'arrivée, sinon de départ
             var quantite = e.HasPrestation && e.Qt_client_facturation is not (null or 0)
                 ? (e.Qt_arrivee is not (null or 0) ? e.Qt_arrivee.Value : e.Qt_depart is not (null or 0) ? e.Qt_depart.Value : 0)
                 : 1;
@@ -80,17 +76,14 @@ public class StatistiqueService(AppDbContext db)
         }).ToList();
     }
 
-    // Number(décimal) de JavaScript : le double le plus proche de l'écriture
-    // décimale.
+    // via string pour avoir le double le plus proche
     private static double ToNumber(decimal? value) =>
         value is null ? 0 : double.Parse(value.Value.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
 }
 
-// ===== CONTROLLER =====
 public class StatistiqueController(StatistiqueService service) : ApiControllerBase
 {
-    // NestJS : GET statistiques/chiffre-affaires
-    // ?from=AAAA-MM-JJ&to=AAAA-MM-JJ (obligatoires, bornes incluses).
+    // bornes incluses
     [HttpGet("statistiques/chiffre-affaires")]
     public Task<object> GetChiffreAffaires([FromQuery] string? from, [FromQuery] string? to, CancellationToken ct)
     {

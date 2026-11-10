@@ -1,10 +1,6 @@
 namespace Horizon.Shared;
 
-// Champs qu'un client peut envoyer pour créer/modifier un contrat.
-// IDSOCIETES/IDMARCHANDISES/IDTYPES_FACTURE sont des strings côté JSON,
-// Date_debut/Date_fin des strings ISO, et Taux_tva une string (Decimal en
-// base). Offre_de_prix/Archive/Qt_client_facturation/Suivant sont des codes
-// 0/1 (pas des booléens).
+// Taux_tva en texte (Decimal en base)
 public class CreateContratDto
 {
     [Text] public Opt<string> Num_contrat { get; set; }

@@ -1,9 +1,6 @@
 namespace Horizon.Shared.Models;
 
-// Réponse de GET /entite et PATCH /entite — ressource singleton (une seule
-// ligne dans `entites`). Les mots de passe SMTP ne sont jamais renvoyés :
-// seulement s'ils sont renseignés. Logo : data URI base64, prête à servir de
-// `src` d'une image, ou null.
+// une seule ligne, mots de passe SMTP jamais renvoyés
 public sealed record EntiteDetail
 {
     public string IDSignaletique { get; init; } = "";

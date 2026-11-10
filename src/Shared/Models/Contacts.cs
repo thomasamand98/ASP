@@ -1,9 +1,6 @@
 namespace Horizon.Shared.Models;
 
-// Réponses de l'API — module Contacts (GET /contacts et /contacts/:id).
-// SocieteContacts ne contient qu'un élément au plus dans la liste ;
-// PointContacts n'est présent qu'avec le filtre pointId (onglet Contacts de
-// la fiche Point) : le lien du contact avec CE point.
+// PointContacts rempli seulement avec le filtre pointId
 public sealed record Contact
 {
     public string IDCONTACTS { get; init; } = "";
@@ -21,8 +18,7 @@ public sealed record ContactSociete(string? Fonction_contact, string? Service_bu
 
 public sealed record ContactPointLien(string? Lien, double? Recevoir_Mail_Planning);
 
-// Fiche complète : tous les rattachements société/point, du plus ancien au
-// plus récent (le premier est la société principale modifiable).
+// 1er lien société = société principale
 public sealed record ContactDetail
 {
     public string IDCONTACTS { get; init; } = "";
@@ -49,7 +45,7 @@ public sealed record ContactDetailPoint(string? Lien, double? Recevoir_Mail_Plan
 
 public sealed record PointLibelle(string? Libelle);
 
-// Adresse d'une société (GET /societes/:id, champ Adresse seulement).
+// GET /societes/:id, juste Adresse
 public sealed record SocieteAdresse(SocieteAdresseLignes? Adresse);
 
 public sealed record SocieteAdresseLignes(string? Adresse1, string? CP, string? Localite);
