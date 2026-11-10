@@ -1,7 +1,6 @@
 @inject Browser Browser
 
-@* Frise d'une ressource (mode « Ligne ») : ses cartes, réparties en couloirs
-   quand elles se chevauchent, et la zone de dépôt d'un glisser. *@
+@* couloirs quand les cartes se chevauchent *@
 <div @ref="_track" class="pl-row-track" style="@TrackStyle" data-drop-effect="@Board.DropEffect"
      @ondragover="DragOverAsync" @ondragover:preventDefault="@(Board.DragItem is not null)"
      @ondrop="DropAsync" @ondrop:preventDefault="@(Board.DragItem is not null)">

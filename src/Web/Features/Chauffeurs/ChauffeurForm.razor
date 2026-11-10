@@ -3,10 +3,7 @@
 @inject Browser Browser
 @inject EnumerationLabels Enumerations
 
-@* Fiche d'un chauffeur, en création (Initial null) ou en modification
-   (pré-remplie avec la ligne du tableau). « Email planning » est l'e-mail
-   professionnel du salarié lié, en lecture seule (il se modifie sur la fiche
-   personnel). *@
+@* Email planning en lecture seule, il se modifie sur la fiche personnel *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -18,7 +15,7 @@
             <FicheField Label="Entreprise">
                 <select value="@_form.IDSOCIETES" @onchange="e => _form.IDSOCIETES = (string)e.Value!">
                     <option value=""></option>
-                    @* Société liée pas encore dans la liste chargée. *@
+                    @* société liée pas encore dans la liste *@
                     @if (_form.IDSOCIETES.Length > 0 && !SortedSocietes.Any(s => s.IDSOCIETES == _form.IDSOCIETES))
                     {
                         <option value="@_form.IDSOCIETES">@(Initial?.Societe?.Nom_societe ?? _form.IDSOCIETES)</option>
@@ -72,9 +69,7 @@
 </form>
 
 @code {
-    // Champs envoyés à l'API (CreateChauffeurDto) : ids en texte, "" = aucun
-    // lien ; Categorie est la `Valeur` d'une entrée de l'énumération
-    // « categorie_chauffeur » ; Archive est un code 0/1.
+    // "" = aucun lien, Categorie = Valeur de l'énumération categorie_chauffeur
     private sealed class Model
     {
         public string Nom_chauffeur { get; set; } = "";
@@ -94,11 +89,9 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public Chauffeur? Initial { get; set; }
 
-    // Valeurs préremplies en création (projection depuis une seule ligne) —
-    // ignorées en modification.
+    // projection, ignorées en modification
     [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
 
-    // Listes des sélecteurs, chargées par ChauffeursPage.
     [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
     [Parameter] public IReadOnlyList<Personnel> Personnel { get; set; } = [];
     [Parameter] public Func<CreateChauffeurDto, Task> OnSubmit { get; set; } = default!;
@@ -113,8 +106,7 @@
 
     private Personnel? Linked => Personnel.FirstOrDefault(p => p.IDPERSONNELS == _form.IDPERSONNELS);
 
-    // E-mail du salarié choisi ; tant que la liste n'est pas chargée, celui
-    // renvoyé avec le chauffeur (même salarié).
+    // celui renvoyé avec le chauffeur tant que la liste n'est pas chargée
     private string? EmailPlanning => _form.IDPERSONNELS.Length == 0 ? null
         : Linked is { } linked ? linked.E_mail_professionnel
         : _form.IDPERSONNELS == FormModel.LinkId(Initial?.IDPERSONNELS) ? Initial?.Personnel?.E_mail_professionnel : null;
@@ -131,8 +123,6 @@
             IDSOCIETES = FormModel.LinkId(Initial?.IDSOCIETES),
         };
         if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
         _categories = await Enumerations.LoadAsync("categorie_chauffeur");

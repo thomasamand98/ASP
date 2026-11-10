@@ -11,18 +11,7 @@ public enum SortDirection
 
 public sealed record TableRow<T>(int Index, T Item);
 
-// Tri et filtres d'un DataTable, avec les règles exactes de TanStack Table
-// v9 telles que configurées dans le front d'origine (tri automatique,
-// filtre « includesString » sur chaque colonne) :
-//   - filtre : la valeur, convertie en texte et en minuscules, contient le
-//     texte saisi (en minuscules) ; un filtre vide est retiré ;
-//   - tri : sur les 10 premières lignes filtrées, une valeur texte donne un
-//     tri « text » (textes en minuscules comparés code par code), sinon un
-//     tri « basic » (comparaison JavaScript < >) ; les égalités gardent
-//     l'ordre d'origine ;
-//   - premier sens : croissant si la première valeur non nulle est un texte,
-//     décroissant sinon ; au clic suivant le sens s'inverse, puis le tri est
-//     retiré ; Maj+clic ajoute la colonne aux tris existants.
+// filtre "contient" sans casse, tri texte ou basique selon les 10 premières lignes, Maj+clic multi-tri
 public sealed class TableModel<T>
 {
     private readonly List<(string Id, bool Desc)> _sorting = [];
@@ -89,7 +78,7 @@ public sealed class TableModel<T>
         return rows;
     }
 
-    // Tri « text » si l'une des 10 premières lignes filtrées a une valeur texte.
+    // sur les 10 premières lignes filtrées
     private static bool UsesTextSort(Column<T> column, List<TableRow<T>> filtered) =>
         filtered.Take(10).Any(row => column.Value(row.Item) is string);
 
@@ -109,7 +98,7 @@ public sealed class TableModel<T>
         if (column.Accessor is null) return;
         var firstDesc = FirstSortDescending(column);
         var current = SortDirection(column.Id);
-        // Prochain sens : premier sens, puis l'autre, puis aucun tri.
+        // premier sens, l'autre, puis plus de tri
         bool? next = current switch
         {
             Table.SortDirection.None => firstDesc,

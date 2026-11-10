@@ -1,6 +1,3 @@
-/* Fiche commande (carte « Informations ») : Client / Contrat / dates du
-   contrat sur une ligne, puis Date commande / Quantité / Référence. Une
-   seule colonne sur mobile. */
 .cmd-contrat {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr);

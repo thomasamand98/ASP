@@ -1,11 +1,6 @@
 namespace Horizon.Web.Features.Documents;
 
-// Fragments HTML insérés par l'éditeur de modèles — partagés entre le
-// contenu de départ (StarterTemplate) et l'insertion en mode code
-// (DocumentTemplateEditor, quand la zone active est éditée en HTML brut).
-// Doivent produire exactement le même balisage que interop.js
-// (docEditor.createChipElement/createRepeatBlockElement), sans quoi les
-// jetons déposés ici ne seraient pas reconnus par l'éditeur.
+// même balisage que createChipElement/createRepeatBlockElement côté JS
 public static class TemplateChipHtml
 {
     public static string Chip(MergeField field) => field.Kind == "image"

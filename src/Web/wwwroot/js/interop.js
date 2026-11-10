@@ -1,11 +1,6 @@
-// Interop JavaScript minimal : uniquement ce que Blazor ne sait pas faire
-// lui-même (stockage local, fichiers, fenêtres, focus, validation native,
-// écouteurs au niveau du document, mesures de position). Appelé depuis
-// Services/Browser.cs ; aucun autre fichier JavaScript dans l'application.
+// ce que Blazor ne sait pas faire tout seul, appelé depuis Services/Browser.cs
 window.horizon = (() => {
-  // ---------- Stockage local (préférences de l'utilisateur) ----------
-  // Indisponible en navigation privée ou cookies bloqués : lectures vides,
-  // écritures ignorées (comme les try/catch du front d'origine).
+  // localStorage KO en navigation privée, on ignore
   const storage = {
     get(key) {
       try {
@@ -18,19 +13,16 @@ window.horizon = (() => {
       try {
         localStorage.setItem(key, value)
       } catch {
-        // Préférence non mémorisée.
       }
     },
     remove(key) {
       try {
         localStorage.removeItem(key)
       } catch {
-        // Rien à faire.
       }
     },
   }
 
-  // ---------- Thème ----------
   const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)')
   let themeListener = null
 
@@ -45,16 +37,13 @@ window.horizon = (() => {
     }
   }
 
-  // ---------- Boîtes natives ----------
   const confirmBox = (message) => window.confirm(message)
   const alertBox = (message) => window.alert(message)
 
-  // ---------- Fichiers ----------
   function blobUrl(bytes, mime) {
     return URL.createObjectURL(new Blob([bytes], mime ? { type: mime } : undefined))
   }
 
-  // Téléchargement d'un fichier généré ou reçu (export Excel, document joint).
   function download(fileName, bytes, mime) {
     const url = blobUrl(bytes, mime)
     const link = document.createElement('a')
@@ -66,9 +55,7 @@ window.horizon = (() => {
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
-  // Fenêtres ouvertes avant une attente réseau : ouvrir une fenêtre après un
-  // `await` n'est plus considéré comme déclenché par le clic par la plupart
-  // des navigateurs, qui bloqueraient le popup. Identifiées par un numéro.
+  // ouvertes avant l'await, sinon popup bloquée
   const windows = new Map()
   let nextWindowId = 1
 
@@ -80,8 +67,7 @@ window.horizon = (() => {
     return id
   }
 
-  // Affiche le fichier dans la fenêtre ouverte d'avance (ou une nouvelle si
-  // elle a été bloquée ou fermée).
+  // nouvelle fenêtre si celle ouverte d'avance a été bloquée ou fermée
   function showInWindow(id, bytes, mime) {
     const url = blobUrl(bytes, mime)
     const handle = windows.get(id)
@@ -95,17 +81,14 @@ window.horizon = (() => {
     windows.delete(id)
   }
 
-  // Aperçu local d'un fichier choisi (page OCR) ; libéré par revokeUrl.
+  // aperçu OCR, à libérer avec revokeUrl
   const createUrl = (bytes, mime) => blobUrl(bytes, mime)
   const revokeUrl = (url) => URL.revokeObjectURL(url)
 
-  // Presse-papier (boutons « Copier » de la page Test OCR).
   const copyText = (text) => navigator.clipboard.writeText(text)
 
-  // ---------- Éléments ----------
   const focus = (element) => element?.focus()
-  // Bouton qui ouvre le sélecteur de fichiers d'un <input type="file"> masqué ;
-  // vider sa valeur permet de re-sélectionner le même fichier après une erreur.
+  // ouvre le sélecteur d'un input file masqué
   const click = (element) => element?.click()
   function clearValue(element) {
     if (element) element.value = ''
@@ -114,8 +97,7 @@ window.horizon = (() => {
     if (element) element.indeterminate = value
   }
 
-  // Contrôle natif des champs (requis, formats) : le navigateur signale le
-  // premier champ invalide. `element` est le formulaire ou le contient.
+  // element = le form ou un parent
   function reportValidity(element) {
     if (!element) return true
     const form = element instanceof HTMLFormElement ? element : element.querySelector('form')
@@ -127,8 +109,7 @@ window.horizon = (() => {
     return { left: r.left, top: r.top, width: r.width, height: r.height }
   }
 
-  // Première interaction avec une fiche (saisie, clic, touche) : à partir de
-  // là, ses modifications comptent (voir UnsavedChanges/UnsavedForm.cs).
+  // première interaction, voir UnsavedForm.cs
   function trackTouch(element, dotnet) {
     if (!element) return
     const events = ['input', 'change', 'click', 'keydown']
@@ -139,9 +120,7 @@ window.horizon = (() => {
     for (const event of events) element.addEventListener(event, touch, true)
   }
 
-  // ---------- Écouteurs du document ----------
-  // Échap et clic en dehors d'un élément (menus, panneaux). Renvoie un
-  // numéro à passer à `unlisten`.
+  // renvoie un id pour unlisten
   const listeners = new Map()
   let nextListenerId = 1
 
@@ -171,8 +150,7 @@ window.horizon = (() => {
     listeners.delete(id)
   }
 
-  // Fermeture ou rechargement de l'onglet du navigateur avec une saisie
-  // modifiée : seul le message standard du navigateur peut s'afficher.
+  // seul le message standard du navigateur s'affiche
   function guardUnload(dotnet) {
     window.addEventListener('beforeunload', (event) => {
       if (!dotnet.invokeMethod('HasUnsavedChanges')) return
@@ -181,29 +159,18 @@ window.horizon = (() => {
     })
   }
 
-  // Bloque le défilement de la page (tiroir du menu mobile ouvert).
   function lockScroll(locked) {
     document.body.style.overflow = locked ? 'hidden' : ''
   }
 
-  // Comportements du navigateur que Blazor ne peut pas régler par événement :
-  //   - Maj+clic sur une ligne sélectionnable d'un tableau : pas de
-  //     surlignage du texte (voir DataTable.razor, data-shift-select) ;
-  //   - onglets de fiche : flèches, Début et Fin changent d'onglet sans
-  //     faire défiler la page (data-nav-keys, voir FicheTabs.razor) ;
-  //   - champ de recherche dans une fiche : Entrée choisit un résultat sans
-  //     enregistrer la fiche, Échap referme la recherche (data-enter-select) ;
-  //   - glisser-déposer (onglets, planning) : effet autorisé et donnée du
-  //     glisser posés au départ (data-drag-effect, data-drag-id), effet de
-  //     dépôt pendant le survol (data-drop-effect).
+  // comportements natifs non réglables depuis Blazor, pilotés par les attributs data-*
   document.addEventListener('mousedown', (event) => {
     if (event.shiftKey && event.target.closest?.('[data-shift-select]')) event.preventDefault()
   })
   document.addEventListener('keydown', (event) => {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) && event.target.closest?.('[data-nav-keys]')) event.preventDefault()
     if (['Enter', 'Escape'].includes(event.key) && event.target.closest?.('[data-enter-select]')) event.preventDefault()
-    // Élément activable au clavier (carte du planning) : Espace ne fait pas
-    // défiler la page.
+    // Espace sans défilement de la page (carte du planning)
     if (['Enter', ' '].includes(event.key) && event.target.matches?.('[data-activate-keys]')) event.preventDefault()
   })
   document.addEventListener('dragstart', (event) => {
@@ -217,24 +184,22 @@ window.horizon = (() => {
     if (target) event.dataTransfer.dropEffect = target.dataset.dropEffect
   })
 
-  // Position d'un élément, lue de façon synchrone pendant un glisser.
+  // synchrone pendant un drag
   const rectSync = (element) => rect(element)
 
   function scrollTop(element, top) {
     element?.scrollTo({ top })
   }
 
-  // Redimensionnement d'une carte du planning : le pointeur reste capturé
-  // par la poignée même s'il en sort.
+  // capture pour garder le pointeur même hors de la poignée
   function capturePointer(element, pointerId) {
     try {
       element?.setPointerCapture(pointerId)
     } catch {
-      // Pointeur déjà relâché.
+      // déjà relâché
     }
   }
 
-  // Taille d'un élément, suivie (graphique du tableau de bord).
   const observers = new Map()
   let nextObserverId = 1
 
@@ -246,10 +211,7 @@ window.horizon = (() => {
     return id
   }
 
-  // Taille [largeur, hauteur] de chaque texte dans la police du document
-  // (graphique du tableau de bord : étiquettes d'axe qui tiennent côte à
-  // côte), mesurée dans un <span> comme le faisait la bibliothèque de
-  // graphiques d'origine.
+  // mesure dans un <span>, pour les étiquettes d'axe du graphique
   function measureTexts(texts, fontSize) {
     const span = document.createElement('span')
     span.setAttribute('aria-hidden', 'true')
@@ -270,22 +232,13 @@ window.horizon = (() => {
   }
 
 
-  // ---------- Éditeur de modèles de document ----------
-  // Manipulation directe du DOM des trois zones contentEditable (plutôt que
-  // de recalculer leur HTML via Blazor à chaque frappe) : c'est le seul
-  // moyen d'y insérer un nœud sans faire sauter le curseur/la sélection de
-  // l'utilisateur à chaque rendu. Voir Features/Documents/DocumentTemplateEditor.razor.
+  // éditeur de modèles : DOM manipulé directement, sinon le curseur saute à chaque rendu
   const docEditor = (() => {
     const DRAG_MIME = 'application/x-merge-field'
     const zones = new Map() // key -> { el, dotnet, lastRange }
     let selectionDotnet = null
 
-    // Amorce le glisser-déposer depuis la palette : posé en délégation sur
-    // tout le document (plutôt qu'un écouteur par ligne de palette, que
-    // Blazor ne peut de toute façon pas câbler lui-même — DataTransfer.setData
-    // n'existe que depuis le vrai gestionnaire natif 'dragstart'). Chaque
-    // ligne glissable porte son payload tout prêt dans `data-merge-drag`
-    // (voir MergeFieldPalette.razor).
+    // en délégation : setData n'est dispo que dans le vrai dragstart natif
     document.addEventListener('dragstart', (e) => {
       const source = e.target.closest?.('[data-merge-drag]')
       if (!source) return
@@ -295,13 +248,12 @@ window.horizon = (() => {
         const payload = JSON.parse(raw)
         e.dataTransfer.setData('text/plain', payload.type === 'field' ? `{{${payload.path}}}` : `{{#${payload.groupId}}}`)
       } catch {
-        // Payload invalide : le glisser-déposer continue sans texte brut.
+        // payload invalide, on continue sans texte brut
       }
       e.dataTransfer.effectAllowed = 'copy'
     })
 
-    // Jeton de fusion inséré dans le texte : un <span> non éditable portant
-    // le chemin du champ, avec une croix de suppression.
+    // span non éditable avec une croix de suppression
     function createChipElement(field) {
       const chip = document.createElement('span')
       chip.className = field.kind === 'image' ? 'dte-chip dte-chip-image' : 'dte-chip'
@@ -329,11 +281,7 @@ window.horizon = (() => {
       return chip
     }
 
-    // Bloc répétable (tableau) : une ligne d'en-tête + une ligne « modèle »
-    // contenant un jeton par colonne (déjà résolues côté C#, voir
-    // MergeFieldGroup.Columns). `data-repeat-list` porte le chemin de la
-    // collection — au moment de la fusion, la ligne modèle sera dupliquée
-    // une fois par élément de la liste.
+    // la ligne modèle sera dupliquée par élément de data-repeat-list à la fusion
     function createRepeatBlockElement(group) {
       const columns = group.columns
       if (!columns || columns.length === 0) return null
@@ -381,10 +329,7 @@ window.horizon = (() => {
       return wrapper
     }
 
-    // Position de dépose dans le texte (insertion « en ligne », pour un
-    // jeton simple) : caretRangeFromPoint (Chrome/Safari) puis repli sur
-    // caretPositionFromPoint (Firefox), non standard à des degrés divers
-    // mais couvrant les navigateurs de bureau visés par cet outil interne.
+    // caretRangeFromPoint (Chrome/Safari), sinon caretPositionFromPoint (Firefox)
     function rangeFromPoint(x, y) {
       if (typeof document.caretRangeFromPoint === 'function') return document.caretRangeFromPoint(x, y)
       if (typeof document.caretPositionFromPoint === 'function') {
@@ -398,12 +343,7 @@ window.horizon = (() => {
       return null
     }
 
-    // Un Range obtenu par point peut tomber au milieu du texte d'un jeton
-    // existant (les chips restent des nœuds texte pour le calcul de
-    // position, contentEditable="false" empêche seulement l'édition, pas le
-    // pointage) : y insérer directement casserait le chip en deux morceaux
-    // imbriqués l'un dans l'autre. On ramène alors le point d'insertion
-    // juste après ce chip.
+    // point tombé dans un jeton : on insère juste après pour ne pas le couper
     function escapeChipRange(range) {
       const container = range.startContainer
       const el = container.nodeType === Node.TEXT_NODE ? container.parentElement : container
@@ -415,8 +355,6 @@ window.horizon = (() => {
       return escaped
     }
 
-    // Insère un nœud « en ligne » (jeton de fusion) à l'endroit précis d'un
-    // Range, puis replace le curseur juste après.
     function insertInlineNodeAtRange(node, inputRange) {
       const range = escapeChipRange(inputRange)
       range.deleteContents()
@@ -429,13 +367,7 @@ window.horizon = (() => {
       selection?.addRange(after)
     }
 
-    // Insère un nœud « bloc » (tableau répétable, tableau libre, saut de
-    // page) : toujours en enfant direct du canvas, jamais au milieu d'un
-    // paragraphe — une <div>/<table> insérée via un Range arbitraire
-    // produirait du HTML imbriqué invalide (bloc dans un <p>) que le
-    // navigateur « corrige » de façon imprévisible. Si `nearPoint` est
-    // fourni, le bloc est inséré juste après le bloc de premier niveau situé
-    // sous ce point ; sinon il est ajouté à la fin du document.
+    // blocs toujours au premier niveau, un <div> dans un <p> serait "corrigé" n'importe comment
     function insertBlockNode(canvas, node, nearPoint) {
       let anchor = null
       if (nearPoint) {
@@ -448,10 +380,7 @@ window.horizon = (() => {
       else canvas.append(node)
     }
 
-    // Dernière position connue du curseur dans la zone (mémorisée par
-    // onSelectionChange ci-dessous), pour que les boutons « + » de la
-    // palette (sans souris sur le canvas) sachent où insérer un champ — à
-    // défaut (zone jamais sélectionnée), insère en fin de zone.
+    // pour les boutons + de la palette, sinon fin de zone
     function currentRange(key) {
       const zone = zones.get(key)
       if (!zone) return null
@@ -475,9 +404,6 @@ window.horizon = (() => {
       }
     }
 
-    // Enregistre le canvas d'une zone (en-tête/contenu/pied) : glisser-
-    // déposer depuis la palette, suppression d'un jeton/bloc par clic
-    // délégué, et notification de modification/focus vers Blazor.
     function registerZone(el, key, dotnet) {
       zones.set(key, { el, dotnet, lastRange: null })
       el.addEventListener('dragover', (e) => {
@@ -517,9 +443,7 @@ window.horizon = (() => {
       zones.delete(key)
     }
 
-    // Écouteur global de changement de sélection, pour détecter dans quelle
-    // zone se trouve le curseur (voir onSelectionChange) — une seule
-    // instance active à la fois (l'éditeur n'est jamais ouvert deux fois).
+    // une seule instance, l'éditeur n'est jamais ouvert deux fois
     function trackSelection(dotnet) {
       selectionDotnet = dotnet
       document.addEventListener('selectionchange', onSelectionChange)
@@ -604,10 +528,7 @@ window.horizon = (() => {
       insertBlockNode(zone.el, marker)
     }
 
-    // Numéro de page (en-tête/pied uniquement) : pas un champ de fusion — un
-    // texte littéral que Chromium remplit lui-même à l'impression (classes
-    // spéciales .pageNumber/.totalPages). Inséré comme un bloc non éditable,
-    // au même titre qu'un jeton, pour ne pas être modifié par erreur.
+    // rempli par Chromium à l'impression (.pageNumber/.totalPages)
     function insertPageNumber(key) {
       const zone = zones.get(key)
       if (!zone) return
@@ -620,11 +541,7 @@ window.horizon = (() => {
       if (range) insertInlineNodeAtRange(node, range)
     }
 
-    // Glisser-déposer depuis la palette pendant l'édition du code HTML brut
-    // (voir DocumentTemplateEditor.razor, codeZone) : pas d'équivalent de
-    // rangeFromPoint pour un <textarea> (son contenu n'est pas du DOM
-    // adressable par point), donc insertion à la position du curseur —
-    // transmise à Blazor pour que l'insertion dans la chaîne reste en C#.
+    // pas de rangeFromPoint dans un textarea, on insère au curseur côté C#
     function registerCodeZone(el, key, dotnet) {
       el.addEventListener('dragover', (e) => {
         if (!e.dataTransfer.types.includes(DRAG_MIME)) return

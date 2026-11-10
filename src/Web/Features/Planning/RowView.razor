@@ -1,5 +1,3 @@
-@* Mode « Ligne » : une ligne par ressource, la période en frise
-   horizontale — pratique pour voir d'un coup d'œil la charge de chacun. *@
 <div class="pl-board-scroll" @onclick="() => Board.OnSelect(null)">
     <div class="pl-row-grid" style="width: calc(var(--pl-label) + @PlanningBoard.Px(TrackWidth))">
         <div class="pl-row-head">
@@ -32,7 +30,6 @@
 </div>
 
 @code {
-    // Largeur d'une heure en pixels : une journée fait 24 × HourW.
     public const double HourW = 20;
     public const double DayW = 24 * HourW;
     public const double LaneH = 68;
@@ -53,8 +50,7 @@
         _segments = PlanningBoard.ClipToRange(Board.Executions, PeriodStart, PeriodEnd);
     }
 
-    // Position horizontale d'un instant, calculée jour par jour pour rester
-    // juste les jours de changement d'heure (23 h ou 25 h).
+    // jour par jour pour rester juste aux changements d'heure (23 h / 25 h)
     public double XOf(double t)
     {
         if (t >= PeriodEnd) return TrackWidth;

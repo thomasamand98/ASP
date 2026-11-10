@@ -1,6 +1,3 @@
-/* Styles globaux propres à Blazor (pas d'équivalent dans le front React). */
-
-/* Erreur inattendue de l'application (voir index.html). */
 #blazor-error-ui {
   position: fixed;
   inset: auto 0 0 0;
@@ -16,36 +13,24 @@
   color: inherit;
 }
 
-/* Bandeau « Tâches à faire » (voir Layout/TasksPanel.razor) : réserve la
-   place de la barre, seulement quand elle est affichée (pas sur l'écran de
-   connexion). Règle sur un ancêtre du composant : elle ne peut pas être
-   isolée dans TasksPanel.razor.css. */
+/* sur un ancêtre, donc pas isolable dans TasksPanel.razor.css */
 #root:has(.tasks-rail) {
   margin-right: calc(1rem + var(--tasks-rail-w));
 }
 
-/* Classe partagée (CrudPage, onglet Documents des fiches) : globale. */
-/* Erreur d'un rechargement (page, recherche) : affichée au-dessus du
-   tableau, qui garde les dernières données reçues. */
+/* le tableau garde les dernières données reçues */
 .crud-page-error {
   color: var(--danger);
   margin: 0 0 0.5rem;
 }
 
-/* Fiche contrat (voir Features/Contrats/ContratForm.razor) : règle sur un
-   ancêtre du composant, impossible à isoler (classe doublée : doit l'emporter
-   sur la règle isolée de Modal.razor.css, de même poids et chargée après). */
-/* La modale générique (Components/Modal.razor.css) est limitée à 480px, trop
-   étroit pour deux colonnes de cartes : élargie pour cette fiche seulement
-   (les autres modes d'affichage ont leur propre largeur). */
+/* fiche contrat trop large pour 480px, classe doublée pour battre Modal.razor.css */
 .modal-panel.modal-panel:has(.contrat-form) {
   max-width: min(1100px, 100%);
 }
 
 
-/* Barre d'actions (Components/PageActions.razor), classe reprise telle quelle
-   par d'autres écrans (cartes de contrat de travail, modèles de document) :
-   globale. */
+/* globale, reprise par d'autres écrans */
 .page-actions {
   display: flex;
   gap: 0.5rem;

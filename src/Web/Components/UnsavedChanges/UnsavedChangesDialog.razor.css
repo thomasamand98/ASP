@@ -1,6 +1,4 @@
-/* Dialogue « Modifications non enregistrées » (voir
-   UnsavedChangesService.cs) : au-dessus de tout, y compris des modales et
-   panneaux de fiche. */
+/* au-dessus des modales et des panneaux de fiche */
 
 .unsaved-overlay {
   position: fixed;

@@ -2,15 +2,10 @@ using System.Globalization;
 
 namespace Horizon.Web.Common;
 
-// Calculs du graphique à barres du tableau de bord (voir ChiffreAffairesChart) :
-// valeurs d'axe « rondes », position des barres, choix des étiquettes qui
-// tiennent côte à côte. Reprend les règles de la bibliothèque de graphiques
-// du front d'origine (Recharts) pour que le dessin soit identique.
+// axes, barres et étiquettes du graphique du tableau de bord
 public static class ChartMath
 {
-    // Graduations d'un axe de valeurs de `min` à `max` : `tickCount` valeurs
-    // à pas régulier « facile à lire » (100, 150, 200...), pouvant déborder
-    // de l'intervalle.
+    // pas "rond" (100, 150, 200...), peut déborder de [min, max]
     public static List<decimal> NiceTicks(decimal min, decimal max, int tickCount = 5)
     {
         var count = Math.Max(tickCount, 2);
@@ -75,8 +70,7 @@ public static class ChartMath
         return (step, middle - below * step, middle + up * step);
     }
 
-    // Pas « facile à comprendre » entre deux graduations : multiple de 0,05
-    // de la puissance de dix qui dépasse le pas brut.
+    // multiple de 0,05 de la puissance de dix au-dessus du pas brut
     private static decimal AdaptiveStep(decimal roughStep, int correction)
     {
         if (roughStep <= 0) return 0;
@@ -96,9 +90,7 @@ public static class ChartMath
         return result;
     }
 
-    // Position d'une barre dans sa catégorie (largeur `band`) : `count` barres
-    // côte à côte séparées de `gap`, marges `categoryGap` (part de la
-    // catégorie) de chaque côté, largeur plafonnée à `maxSize`.
+    // categoryGap en fraction de band, de chaque côté
     public static (double Offset, double Size) BarPosition(double band, int count, int index, double categoryGap, double gap, double maxSize)
     {
         var margin = band * categoryGap;
@@ -109,9 +101,7 @@ public static class ChartMath
         return (margin + count * (original - size) / 2 + (size + realGap) * index, size);
     }
 
-    // Étiquettes d'axe horizontal à afficher : la première et la dernière
-    // toujours (si elles tiennent), les autres tant qu'elles ne chevauchent
-    // pas la précédente (écart minimal `minGap`).
+    // première et dernière d'abord, puis celles qui ne chevauchent pas
     public static List<int> VisibleXTicks(IReadOnlyList<double> centers, IReadOnlyList<double> widths, double start, double end, double minGap)
     {
         var count = centers.Count;
@@ -146,6 +136,6 @@ public static class ChartMath
     private static bool Fits(double position, double size, double start, double end) =>
         position >= start && position <= end && position - size / 2 - start >= 0 && position + size / 2 - end <= 0;
 
-    // Nombre → attribut SVG (point décimal, pas d'exposant).
+    // pour les attributs SVG : point décimal, pas d'exposant
     public static string Svg(double value) => Math.Round(value, 4).ToString("0.####", CultureInfo.InvariantCulture);
 }

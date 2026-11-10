@@ -1,8 +1,6 @@
 @inject ApiClient Api
 
-@* Onglet « Contrats / Offres » de la fiche Société : la même table que la
-   page Contrats, limitée aux contrats de cette société — « Nouveau » ouvre la
-   fiche contrat avec la société déjà sélectionnée. *@
+@* Nouveau ouvre la fiche avec la société déjà choisie *@
 <CrudPage T="Contrat" TDto="CreateContratDto" TDetail="ContratDetail"
           Title="Contrats" LoadingLabel="Chargement des contrats..."
           Source="_list" Columns="Columns" GetRowId="c => c.IDCONTRATS"
@@ -16,8 +14,7 @@
 </CrudPage>
 
 @code {
-    // Colonnes de la page Contrats, sans Société / N° TVA : toujours la
-    // société de la fiche ici.
+    // sans Société / N° TVA, toujours celle de la fiche
     private static readonly IReadOnlyList<Column<Contrat>> Columns = [.. ContratsPage.Columns.Where(c => c.Id is not "societe" and not "numero_tva")];
 
     private ApiList<Contrat> _list = default!;

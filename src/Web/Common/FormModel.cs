@@ -5,11 +5,7 @@ using Horizon.Shared;
 
 namespace Horizon.Web.Common;
 
-// Passage d'un modèle de formulaire (classe simple, mêmes noms de champs que
-// le DTO de l'API) au DTO partagé (Shared/Dtos) envoyé à l'API. Comme les
-// formulaires du front d'origine, qui envoyaient leur objet `form` entier :
-// chaque champ du modèle est envoyé ; les champs du DTO absents du modèle
-// ne le sont pas.
+// copie par nom de propriété, champs absents du modèle laissés non définis
 public static class FormModel
 {
     private static readonly ConcurrentDictionary<(Type, Type), (PropertyInfo Source, PropertyInfo Target)[]> Maps = new();
@@ -28,8 +24,7 @@ public static class FormModel
         [.. dto.GetProperties()
             .Where(p => p.PropertyType.IsGenericType && p.PropertyType.GetGenericTypeDefinition() == typeof(Opt<>))
             .Select(target => (Source: model.GetProperty(target.Name), Target: target))
-            // Champs simples seulement : les listes et objets imbriqués
-            // (plages horaires d'un point...) sont convertis par le formulaire.
+            // listes et objets imbriqués : à convertir dans le formulaire
             .Where(pair => pair.Source is not null && IsScalar(pair.Source.PropertyType) && IsScalar(pair.Target.PropertyType.GetGenericArguments()[0]))
             .Select(pair => (pair.Source!, pair.Target))];
 
@@ -46,9 +41,7 @@ public static class FormModel
         return underlying.IsInstanceOfType(value) ? value : System.Convert.ChangeType(value, underlying, CultureInfo.InvariantCulture);
     }
 
-    // Valeurs préremplies en création (projection depuis une seule ligne) :
-    // remplacent les champs texte de même nom du modèle (comme
-    // `{ ...form, ...defaults }`).
+    // préremplissage en création, champs texte seulement
     public static void ApplyDefaults(object model, IReadOnlyDictionary<string, string>? defaults)
     {
         if (defaults is null) return;
@@ -59,15 +52,12 @@ public static class FormModel
         }
     }
 
-    // Un id 0 (défaut WinDev) équivaut à « aucun lien ».
+    // id 0 = pas de lien (défaut WinDev)
     public static string LinkId(string? value) => value is { Length: > 0 } and not "0" ? value : "";
 
-    // Date ISO renvoyée par l'API → « AAAA-MM-JJ » d'un <input type="date">.
     public static string DateInput(string? value) => string.IsNullOrEmpty(value) ? "" : value[..Math.Min(10, value.Length)];
 
-    // Tri « fr » des listes de choix (localeCompare(..., 'fr')).
     public static readonly StringComparer French = StringComparer.Create(new CultureInfo("fr"), CompareOptions.None);
 
-    // [a, b].filter(Boolean).join(' ').
     public static string JoinNonEmpty(string separator, params string?[] parts) => string.Join(separator, parts.Where(p => !string.IsNullOrEmpty(p)));
 }

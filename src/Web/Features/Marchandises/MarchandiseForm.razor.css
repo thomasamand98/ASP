@@ -1,5 +1,3 @@
-/* Fiche marchandise : cartes « Marchandise » (nom + couleur planning) et
-   « Déchets » (déchet lié, en lecture seule, choisi via la recherche). */
 .fiche ::deep .mf-section + .mf-section {
   margin-top: 0.75rem;
 }

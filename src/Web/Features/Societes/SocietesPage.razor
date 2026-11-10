@@ -1,7 +1,5 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
 <CrudPage T="Societe" TDto="CreateSocieteDto" TDetail="SocieteDetail"
           Title="Sociétés" LoadingLabel="Chargement des sociétés..."
           Source="_list" Columns="Columns" GetRowId="s => s.IDSOCIETES"
@@ -25,8 +23,7 @@
 
     private ApiList<Societe> _list = default!;
     private CrudApi<CreateSocieteDto, Societe, SocieteDetail> _api = default!;
-    // Sélecteurs « Contact pour la comptabilité » des sous-onglets Client /
-    // Fournisseur, chargés une fois tant que l'onglet reste ouvert.
+    // pour les sous-onglets Client / Fournisseur
     private ApiList<Contact> _contacts = default!;
 
     [Parameter] public ProjectionView? Projection { get; set; }

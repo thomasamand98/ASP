@@ -2,10 +2,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Fiche d'un attelage de référence, en création (Initial null) ou en
-   modification (pré-remplie avec la ligne du tableau). Tracteur et Remorque
-   ne proposent que les véhicules de ce type ; le véhicule déjà lié reste
-   affiché même s'il est d'un autre type. *@
+@* le véhicule déjà lié reste affiché même s'il est d'un autre type *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -44,11 +41,11 @@
 </form>
 
 @code {
-    // Codes de l'énumération « type_vehicule » proposés dans chaque sélecteur.
+    // codes type_vehicule
     private const double TypeTracteur = 1;
     private const double TypeRemorque = 2;
 
-    // Champs envoyés à l'API (CreateAttelageDto) : ids en texte, "" = aucun lien.
+    // "" = aucun lien
     private sealed class Model
     {
         public string IDCHAUFFEUR { get; set; } = "";
@@ -65,17 +62,16 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public Attelage? Initial { get; set; }
 
-    // Valeurs préremplies en création (projection depuis une seule ligne).
+    // projection depuis une seule ligne
     [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
 
-    // Listes des sélecteurs, chargées par AttelagesPage.
     [Parameter] public IReadOnlyList<Chauffeur> Chauffeurs { get; set; } = [];
     [Parameter] public IReadOnlyList<Vehicule> Vehicules { get; set; } = [];
     [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
     [Parameter] public Func<CreateAttelageDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
 
-    // Un véhicule lié affiché comme « Marque Modèle (immat) ».
+    // "Marque Modèle (immat)"
     public static string VehiculeLabel(AttelageVehicule? v) =>
         v is null ? "" : FormModel.JoinNonEmpty(" ", v.Marque, v.Modele) + (string.IsNullOrEmpty(v.Num_immat) ? "" : $" ({v.Num_immat})");
 
@@ -87,8 +83,7 @@
 
     private List<Vehicule> OfType(double type) => [.. Vehicules.Where(v => v.Type == type).OrderBy(VehiculeLabel, FormModel.French)];
 
-    // Option pour la valeur liée absente de la liste proposée (autre type de
-    // véhicule, chauffeur archivé, liste pas encore chargée...).
+    // valeur liée absente de la liste (autre type, chauffeur archivé...)
     private static RenderFragment? CurrentOption(string value, bool listed, string? label) =>
         value.Length > 0 && !listed ? @<option value="@value">@(string.IsNullOrEmpty(label) ? value : label)</option> : null;
 
@@ -116,8 +111,6 @@
             IDSOCIETES = FormModel.LinkId(Initial?.IDSOCIETES),
         };
         if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
     }

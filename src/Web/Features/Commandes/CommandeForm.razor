@@ -3,12 +3,7 @@
 @inject Browser Browser
 @inject ApiClient Api
 
-@* Fiche d'une commande, reprise de l'écran WinDev : carte « Informations »
-   avec le client, le contrat et ses dates en lecture seule, puis la
-   prestation du contrat, la date, la quantité, la référence et
-   l'instruction. En création, le contrat se choisit dans une liste ; il
-   n'est plus modifiable ensuite. Statut / QT_planifie (gérés par le
-   planning) ne sont pas affichés mais conservés. *@
+@* Statut / QT_planifie gérés par le planning : pas affichés mais conservés *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -56,7 +51,7 @@
             <select value="@_form.IDPRESTATIONS" @onchange="e => _form.IDPRESTATIONS = (string)e.Value!" disabled="@(_form.IDCONTRATS.Length == 0)"
                     title="@(_form.IDCONTRATS.Length > 0 ? null : "Choisissez d’abord un contrat")">
                 <option value="">@(_prestations is null ? "Chargement des prestations..." : "")</option>
-                @* Prestation liée absente de la liste (pas encore chargée...). *@
+                @* prestation liée pas encore chargée *@
                 @if (_form.IDPRESTATIONS.Length > 0 && !PrestationListed)
                 {
                     <option value="@_form.IDPRESTATIONS">
@@ -93,11 +88,10 @@
 @code {
     private const string Nbsp = " ";
 
-    // Tri des contrats : société (« fr »), puis numéro (numérique : « 2 » avant « 10 »).
+    // société puis numéro en numérique (2 avant 10)
     private static readonly StringComparer NumericFrench = StringComparer.Create(new CultureInfo("fr"), CompareOptions.NumericOrdering);
 
-    // Champs envoyés à l'API (CreateCommandeDto) : ids en texte ("" = aucun),
-    // date « AAAA-MM-JJ ».
+    // ids en texte, "" = aucun
     private sealed class Model
     {
         public string Date_commande { get; set; } = "";
@@ -112,7 +106,7 @@
 
     private Model _form = new();
     private bool _submitting;
-    // null pendant le chargement.
+    // null pendant le chargement
     private List<PrestationOption>? _prestations;
     private string? _prestationsFor;
     private ElementReference _formRef;
@@ -121,10 +115,9 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public Commande? Initial { get; set; }
 
-    // Valeurs préremplies en création (projection depuis une seule ligne).
+    // projection depuis une seule ligne
     [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
 
-    // Liste du sélecteur Contrat, chargée par CommandesPage.
     [Parameter] public IReadOnlyList<Contrat> Contrats { get; set; } = [];
     [Parameter] public Func<CreateCommandeDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
@@ -138,7 +131,7 @@
         .OrderBy(c => c.Societe?.Nom_societe ?? "", FormModel.French)
         .ThenBy(c => ContratFormat.Numero(c.Num_contrat, c.Version_contrat), NumericFrench);
 
-    // Contrat choisi : celui de la liste, sinon celui renvoyé avec la commande.
+    // sinon celui renvoyé avec la commande
     private CommandeContrat? Selected
     {
         get
@@ -168,8 +161,6 @@
             Instruction = Initial?.Instruction ?? "",
         };
         if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
     }
@@ -182,7 +173,7 @@
         await LoadPrestationsAsync();
     }
 
-    // Prestations du contrat choisi, rechargées quand il change.
+    // rechargées au changement de contrat
     private async Task LoadPrestationsAsync()
     {
         var id = _form.IDCONTRATS;
@@ -210,7 +201,7 @@
         StateHasChanged();
     }
 
-    // Changer de contrat vide la prestation, qui appartient à l'ancien.
+    // la prestation appartient à l'ancien contrat
     private void ChangeContrat(string id)
     {
         _form.IDCONTRATS = id;

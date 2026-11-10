@@ -1,15 +1,12 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Bloc « Conditions CMR » de la fiche contrat : contrairement au reste du
-   formulaire, chaque ajout / coche / suppression est envoyé tout de suite à
-   l'API sans attendre « Enregistrer » — ce sont des lignes à part entière,
-   pas des champs du contrat. *@
+@* chaque modif part tout de suite à l'API, sans attendre Enregistrer *@
 <div class="contrat-conditions">
     <div class="contrat-conditions-add">
         <label class="field contrat-conditions-libelle">
             Condition
-            @* Entrée ajoute la condition sans soumettre le formulaire du contrat. *@
+            @* Entrée ajoute sans soumettre le formulaire du contrat *@
             <input value="@_libelle" @oninput="e => _libelle = (string)e.Value!" @onkeydown="OnKeyDown" data-enter-select maxlength="200"
                    disabled="@Disabled" placeholder="@(Disabled ? "Enregistrez d’abord le contrat" : "Ajouter une condition")" />
         </label>
@@ -52,15 +49,13 @@
     private bool _boite;
     private bool _busy;
 
-    // null en création : la condition a besoin d'un contrat enregistré pour
-    // s'y rattacher, le bloc est alors désactivé.
+    // null en création, bloc désactivé
     [Parameter] public string? ContratId { get; set; }
     [Parameter] public IReadOnlyList<ConditionCmr> Conditions { get; set; } = [];
     [Parameter] public EventCallback<List<ConditionCmr>> ConditionsChanged { get; set; }
 
     private bool Disabled => ContratId is null;
 
-    // Verrouille les boutons pendant l'appel et affiche l'échec.
     private async Task RunAsync(Func<Task> action, string failure)
     {
         _busy = true;
@@ -92,8 +87,7 @@
             var created = (await Api.SendJsonAsync<ConditionCmr>(HttpMethod.Post, "conditions-cmr",
                 new CreateConditionCmrDto { IDCONTRATS = ContratId, Libelle = label, Boite_a_cocher = _boite ? 1 : 0 }))!;
             await ConditionsChanged.InvokeAsync([.. Conditions, created]);
-            // Champ vidé seulement s'il contient encore le texte envoyé — sinon
-            // on écraserait ce que l'utilisateur a tapé pendant la requête.
+            // sinon on écrase ce qui a été tapé pendant la requête
             if (_libelle.Trim() == label) _libelle = "";
             _boite = false;
         }, "Échec de l'ajout");

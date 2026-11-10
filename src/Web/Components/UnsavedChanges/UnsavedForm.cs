@@ -6,9 +6,7 @@ using Microsoft.JSInterop;
 
 namespace Horizon.Web.Components.UnsavedChanges;
 
-// Zone enfant de `parent`, créée par un composant qui doit pouvoir la
-// vérifier avant de la quitter (fiche ouverte, onglet, modale) : à passer à
-// <GuardBoundary Scope="..."> et à détacher quand le composant disparaît.
+// à passer à <GuardBoundary Scope> et à détacher au Dispose
 public static class GuardScopes
 {
     public static GuardScope CreateChild(GuardScope? parent, UnsavedChangesService service)
@@ -19,8 +17,7 @@ public static class GuardScopes
     }
 }
 
-// Saisie déclarée dans une zone (équivalent de useLeaveGuard) : gardes
-// personnalisés (éditeur de modèle, feuille de pointage...).
+// gardes personnalisés (éditeur de modèle, feuille de pointage...)
 public sealed class LeaveGuard(Func<bool> isDirty, Func<Task> save, Func<bool>? validate = null) : ILeaveGuard, IDisposable
 {
     private GuardScope? _scope;
@@ -45,12 +42,7 @@ public sealed class LeaveGuard(Func<bool> isDirty, Func<Task> save, Func<bool>? 
     public void Dispose() => _scope?.Guards.Remove(this);
 }
 
-// Version formulaire (équivalent de useUnsavedForm) : compare la valeur
-// saisie (`value`, sérialisée) à celle de référence. Tant que l'utilisateur
-// n'a pas interagi avec la fiche (saisie, clic, touche dans l'élément
-// suivi), la référence suit la valeur : les pré-remplissages asynchrones
-// (société par défaut, données chargées après ouverture...) ne comptent donc
-// pas comme des modifications.
+// la référence suit la valeur jusqu'à la première interaction, pour ignorer les préremplissages
 public sealed class UnsavedForm : ILeaveGuard, IDisposable
 {
     private readonly Func<object?> _value;
@@ -74,8 +66,7 @@ public sealed class UnsavedForm : ILeaveGuard, IDisposable
 
     private string Serialize() => JsonSerializer.Serialize(_value(), JsonConfig.Options);
 
-    // À appeler à chaque rendu (OnParametersSet) : rattache le garde à la
-    // zone courante.
+    // à chaque OnParametersSet
     public void Register(GuardScope? scope)
     {
         scope ??= _service.Root;
@@ -85,8 +76,7 @@ public sealed class UnsavedForm : ILeaveGuard, IDisposable
         scope.Guards.Add(this);
     }
 
-    // Élément racine de la fiche (le <form>), pour détecter la première
-    // interaction et lancer la validation native. À appeler au premier rendu.
+    // au premier rendu, sert à détecter la première interaction
     public async Task TrackAsync(ElementReference root)
     {
         _root = root;
@@ -110,15 +100,12 @@ public sealed class UnsavedForm : ILeaveGuard, IDisposable
 
     public void Release() => _released = true;
 
-    // Boutons Annuler/Fermer de la fiche elle-même, qui ne concernent qu'elle.
     public async Task ConfirmLeaveAsync(Func<Task> leave)
     {
         if (await _service.ConfirmLeaveAsync(LeaveTarget.Of(this))) await leave();
     }
 
-    // Après un enregistrement qui laisse la fiche ouverte : la valeur
-    // enregistrée devient la référence (et les mises à jour renvoyées par le
-    // serveur ne comptent pas comme des modifications).
+    // fiche restée ouverte après enregistrement : nouvelle référence
     public async Task MarkCleanAsync()
     {
         _touched = false;

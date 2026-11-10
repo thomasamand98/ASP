@@ -1,7 +1,6 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 <CrudPage T="Chauffeur" TDto="CreateChauffeurDto" TDetail="Chauffeur"
           Title="Chauffeurs" LoadingLabel="Chargement des chauffeurs..."
           Source="_list" Columns="Columns" GetRowId="c => c.IDCHAUFFEURS"
@@ -30,12 +29,10 @@
 
     private ApiList<Chauffeur> _list = default!;
     private CrudApi<CreateChauffeurDto, Chauffeur, Chauffeur> _api = default!;
-    // Listes des sélecteurs Entreprise et Lien salarié, chargées une fois
-    // tant que l'onglet reste ouvert (pas à chaque ouverture de fiche).
+    // une fois tant que l'onglet reste ouvert
     private ApiList<Societe> _societes = default!;
     private ApiList<Personnel> _personnel = default!;
-    // Non archivés par défaut ; tous en projection, pour ne masquer aucune
-    // ligne liée.
+    // non archivés par défaut, tous en projection
     private string _archive = "0";
 
     [Parameter] public ProjectionView? Projection { get; set; }

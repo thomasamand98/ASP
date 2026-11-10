@@ -1,7 +1,3 @@
-/* Onglets des fiches (voir FicheTabs.razor) : libellés en gras, onglet actif
-   souligné de la couleur de la marque, barre séparée du contenu par un
-   filet. */
-
 .fiche-tabs {
   display: flex;
   flex-wrap: wrap;

@@ -2,10 +2,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Fiche d'une société, en création (Initial null) ou en modification (fiche
-   complète chargée par CrudPage). Les onglets Contacts / Contrats /
-   Documents / Messages ne portent que de la consultation liée à un
-   enregistrement existant — désactivés tant que la société n'est pas créée. *@
+@* onglets Contacts / Contrats / Documents / Messages désactivés en création *@
 <div class="societe-form">
     <FicheTabs AriaLabel="Sections de la fiche société" Value="@_topTab" ValueChanged="SetTopTab" Tabs="TopTabs" />
 
@@ -119,8 +116,7 @@
         </form>
     }
 
-    @* Onglets tableau gardés montés : une fiche contact ou contrat en cours
-       de saisie survit au changement d'onglet. *@
+    @* gardés montés pour ne pas perdre une saisie en cours *@
     @if (Initial is not null)
     {
         <FichePanel Active="@(_topTab == "contacts")">
@@ -143,9 +139,7 @@
 @code {
     private static readonly IReadOnlyList<FicheTab> BillingTabs = [new("client", "Client"), new("fournisseur", "Fournisseur")];
 
-    // Champs envoyés à l'API (CreateSocieteDto). Codes 0/1 pour Prospect,
-    // Archive et les options de facturation. Les adresses de facturation sont
-    // des objets ; tous les IDADRESSES restent côté serveur.
+    // adresses de facturation en objets, les IDADRESSES restent côté serveur
     private sealed class Model
     {
         public string Nom_societe { get; set; } = "";
@@ -196,8 +190,7 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public SocieteDetail? Initial { get; set; }
 
-    // Liste des contacts pour les sélecteurs « Contact pour la comptabilité »,
-    // chargée par SocietesPage.
+    // pour "Contact pour la comptabilité"
     [Parameter] public IReadOnlyList<Contact> Contacts { get; set; } = [];
     [Parameter] public Func<CreateSocieteDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
@@ -282,16 +275,13 @@
             Fournisseur_Bic = fournisseur?.Bic ?? "",
         };
         SetAdresse(AdresseValues.From(Initial?.Adresse));
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
     }
 
     protected override void OnParametersSet() => _guard.Register(Scope);
 
-    // Le formulaire est recréé à chaque retour sur l'onglet Principale : il
-    // faut alors le suivre à nouveau.
+    // formulaire recréé à chaque retour sur l'onglet Principale
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!_track || _topTab != "principale") return;

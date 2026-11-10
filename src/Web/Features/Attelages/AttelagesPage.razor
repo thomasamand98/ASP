@@ -1,7 +1,5 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
 <CrudPage T="Attelage" TDto="CreateAttelageDto" TDetail="Attelage"
           Title="Attelages" LoadingLabel="Chargement des attelages..."
           Source="_list" Columns="Columns" GetRowId="a => a.IDATTELAGE_REFERENCE"
@@ -24,8 +22,7 @@
 
     private ApiList<Attelage> _list = default!;
     private CrudApi<CreateAttelageDto, Attelage, Attelage> _api = default!;
-    // Listes des sélecteurs Chauffeur / Tracteur / Remorque / Société,
-    // chargées une fois tant que l'onglet reste ouvert.
+    // chargées une fois tant que l'onglet reste ouvert
     private ApiList<Chauffeur> _chauffeurs = default!;
     private ApiList<Vehicule> _vehicules = default!;
     private ApiList<Societe> _societes = default!;

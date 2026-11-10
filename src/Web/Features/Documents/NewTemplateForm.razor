@@ -2,10 +2,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Formulaire de la modale « Nouveau modèle » : demande le type de modèle
-   avant tout (un modèle de facture n'a pas la même mise en page qu'un
-   modèle de contrat — un seul type existe pour l'instant, voir
-   CreateDocumentTemplateDto.TypeContrat). *@
+@* un seul type (contrat) pour l'instant *@
 <form @ref="_formRef" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" class="dtp-create-form">
     <label class="field">
         Nom du modèle

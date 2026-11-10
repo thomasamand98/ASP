@@ -1,7 +1,6 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 <CrudPage T="Contrat" TDto="CreateContratDto" TDetail="ContratDetail"
           Title="Contrats" LoadingLabel="Chargement des contrats..."
           Source="_list" Columns="Columns" GetRowId="c => c.IDCONTRATS"
@@ -15,7 +14,7 @@
 </CrudPage>
 
 @code {
-    // Colonnes partagées avec l'onglet Contrats de la fiche Société.
+    // partagées avec l'onglet Contrats de la fiche Société
     public static readonly IReadOnlyList<Column<Contrat>> Columns =
     [
         Col.Key<Contrat>("Num_contrat", "Numéro", c => c.Num_contrat),
@@ -28,8 +27,7 @@
 
     private ApiList<Contrat> _list = default!;
     private CrudApi<CreateContratDto, Contrat, ContratDetail> _api = default!;
-    // Listes de la fiche (sociétés, types de facture, modèles « CONTRAT »),
-    // chargées une fois tant que l'onglet reste ouvert.
+    // une fois tant que l'onglet reste ouvert
     private ContratLookups _lookups = default!;
 
     [Parameter] public ProjectionView? Projection { get; set; }

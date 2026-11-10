@@ -3,10 +3,7 @@ using Horizon.Web.Services;
 
 namespace Horizon.Web.Features.Contrats;
 
-// Listes de la fiche contrat (sélecteurs Société et Type facture, modèles
-// « CONTRAT » du bouton « Voir le PDF ») : chargées par la page (Contrats, ou
-// onglet Contrats de la fiche Société) plutôt qu'à chaque ouverture de fiche.
-// Un échec laisse la liste vide (le sélecteur ne propose alors que « — »).
+// chargées par la page plutôt qu'à chaque fiche, vides en cas d'échec
 public sealed class ContratLookups(ApiClient api)
 {
     public ApiList<Societe> Societes { get; } = new(api, "societes");
@@ -30,7 +27,7 @@ public sealed class ContratLookups(ApiClient api)
         }
         catch (Exception)
         {
-            // Sélecteur limité à « — ».
+            // sélecteur limité à "—"
         }
     }
 
@@ -43,7 +40,7 @@ public sealed class ContratLookups(ApiClient api)
         }
         catch (Exception)
         {
-            // Bouton « Voir le PDF » désactivé, comme sans modèle.
+            // Voir le PDF désactivé, comme sans modèle
         }
     }
 }

@@ -5,8 +5,6 @@
   min-width: 0;
 }
 
-/* ---------- Bouton « Voir le PDF » ---------- */
-
 .contrat-form ::deep .contrat-pdf {
   display: inline-flex;
   align-items: center;
@@ -23,18 +21,13 @@
   font-size: 0.8rem;
 }
 
-/* ---------- Détail : deux colonnes de cartes ---------- */
-
 .contrat-form ::deep .contrat-detail {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-/* auto-fit plutôt qu'une media query sur le viewport : la fiche vit dans des
-   conteneurs de largeurs très différentes selon le mode d'affichage choisi
-   (voir components/view-modes/) — les deux colonnes passent seules l'une
-   sous l'autre dès que le conteneur n'a plus la place. */
+/* auto-fit et pas de media query : la fiche vit dans des conteneurs de largeur variable */
 .contrat-form ::deep .contrat-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -90,12 +83,10 @@
   flex: 0 1 8rem !important;
 }
 
-/* Aligne la case à cocher sur le bas des champs voisins d'une ligne. */
+/* case alignée sur le bas des champs voisins */
 .contrat-form ::deep .contrat-checkbox {
   padding-bottom: 0.3rem;
 }
-
-/* ---------- Conditions CMR ---------- */
 
 .contrat-form ::deep .contrat-conditions {
   display: flex;
@@ -152,8 +143,6 @@
   padding-bottom: 0;
 }
 
-/* ---------- Chiffres clés ---------- */
-
 .contrat-form ::deep .contrat-kpi {
   display: flex;
   align-items: baseline;
@@ -173,8 +162,6 @@
   color: var(--text-h);
   font-variant-numeric: tabular-nums;
 }
-
-/* ---------- Onglets Prestations / Factures ---------- */
 
 .contrat-form ::deep .contrat-table-wrapper {
   overflow-x: auto;
@@ -215,8 +202,7 @@
   white-space: nowrap;
 }
 
-/* Dates et numéros : jamais coupés sur deux lignes (le tableau défile
-   horizontalement si besoin). */
+/* jamais sur deux lignes, le tableau défile */
 .contrat-form ::deep .contrat-table .contrat-nowrap {
   white-space: nowrap;
 }
@@ -232,8 +218,7 @@
   font-weight: 600;
 }
 
-/* Mobile : chaque ligne devient une carte label/valeur, comme le DataTable
-   (voir components/DataTable.css). */
+/* mobile : une carte label/valeur par ligne */
 @media (max-width: 640px) {
   .contrat-form ::deep .contrat-table thead {
     display: none;

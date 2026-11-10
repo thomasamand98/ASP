@@ -1,8 +1,4 @@
-/* Fiches en cartes (voir FicheLayout.razor), même langage visuel que la fiche
-   personnel (PersonnelForm.css). Les colonnes se replient selon la largeur
-   du conteneur (auto-fit), pas celle de la fenêtre : la fiche s'affiche dans
-   des modes très différents (modale, tiroir, vue divisée..., voir
-   components/view-modes/). */
+/* auto-fit sur la largeur du conteneur, la fiche s'affiche dans plusieurs modes */
 
 .fiche {
   display: flex;
@@ -13,12 +9,10 @@
   line-height: 1.35;
 }
 
-/* La modale (480px par défaut) s'élargit pour ces fiches en colonnes. */
+/* modale à 480px par défaut, trop étroite */
 .modal-panel:has(> .fiche) {
   max-width: min(60rem, 100%);
 }
-
-/* ---------- En-tête ---------- */
 
 .fiche-hero {
   display: flex;
@@ -44,7 +38,7 @@
   letter-spacing: 0.03em;
 }
 
-/* Variante carrée neutre (organisation, lieu). */
+/* variante carrée (organisation, lieu) */
 .fiche-avatar--icon {
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -78,8 +72,6 @@
 .fiche-quick a {
   text-decoration: none;
 }
-
-/* ---------- Colonnes et sections ---------- */
 
 .fiche-columns {
   display: grid;
@@ -150,8 +142,6 @@
   font-size: 0.8rem;
 }
 
-/* ---------- Interrupteur ---------- */
-
 .fiche-switch {
   position: relative;
   display: inline-flex;
@@ -206,8 +196,6 @@
   outline-offset: 2px;
 }
 
-/* ---------- Étiquettes (rattachements) ---------- */
-
 .fiche-chips {
   display: flex;
   flex-wrap: wrap;
@@ -236,7 +224,7 @@
   font-weight: 500;
 }
 
-/* Valeur non modifiable (déduite d'une fiche liée), à la place d'un champ. */
+/* valeur déduite d'une fiche liée, pas modifiable */
 .fiche-readonly {
   display: block;
   min-height: 2.1rem;
@@ -248,8 +236,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Case à cocher à droite de son libellé (codes 0/1 WinDev), alignée sur la
-   hauteur des champs voisins. */
+/* codes 0/1 WinDev, aligné sur la hauteur des champs */
 .fiche-check {
   display: flex;
   align-items: center;
@@ -266,10 +253,7 @@
   cursor: pointer;
 }
 
-/* Titre de carte centré, en casse normale (fiches reprises des écrans
-   WinDev : Condition d'exécution, Marchandise, Véhicule...). Grille
-   1fr/auto/1fr : le titre reste centré, l'éventuel `aside` se cale à
-   droite. */
+/* 1fr/auto/1fr pour garder le titre centré avec un aside */
 .fiche-section--center .fiche-section-head {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

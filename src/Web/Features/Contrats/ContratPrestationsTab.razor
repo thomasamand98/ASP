@@ -1,9 +1,6 @@
 @inject EnumerationLabels Enumerations
 
-@* Onglet « Prestations » de la fiche contrat — lecture seule, les
-   prestations viennent avec la fiche. L'unité est un code de l'énumération
-   « unite_prestation » : son libellé, ou le code brut tant que les libellés
-   ne sont pas chargés. *@
+@* lecture seule, code brut tant que les libellés ne sont pas chargés *@
 @if (Prestations.Count == 0)
 {
     <p class="muted">Aucune prestation sur ce contrat.</p>

@@ -2,12 +2,8 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Carte d'un contrat de travail en cours de saisie (création ou
-   modification) : champs du contrat, activités et liste complète des taux
-   horaires. Quitter le contrat modifié (Annuler, ou fermer la fiche
-   personnel) demande « Enregistrer / Annuler les modifications ». *@
 <form @ref="_formRef" class="pct-card pct-card--editing" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
-    @* Boutons en haut, comme sur les autres fiches. *@
+    @* boutons en haut comme sur les autres fiches *@
     <div class="pct-editor-head">
         <p class="pct-editing-title">@(Initial is not null ? "Modifier le contrat" : "Nouveau contrat")</p>
         <div class="page-actions">
@@ -88,7 +84,7 @@
 </form>
 
 @code {
-    // Taux en cours de saisie (TauxHoraireDto) : valeurs en texte.
+    // valeurs en texte
     public sealed class RateModel
     {
         public string? IDTAUX_HORAIRE { get; set; }
@@ -106,8 +102,7 @@
         public void Set(string field, string value) => typeof(RateModel).GetProperty(field)!.SetValue(this, value);
     }
 
-    // ContratTravailDto : dates « AAAA-MM-JJ », codes 0/1 ; Taux remplace la
-    // liste complète des taux du contrat.
+    // Taux remplace toute la liste des taux du contrat
     private sealed class Model
     {
         public string TypeContrat { get; set; } = "";

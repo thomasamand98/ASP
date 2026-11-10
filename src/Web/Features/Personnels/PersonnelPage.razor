@@ -1,7 +1,6 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 <CrudPage T="Personnel" TDto="CreatePersonnelDto" TDetail="PersonnelDetail"
           Title="Personnel" LoadingLabel="Chargement du personnel..."
           Source="_list" Columns="Columns" GetRowId="p => p.IDPERSONNELS"

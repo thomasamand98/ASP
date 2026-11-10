@@ -1,7 +1,4 @@
-/* Fiche personnel (voir PersonnelForm.razor). Les colonnes se replient selon
-   la largeur du conteneur (auto-fit), pas celle de la fenêtre : la fiche
-   s'affiche dans des modes très différents (modale, tiroir, vue divisée...,
-   voir components/view-modes/). */
+/* colonnes en auto-fit sur la largeur du conteneur (modale, tiroir, vue divisée...) */
 
 .pf {
 
@@ -14,7 +11,7 @@
   letter-spacing: normal;
 }
 
-/* La modale (480px par défaut) s'élargit pour cette fiche en colonnes. */
+/* modale élargie pour cette fiche */
 .pf ::deep .modal-panel:has(> .pf) {
   max-width: min(76rem, 100%);
 }
@@ -24,8 +21,6 @@
   flex-direction: column;
   gap: 1rem;
 }
-
-/* ---------- En-tête (identité résumée + activités) ---------- */
 
 .pf ::deep .pf-hero {
   display: flex;
@@ -105,8 +100,6 @@
   outline-offset: 2px;
 }
 
-/* ---------- Colonnes et sections ---------- */
-
 .pf ::deep .pf-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
@@ -151,7 +144,6 @@
   grid-column: 1 / -1;
 }
 
-/* Contrôles : styles globaux (.field, voir styles/controls.css). */
 
 .pf ::deep .pf input:invalid:not(:placeholder-shown):not(:focus) {
   border-color: var(--danger-border);
@@ -167,8 +159,6 @@
   margin-top: -0.35rem;
   font-size: 0.7rem;
 }
-
-/* ---------- Validités ---------- */
 
 .pf ::deep .pf-validities {
   display: grid;
@@ -213,9 +203,7 @@
   background: var(--danger-bg);
   color: var(--danger);
 }
-/* Onglet « Contrat » de la fiche personnel (voir PersonnelContratsTab.razor).
-   Affiché dans `.pf` : réutilise ses variables (--pf-brand, --pf-surface)
-   et ses champs (.pf-field, .pf-chip). */
+/* onglet Contrat, réutilise les variables et champs de .pf */
 
 .pf ::deep .pct {
   display: flex;
@@ -263,8 +251,6 @@
 .pf ::deep .pct-empty p {
   margin: 0;
 }
-
-/* ---------- Carte d'un contrat ---------- */
 
 .pf ::deep .pct-card {
   display: flex;
@@ -374,8 +360,6 @@
   font-weight: 600;
 }
 
-/* ---------- Taux en vigueur ---------- */
-
 .pf ::deep .pct-rates {
   display: flex;
   flex-direction: column;
@@ -439,8 +423,6 @@
   font-size: 1.15rem;
 }
 
-/* ---------- Historique ---------- */
-
 .pf ::deep .pct-history summary {
   width: fit-content;
   color: var(--accent);
@@ -484,8 +466,6 @@
 .pf ::deep .pct-table .pct-num {
   text-align: right;
 }
-
-/* ---------- Édition ---------- */
 
 .pf ::deep .pct-card--editing {
   border-color: var(--accent-border);
@@ -534,7 +514,7 @@
   background: var(--surface);
 }
 
-/* Symbole € dans le champ, sans le mêler à la valeur saisie. */
+/* € dans le champ, hors de la valeur */
 .pf ::deep .pct-euro {
   position: relative;
   display: block;

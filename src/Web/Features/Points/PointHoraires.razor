@@ -1,7 +1,4 @@
-@* Semaine d'ouverture d'un point : une colonne par jour, plages éditables
-   sur place. Les plages sont gardées dans l'ordre de saisie ; l'API les
-   renvoie triées par jour puis par heure de début. Jour_semaine 1 = lundi
-   … 7 = dimanche. *@
+@* plages gardées dans l'ordre de saisie, Jour_semaine 1 = lundi *@
 <div class="pt-week">
     <div class="pt-week-days">
         @foreach (var (jour, court, nom) in Jours)
@@ -50,8 +47,7 @@
         (5, "Ven", "Vendredi"), (6, "Sam", "Samedi"), (7, "Dim", "Dimanche"),
     ];
 
-    // Plage modifiable : référence propre à chaque plage (une plage
-    // modifiée est remplacée par une nouvelle, comme dans le front d'origine).
+    // record : une plage modifiée est remplacée par une nouvelle
     public sealed record Horaire(int Jour_semaine, string Heure_debut, string Heure_fin);
 
     [Parameter, EditorRequired] public IReadOnlyList<Horaire> Value { get; set; } = [];
@@ -64,7 +60,7 @@
             ? h with { Heure_debut = debut ?? h.Heure_debut, Heure_fin = fin ?? h.Heure_fin }
             : h)]);
 
-    // Nouvelle plage : 8h-12h, ou à la suite de la dernière du jour.
+    // 8h-12h, ou à la suite de la dernière du jour
     private static Horaire NextSlot(List<Horaire> daySlots, int jour)
     {
         if (daySlots.Count == 0) return new Horaire(jour, "08:00", "12:00");
@@ -75,7 +71,7 @@
         return new Horaire(jour, $"{start:00}:{m:00}", $"{Math.Min(start + 4, 23):00}:{m:00}");
     }
 
-    // Reporte les plages du lundi sur mardi → vendredi.
+    // lundi recopié du mardi au vendredi
     private Task CopyMondayToWeekdays()
     {
         var lundi = ByDay(1);

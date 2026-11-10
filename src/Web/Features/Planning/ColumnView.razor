@@ -1,7 +1,6 @@
 @inject Browser Browser
 
-@* Mode « Colonne » : une colonne par ressource, les journées de la période
-   empilées verticalement avec leur axe horaire (comme l'écran WinDev). *@
+@* journées empilées avec leur axe horaire, comme l'écran WinDev *@
 <div class="pl-board-scroll" @ref="_scroll" @onclick="() => Board.OnSelect(null)">
     <div class="pl-col-grid" style="@GridStyle">
         <div class="pl-col-head pl-col-corner"></div>
@@ -45,10 +44,9 @@
 </div>
 
 @code {
-    // Hauteur d'une heure en pixels : une journée complète fait 24 × HourPx.
     public const double HourPx = 26;
     private static readonly int[] HourLabels = [.. Enumerable.Range(0, 12).Select(i => i * 2)];
-    // Heure affichée en haut à l'ouverture (la nuit est rarement utilisée).
+    // la nuit est rarement utilisée
     private const int InitialScrollHour = 5;
 
     private ElementReference _scroll;

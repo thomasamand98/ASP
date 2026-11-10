@@ -1,12 +1,9 @@
 @implements IDisposable
 @inject ApiClient Api
 
-@* Formulaire « Coordonnée entreprise » — pas de bouton de soumission ici, il
-   vit dans l'en-tête de EntitePage (attribut `form`, voir FormId) pour
-   rester visible en haut de page. *@
+@* bouton Enregistrer dans l'en-tête de EntitePage (attribut form) *@
 <form id="@FormId" class="entite-form" @onsubmit="OnSubmit" @onsubmit:preventDefault="true">
-    @* Zone du logo : le sélecteur de fichier invisible couvre toute la zone
-       (clic et glisser-déposer natifs). *@
+    @* input file invisible sur toute la zone : clic et drop natifs *@
     <div class="entite-logo-drop@(_logoDragOver ? " drag-over" : string.Empty)" role="button" tabindex="0"
          @ondragenter="() => _logoDragOver = true" @ondragleave="() => _logoDragOver = false" @ondrop="() => _logoDragOver = false">
         @if (Form.Logo.Length > 0)
@@ -84,8 +81,6 @@
 
     <h3 class="entite-section-title">Configuration des paramètres e-mail</h3>
 
-    @* Une colonne par bloc : serveur, puis compte compta et compte planning
-       (e-mail suivi de son mot de passe). *@
     <div class="entite-form-grid entite-form-grid-email">
         <div class="entite-email-column">
             @Text("Serveur :", () => Form.Seveur_SMTP, v => Form.Seveur_SMTP = v)
@@ -119,10 +114,7 @@
 </form>
 
 @code {
-    // Options de sécurisation de la connexion SMTP — non documentées côté
-    // base (pas de table d'énumération pour ce champ, juste un entier),
-    // déduites de la seule donnée existante (TypeConnexion_SMTP=2 ↔ « Option
-    // Sécurisé TLS » dans la maquette fournie).
+    // pas d'énumération en base, valeurs déduites de la maquette (2 = TLS)
     private static readonly (int Value, string Label)[] ConnexionSmtp = [(0, "Aucune"), (1, "SSL"), (2, "Option Sécurisé TLS")];
 
     private const string UnchangedPlaceholder = "•••••••• (inchangé)";
@@ -136,15 +128,12 @@
     [Parameter, EditorRequired] public string FormId { get; set; } = "";
     [Parameter, EditorRequired] public EntiteModel Form { get; set; } = default!;
 
-    // Mots de passe SMTP déjà enregistrés (jamais renvoyés par l'API) : sert
-    // seulement à indiquer « inchangé » dans le champ.
+    // jamais renvoyés par l'API, juste pour afficher "inchangé"
     [Parameter] public bool SmtpPasswordSet { get; set; }
     [Parameter] public bool SmtpPlanningPasswordSet { get; set; }
     [Parameter] public EventCallback OnSubmit { get; set; }
 
-    // La ville actuellement enregistrée peut ne pas (ou plus) figurer dans les
-    // résultats de recherche (code postal pas encore recherché, ville
-    // renommée...) — ajoutée à la liste pour ne pas perdre la valeur affichée.
+    // ville enregistrée absente des résultats : ajoutée pour ne pas la perdre
     private IEnumerable<VilleOption> VilleChoices =>
         Form.Localite.Length > 0 && !_villes.Any(v => v.Nom_ville == Form.Localite)
             ? [new VilleOption("current", Form.Localite), .. _villes]
@@ -156,7 +145,7 @@
             <input type="@type" value="@get()" placeholder="@placeholder" autocomplete="@autocomplete" @oninput="e => set((string)e.Value!)" />
         </label>;
 
-    // Liste des pays : ~240 lignes, chargée une seule fois.
+    // ~240 pays, chargés une fois
     protected override async Task OnInitializedAsync()
     {
         try
@@ -165,13 +154,12 @@
         }
         catch (Exception)
         {
-            // Liste indisponible.
+            // liste indisponible
         }
         if (Form.CP.Length > 0) await SearchVillesAsync(Form.CP);
     }
 
-    // Recherche des villes par code postal, avec un léger anti-rebond — la
-    // table en compte ~39 000, impossible à charger en une fois.
+    // ~39 000 villes, recherche par CP avec anti-rebond
     private void SetCp(string cp)
     {
         Form.CP = cp;
@@ -195,7 +183,7 @@
         }
         catch (Exception)
         {
-            // Recherche remplacée par une plus récente, ou serveur injoignable.
+            // remplacée par une plus récente, ou serveur injoignable
         }
     }
 
@@ -206,10 +194,7 @@
         Form.Pays = match?.ISO ?? "";
     }
 
-    // Le logo n'est enregistré qu'au clic sur « Enregistrer » comme le reste
-    // du formulaire — pas d'envoi immédiat, pour rester cohérent avec tous
-    // les autres champs de cette fiche. Converti en data URI base64
-    // (« data:image/png;base64,... »), stockée telle quelle par l'API.
+    // envoyé seulement à l'enregistrement, en data URI base64
     private async Task LogoChosenAsync(InputFileChangeEventArgs e)
     {
         var file = e.File;

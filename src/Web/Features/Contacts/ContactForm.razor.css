@@ -1,7 +1,5 @@
-/* Fiche contact (voir ContactForm.razor) — mise en page commune dans
-   wwwroot/css/fiche.css, seuls les cas propres au contact ici. */
+/* le reste est dans fiche.css */
 
-/* Civilité étroite, Nom et Prénom à parts égales. */
 .cf-grid--identity {
   grid-template-columns: minmax(7rem, 0.7fr) repeat(2, minmax(8rem, 1fr));
 }
@@ -12,7 +10,7 @@
   }
 }
 
-/* Adresse reprise de la société. */
+/* adresse reprise de la société */
 .cf-company-address {
   display: flex;
   flex-direction: column;
@@ -24,7 +22,7 @@
   color: var(--text-h);
 }
 
-/* Autres sociétés, sous la société principale. */
+/* autres sociétés, sous la principale */
 .cf-links {
   display: flex;
   flex-direction: column;

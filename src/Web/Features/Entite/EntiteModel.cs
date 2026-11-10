@@ -2,8 +2,7 @@ using Horizon.Shared.Models;
 
 namespace Horizon.Web.Features.Entite;
 
-// Valeurs du formulaire « Coordonnée entreprise » (même noms que
-// UpdateEntiteDto) : tout en string/double, adresse aplatie.
+// mêmes noms que UpdateEntiteDto, adresse aplatie
 public sealed class EntiteModel
 {
     public string Nom_societe { get; set; } = "";
@@ -21,8 +20,7 @@ public sealed class EntiteModel
     public string Seveur_SMTP { get; set; } = "";
     public double Port_SMTP { get; set; }
     public string Utilisateur_SMTP { get; set; } = "";
-    // Jamais renvoyés par l'API : vides tant que l'utilisateur n'en saisit pas
-    // un nouveau (vide = inchangé côté serveur).
+    // vide = inchangé côté serveur
     public string MDP_SMTP { get; set; } = "";
     public double TypeConnexion_SMTP { get; set; }
     public string Utilisateur_smtp_planning { get; set; } = "";
@@ -34,7 +32,7 @@ public sealed class EntiteModel
     public string Localite { get; set; } = "";
     public string Pays { get; set; } = "";
     public string Pays_full_name { get; set; } = "";
-    // Chaîne vide = supprime le logo.
+    // vide = supprime le logo
     public string Logo { get; set; } = "";
 
     public static EntiteModel From(EntiteDetail d) => new()

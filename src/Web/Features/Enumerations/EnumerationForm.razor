@@ -2,10 +2,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Formulaire de la modale de création/modification d'une valeur (voir
-   EnumerationsPage). `Initial` vaut null en création. La `Valeur` d'une
-   valeur système est verrouillée : le code applicatif la compare telle
-   quelle. *@
+@* Valeur verrouillée pour une valeur système, le code la compare telle quelle *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="enum-form">
     <label class="field">
         Valeur affichée
@@ -58,7 +55,7 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter, EditorRequired] public string CategorieId { get; set; } = "";
 
-    // Ordre proposé à la création (dernier ordre de la catégorie + 1).
+    // dernier ordre de la catégorie + 1
     [Parameter] public double DefaultOrdre { get; set; }
     [Parameter] public Enumeration? Initial { get; set; }
     [Parameter] public Func<CreateEnumerationDto, Task> OnSubmit { get; set; } = default!;

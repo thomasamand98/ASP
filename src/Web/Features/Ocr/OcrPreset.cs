@@ -1,9 +1,6 @@
 namespace Horizon.Web.Features.Ocr;
 
-// Préréglages d'extraction structurée pour la page Test OCR : un prompt qui
-// guide Mistral et le JSON Schema qu'il doit remplir (voir OcrAnnotation
-// côté API). Le schéma est envoyé en mode strict : chaque objet liste toutes
-// ses propriétés dans `required` et interdit les propriétés supplémentaires.
+// schéma envoyé en mode strict : tout dans required, pas de propriétés en plus
 public sealed record OcrPreset(string Id, string Label, string Prompt, string Schema)
 {
     private const string TransportPrompt = """"

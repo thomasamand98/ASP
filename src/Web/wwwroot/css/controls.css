@@ -1,11 +1,4 @@
-/* Contrôles partagés par tous les écrans : boutons et champs de formulaire.
-   Les CSS de features ne gèrent que la mise en page (grilles, colonnes) et
-   leurs cas vraiment spécifiques. */
-
-/* ========== Boutons ========== */
-
-/* Bouton texte. Variantes : .primary (couleur de marque), .danger, .ghost
-   (lien sans bordure), .sm (compact, barres d'outils). */
+/* variantes .primary .danger .ghost .sm */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -83,8 +76,7 @@
   width: 100%;
 }
 
-/* Bouton icône carré, transparent par défaut. Variantes : .outlined
-   (bordé, barres d'outils), .primary, .danger (rouge au survol), .sm. */
+/* variantes .outlined .primary .danger .sm */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -161,15 +153,12 @@
   outline-offset: 2px;
 }
 
-/* ========== Formulaires ========== */
-
 .form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-/* Boutons Annuler / Enregistrer, en haut à droite des fiches. */
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -177,8 +166,7 @@
   gap: 0.5rem;
 }
 
-/* Libellé + contrôle empilés. Le libellé est le texte du <label> lui-même,
-   ou un <span class="field-label"> quand il faut le styler à part. */
+/* .field-label quand le libellé doit être stylé à part */
 .field {
   display: flex;
   flex-direction: column;
@@ -200,8 +188,7 @@
   font-weight: 400;
 }
 
-/* :where() garde la spécificité au niveau d'une seule classe, pour que
-   chaque écran puisse ajuster un contrôle sans surenchère de sélecteurs. */
+/* :where() pour rester à une seule classe de spécificité */
 .field :where(input:not([type='checkbox'], [type='radio'], [type='file']), select, textarea),
 .control {
   box-sizing: border-box;
@@ -240,7 +227,6 @@ textarea.control {
   cursor: not-allowed;
 }
 
-/* Case à cocher + libellé sur une ligne. */
 .checkbox {
   display: inline-flex;
   align-items: center;

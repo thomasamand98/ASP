@@ -1,5 +1,3 @@
-// Point d'entrée du front Blazor WebAssembly : monte App dans <div id="root">
-// (wwwroot/index.html) et enregistre les services de l'application.
 using System.Globalization;
 using Horizon.Web;
 using Horizon.Web.Components.UnsavedChanges;
@@ -9,9 +7,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#root");
 
-// Culture invariante par défaut (nombres envoyés à l'API avec un point,
-// comme String() en JavaScript) ; les affichages en fr-BE passent par
-// Common/Format.cs, comme les toLocaleString('fr-BE') d'origine.
+// nombres envoyés à l'API avec un point, l'affichage fr-BE passe par Format.cs
 CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 

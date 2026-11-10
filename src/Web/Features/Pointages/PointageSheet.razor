@@ -2,10 +2,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Feuille de pointage (menu Gestion personnel → Pointage) : un salarié, une
-   période (un mois par défaut), une ligne par jour. Choisir un mois cale la
-   période sur ce mois ; choisir une période affiche le mois de sa date de
-   début. Cliquer sur un jour ouvre la saisie du pointage de ce jour. *@
+@* choisir un mois cale la période dessus, choisir une période affiche le mois du début *@
 <div class="pt">
     <header class="pt-toolbar">
         <h2 class="pt-title">Pointage</h2>
@@ -141,12 +138,11 @@
 </div>
 
 @code {
-    // Au-delà, la feuille devient illisible (l'API refuse aussi).
+    // au-delà illisible, et l'API refuse
     private const int MaxDays = 93;
     private const string PersonnelStorageKey = "mvc-template:pointagePersonnel";
 
-    // Pointage en cours de saisie : celui du jour cliqué (null = nouveau), avec
-    // sa fiche complète (la feuille la contient déjà).
+    // null = nouveau pointage
     private sealed record Editing(PointageFeuille? Pointage, string Date)
     {
         public PointageDetail? Detail => Pointage is null ? null : new PointageDetail
@@ -191,7 +187,7 @@
 
     private IEnumerable<Personnel> Salaries => _personnel.OrderBy(p => $"{p.Nom_Personnel ?? ""} {p.Prenom_Personnel ?? ""}", FormModel.French);
 
-    // Un salarié retenu d'une session précédente mais supprimé depuis.
+    // salarié retenu d'une session précédente mais supprimé depuis
     private bool SelectedKnown => _personnelId.Length == 0 || _personnelLoading || _personnel.Any(p => p.IDPERSONNELS == _personnelId);
 
     private List<SheetDay> Days => FeuilleCalc.BuildDays(DateUtils.DaysInRange(_from, _to), _feuille?.pointages ?? []);
@@ -212,7 +208,7 @@
         }
         catch (Exception)
         {
-            // Liste vide : seul le salarié retenu reste sélectionné.
+            // liste vide : seul le salarié retenu reste
         }
         _personnelLoading = false;
     }
@@ -225,12 +221,11 @@
         }
         catch (Exception)
         {
-            // Sélecteur Statut vide.
+            // sélecteur Statut vide
         }
     }
 
-    // Rien n'est chargé tant qu'aucun salarié n'est choisi. Une réponse
-    // arrivée après un changement de salarié ou de période est ignorée.
+    // réponse ignorée si le salarié ou la période a changé entre-temps
     private async Task LoadAsync()
     {
         if (_personnelId.Length == 0)
@@ -268,8 +263,6 @@
         await LoadAsync();
     }
 
-    // --- Période -----------------------------------------------------------
-
     private Task SelectMonthAsync(DateTime date)
     {
         _from = new DateTime(date.Year, date.Month, 1);
@@ -302,8 +295,6 @@
         else if (DateUtils.DaysInRange(_from, date).Count > MaxDays) _from = date.AddDays(-(MaxDays - 1));
         return LoadAsync();
     }
-
-    // --- Saisie ------------------------------------------------------------
 
     private void OpenDay(string date, PointageFeuille? pointage)
     {
@@ -375,13 +366,11 @@
     private static string RowLabel(DateTime date, PointageFeuille? p) =>
         (p is not null ? "Modifier" : "Saisir") + " le pointage du " + Format.WeekdayLong(date) + " " + Format.Date(date);
 
-    // Une ligne par pointage du jour, ou une ligne vide à saisir.
+    // ou une ligne vide à saisir
     private static List<PointageFeuille?> RowsOf(SheetDay day) => day.Pointages.Count > 0 ? [.. day.Pointages] : [null];
 
     private static string EditorTitle(Editing editing) =>
         (editing.Pointage is not null ? "Modifier" : "Saisir") + " le pointage du " + Format.Date(DateUtils.FromInputValue(editing.Date) ?? DateTime.Now);
-
-    // --- Rendu -------------------------------------------------------------
 
     private static RenderFragment Duration(double minutes) =>
         minutes > 0 ? @<text>@FeuilleCalc.FormatDuration(minutes)</text> : @<span class="pt-zero">—</span>;
@@ -389,7 +378,7 @@
     private static RenderFragment PointageCells(PointageFeuille p) => __builder =>
     {
         var color = WindevColor.ToHex(p.TypeStatut?.CouleurStatut);
-        // Fin le lendemain du début (travail de nuit).
+        // fin le lendemain (travail de nuit)
         var nextDay = !string.IsNullOrEmpty(p.Date_heure_debut) && !string.IsNullOrEmpty(p.Date_heure_fin)
             && !DateUtils.IsSameDay(Clock.ToLocal(Clock.Parse(p.Date_heure_debut)), Clock.ToLocal(Clock.Parse(p.Date_heure_fin)));
         var debut = FeuilleCalc.ClockTime(p.Date_heure_debut);

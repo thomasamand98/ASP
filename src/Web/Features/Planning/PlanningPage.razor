@@ -2,12 +2,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Écran Planning (menu Production) : filtre de période, panneau des
-   commandes / déchargements en attente, et grille en mode « Colonne » (une
-   colonne par ressource) ou « Ligne » (une ligne par ressource). Chaque
-   glisser-déposer est enregistré aussitôt en base (voir PlanningStore) :
-   déplacer une carte change ses dates et sa ressource, tirer sa poignée
-   change sa fin, déposer une commande crée une exécution. *@
+@* chaque drag & drop est enregistré tout de suite en base (PlanningStore) *@
 <div class="planning@(_dragItem is not null ? " is-dragging" : string.Empty)">
     <header class="pl-toolbar">
         <div class="pl-toolbar-group">
@@ -131,16 +126,14 @@
 </div>
 
 @code {
-    // Au-delà, la grille devient illisible et trop lourde à afficher (l'API
-    // refuse aussi les périodes trop longues).
+    // au-delà illisible et trop lourd, l'API refuse aussi
     private const int MaxDays = 31;
-    // Période affichée à l'ouverture et par « Cette semaine » : du lundi au
-    // dimanche de la semaine en cours.
+    // du lundi au dimanche de la semaine en cours
     private const int DefaultDays = 7;
     private const string PrefsStorageKey = "mvc-template:planningPrefs";
     private const int SavedNoticeMs = 2500;
 
-    // Message affiché en bas du planning : enregistré (Error null) ou erreur.
+    // Error null = enregistré
     private sealed record Notice(string? Error);
 
     private sealed record Prefs(string? viewMode, string? groupBy);
@@ -156,8 +149,7 @@
     private DropPreview? _preview;
     private Notice? _notice;
     private CancellationTokenSource? _noticeTimer;
-    // Numéro du glisser en cours : un glisser terminé avant d'avoir été pris
-    // en compte (voir DragStartItemAsync) ne le réactive pas.
+    // un glisser fini avant DragStartItemAsync ne doit pas le réactiver
     private int _dragSequence;
     private double _now = Clock.Now;
     private readonly CancellationTokenSource _stop = new();
@@ -190,7 +182,7 @@
             List<PlanningResource> resources = _groupBy == "executant"
                 ? [.. Chauffeurs.Select(c => new PlanningResource(c.id, c.nom, c.sousTraitant ?? (c.tracteurParDefaut is { Length: > 0 } t ? $"Interne · {t}" : "Interne")))]
                 : [.. (Data?.Remorques ?? []).Select(r => new PlanningResource(r.id, r.immat, r.type))];
-            // Toujours proposée pendant un glisser, pour pouvoir désaffecter.
+            // toujours proposée pendant un glisser, pour désaffecter
             if (_dragItem is not null || executions.Any(e => PlanningBoard.ResourceIdOf(e, _groupBy) == PlanningBoard.UnassignedId))
             {
                 resources.Add(new PlanningResource(PlanningBoard.UnassignedId, "Non affecté", null));
@@ -239,7 +231,7 @@
         await Browser.SetItemAsync(PrefsStorageKey, System.Text.Json.JsonSerializer.Serialize(new Prefs(viewMode, groupBy)));
     }
 
-    // Heure courante, rafraîchie chaque minute, pour le trait « maintenant ».
+    // pour le trait "maintenant", rafraîchie chaque minute
     private async Task TickAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
@@ -253,7 +245,7 @@
         }
         catch (OperationCanceledException)
         {
-            // Onglet fermé.
+            // onglet fermé
         }
     }
 
@@ -271,8 +263,6 @@
     }
 
     private void ShowError(Exception e) => ShowNotice(new Notice(e is ApiException ? e.Message : "L'enregistrement a échoué."));
-
-    // --- Période -----------------------------------------------------------
 
     private Task LoadAsync() => _store.LoadAsync(_from, _to);
 
@@ -294,8 +284,7 @@
         return LoadAsync();
     }
 
-    // Décale la période de sa propre durée (semaine précédente / suivante
-    // pour une période d'une semaine).
+    // décale de la durée de la période
     private Task ShiftPeriodAsync(int direction)
     {
         var count = Days.Count;
@@ -312,8 +301,6 @@
         return LoadAsync();
     }
 
-    // --- Glisser-déposer ---------------------------------------------------
-
     private Task SelectAsync(string? id)
     {
         _selectedId = id;
@@ -321,8 +308,7 @@
         return Task.CompletedTask;
     }
 
-    // Différé : modifier le DOM pendant le dragstart annule le glisser dans
-    // certains navigateurs.
+    // différé : toucher au DOM pendant le dragstart annule le glisser sur certains navigateurs
     private async Task DragStartItemAsync(DragItem item)
     {
         var sequence = ++_dragSequence;
@@ -348,8 +334,7 @@
         return Task.CompletedTask;
     }
 
-    // Chauffeur / tracteur / remorque d'une exécution créée en déposant une
-    // commande sur une ressource : complétés avec l'attelage de référence.
+    // complétés avec l'attelage de référence de la ressource
     private (string? ChauffeurId, string? TracteurId, string? RemorqueId) AssignmentFor(string? target)
     {
         if (_groupBy == "executant")

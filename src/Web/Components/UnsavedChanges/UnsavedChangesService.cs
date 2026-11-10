@@ -2,11 +2,7 @@ using Microsoft.JSInterop;
 
 namespace Horizon.Web.Components.UnsavedChanges;
 
-// Racine du suivi des saisies non enregistrées (voir GuardScope) : fournit la
-// zone de l'application et la question « Enregistrer / Annuler les
-// modifications » posée quand on quitte une zone modifiée (affichée par
-// UnsavedChangesDialog). Prévient aussi le navigateur à la fermeture ou au
-// rechargement de la page (voir HasUnsavedChanges).
+// racine du suivi des saisies, prévient aussi à la fermeture de l'onglet
 public sealed class UnsavedChangesService
 {
     private sealed record Pending(LeaveTarget Target, List<ILeaveGuard> Guards, TaskCompletionSource<bool> Result);
@@ -21,13 +17,12 @@ public sealed class UnsavedChangesService
 
     public event Action? Changed;
 
-    // true = on peut quitter (rien de modifié, enregistré, ou abandonné).
+    // true = on peut quitter
     public Task<bool> ConfirmLeaveAsync(LeaveTarget target)
     {
         var guards = target.DirtyGuards();
         if (guards.Count == 0) return Task.FromResult(true);
-        // Une seule question à la fois : une demande pendant qu'une autre est
-        // affichée est refusée (double clic sur une croix, par exemple).
+        // une seule question à la fois (double clic sur une croix...)
         if (_pending is not null) return Task.FromResult(false);
         _pending = new Pending(target, guards, new TaskCompletionSource<bool>());
         Changed?.Invoke();
@@ -47,7 +42,7 @@ public sealed class UnsavedChangesService
     {
         var request = _pending;
         if (request is null) return;
-        // Saisie invalide : on reste sur la fiche, le navigateur signale le champ.
+        // saisie invalide, le navigateur signale le champ
         if (!request.Guards.All(guard => guard.Validate()))
         {
             Finish(false);
@@ -61,7 +56,7 @@ public sealed class UnsavedChangesService
         }
         catch (Exception)
         {
-            // Erreur déjà affichée par la saisie elle-même.
+            // erreur déjà affichée par la saisie
         }
         Finish(await SettledAsync(request.Target));
     }
@@ -72,9 +67,7 @@ public sealed class UnsavedChangesService
         Finish(true);
     }
 
-    // Laisse l'interface appliquer les mises à jour déclenchées par
-    // l'enregistrement (fiche refermée, état « propre ») avant de vérifier le
-    // résultat.
+    // laisse passer le rendu (fiche refermée...) avant de vérifier
     private static async Task<bool> SettledAsync(LeaveTarget target)
     {
         for (var attempt = 0; attempt < 10; attempt++)

@@ -30,10 +30,7 @@
   background: var(--accent-bg);
 }
 
-/* Sous 768px, la sidebar devient un tiroir (voir Sidebar.css). Le bouton
-   burger reste fixe en haut à gauche, au-dessus du tiroir et du fond
-   assombri ; le contenu récupère un peu d'espace en haut pour ne pas
-   passer sous le bouton. */
+/* burger fixe au-dessus du tiroir, contenu décalé pour ne pas passer dessous */
 @media (max-width: 768px) {
 
   .app-layout-menu-toggle {

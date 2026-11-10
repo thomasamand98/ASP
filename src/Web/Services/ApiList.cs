@@ -3,20 +3,10 @@ using Horizon.Shared;
 
 namespace Horizon.Web.Services;
 
-// Liste chargée depuis l'API (équivalent de useApiList). `endpoint` est à la
-// fois le chemin HTTP (ex. "societes" → GET /societes) et la clé sous
-// laquelle l'API renvoie le tableau (ex. { societes: [...], total }).
-//
-// Non paginée : toute la liste en un appel, Total = nombre d'éléments reçus.
-// Paginée (Paginated = true) : Page, PageSize, Search (?search=, appliqué
-// côté serveur sur toutes les colonnes texte) et Filters (paramètres
-// supplémentaires, ex. { societeId }) sont envoyés en query string, et la
-// liste est rechargée à chaque changement.
+// endpoint = chemin du GET et clé du tableau dans la réponse, sauf si key est fourni
 public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = null)
 {
-    // Numéro de la dernière requête lancée : une réponse plus ancienne (ex.
-    // recherche « dup » arrivée après « dupont ») est ignorée au lieu
-    // d'écraser la plus récente.
+    // pour ignorer les réponses arrivées dans le désordre
     private int _lastRequest;
 
     public List<T> Data { get; set; } = [];
@@ -30,7 +20,6 @@ public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = nul
     public string Search { get; private set; } = "";
     public IReadOnlyDictionary<string, string> Filters { get; private set; } = new Dictionary<string, string>();
 
-    // Données modifiées (chargement terminé, ligne ajoutée...) : à rafraîchir.
     public event Action? Changed;
 
     public void NotifyChanged() => Changed?.Invoke();
@@ -41,7 +30,6 @@ public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = nul
         return RefetchAsync();
     }
 
-    // Nouvelle taille de page ou nouvelle recherche : retour à la page 1.
     public Task SetPageSizeAsync(int pageSize)
     {
         PageSize = pageSize;
@@ -56,8 +44,7 @@ public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = nul
         return RefetchAsync();
     }
 
-    // Comme les dépendances de useApiList : un filtre identique ne relance rien.
-    // resetPage : retour à la page 1 (nouveau filtre choisi par l'utilisateur).
+    // filtre identique : pas de rechargement
     public Task SetFiltersAsync(IReadOnlyDictionary<string, string> filters, bool resetPage = false)
     {
         var pageChanged = resetPage && Page != 1;
@@ -67,7 +54,7 @@ public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = nul
         return RefetchAsync();
     }
 
-    // Réglages initiaux (avant le premier chargement), sans requête.
+    // avant le premier chargement, sans requête
     public void Configure(int page, int pageSize, string search, IReadOnlyDictionary<string, string> filters)
     {
         Page = page;
@@ -116,10 +103,7 @@ public sealed class ApiList<T>(ApiClient api, string endpoint, string? key = nul
     }
 }
 
-// Création / modification / suppression pour un endpoint (équivalent de
-// useApiMutation). Create/Update renvoient l'enregistrement à jour tel que la
-// liste l'attend (T) ; Get renvoie la fiche détaillée (TDetail), pour les
-// écrans dont la fiche contient plus de champs que la liste.
+// T = ligne de liste, TDetail = fiche complète
 public sealed class CrudApi<TDto, T, TDetail>(ApiClient api, string endpoint)
 {
     public async Task<TDetail> GetAsync(string id) => (await api.SendJsonAsync<TDetail>(HttpMethod.Get, $"{endpoint}/{id}"))!;

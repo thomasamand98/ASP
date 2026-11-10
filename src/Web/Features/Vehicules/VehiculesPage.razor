@@ -1,8 +1,6 @@
 @inject ApiClient Api
 @inject EnumerationLabels Enumerations
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
 <CrudPage T="Vehicule" TDto="CreateVehiculeDto" TDetail="VehiculeDetail"
           Title="Véhicules" LoadingLabel="Chargement des véhicules..."
           Source="_list" Columns="_columns" GetRowId="v => v.IDVEHICULES"
@@ -18,8 +16,7 @@
 @code {
     private ApiList<Vehicule> _list = default!;
     private CrudApi<CreateVehiculeDto, Vehicule, VehiculeDetail> _api = default!;
-    // Liste du sélecteur Société, chargée une fois tant que l'onglet reste
-    // ouvert (pas à chaque ouverture de fiche).
+    // une fois tant que l'onglet reste ouvert
     private ApiList<Societe> _societes = default!;
     private IReadOnlyList<Column<Vehicule>> _columns = [];
 
@@ -36,8 +33,7 @@
         _societes.Changed += StateHasChanged;
         _columns = MakeColumns(new Dictionary<string, string>());
         var loading = Task.WhenAll(_list.RefetchAsync(), _societes.RefetchAsync());
-        // Libellés de l'énumération « type_vehicule » indexés par code — le
-        // code brut s'affiche tant qu'ils ne sont pas chargés.
+        // code brut tant que les libellés ne sont pas chargés
         _columns = MakeColumns(await Enumerations.LoadAsync("type_vehicule"));
         await loading;
     }

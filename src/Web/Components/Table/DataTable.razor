@@ -1,11 +1,7 @@
 @typeparam T
 @inject Browser Browser
 
-@* Tableau générique : tri au clic sur le libellé, filtre par colonne via
-   l'icône entonnoir, multisélection, export Excel. Reprend exactement les
-   règles de TanStack Table utilisées par le front d'origine (voir
-   TableModel.cs). Sous 768px (voir DataTable.razor.css, aligné sur le seuil
-   du menu burger), chaque ligne bascule en carte empilée label/valeur. *@
+@* en cartes sous 768px, même seuil que le menu burger *@
 <div class="data-table">
     <div class="data-table-toolbar">
         @ToolbarStart
@@ -95,7 +91,7 @@
     private List<string> _visibleIds = [];
     private string? _openFilterId;
     private bool _focusFilter;
-    // Dernière ligne cliquée sans Maj — point de départ du Maj+clic.
+    // point de départ du Maj+clic
     private string? _anchorId;
     private ElementReference _selectAll;
     private ElementReference _filterInput;
@@ -103,28 +99,20 @@
     [Parameter, EditorRequired] public IReadOnlyList<T> Data { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<Column<T>> Columns { get; set; } = [];
 
-    // Identifiant unique de chaque ligne — requis pour la sélection.
     [Parameter] public Func<T, string>? GetRowId { get; set; }
 
-    // Multisélection — fournir les deux active la colonne de cases à cocher.
-    // Simple clic : sélectionne uniquement cette ligne, sans rien ouvrir.
-    // Ctrl/Cmd+clic ou case à cocher : ajoute/retire la ligne. Maj+clic :
-    // sélectionne la plage depuis la dernière ligne cliquée, dans l'ordre
-    // affiché (donc après tri et filtres).
+    // fournir les deux active les cases à cocher ; Maj+clic suit l'ordre affiché
     [Parameter] public IReadOnlySet<string>? SelectedRowIds { get; set; }
     [Parameter] public EventCallback<HashSet<string>> OnSelectionChange { get; set; }
 
-    // Double clic : ouvre la fiche (voir CrudPage).
     [Parameter] public EventCallback<T> OnRowDoubleClick { get; set; }
 
-    // Nom du fichier généré par le bouton Exporter (sans l'extension .xlsx).
+    // sans .xlsx
     [Parameter] public string? ExportFileName { get; set; }
 
-    // Contenu placé à gauche du bouton Exporter (ex. le champ Rechercher).
     [Parameter] public RenderFragment? ToolbarStart { get; set; }
 
-    // Ligne « dépliée » : une ligne supplémentaire s'insère juste en dessous
-    // avec RenderExpandedRow (voir le mode de vue « Ligne + bloc »).
+    // mode Ligne + bloc
     [Parameter] public string? ExpandedRowId { get; set; }
     [Parameter] public RenderFragment? RenderExpandedRow { get; set; }
 
@@ -193,7 +181,7 @@
         {
             var bounds = new[] { _visibleIds.IndexOf(_anchorId), _visibleIds.IndexOf(id) }.Order().ToArray();
             var range = _visibleIds.GetRange(bounds[0], bounds[1] - bounds[0] + 1);
-            // Maj+Ctrl ajoute la plage à la sélection existante, Maj seul la remplace.
+            // Maj+Ctrl ajoute la plage, Maj seul remplace
             return OnSelectionChange.InvokeAsync(e.CtrlKey || e.MetaKey ? [.. Selection, .. range] : [.. range]);
         }
         if (e.CtrlKey || e.MetaKey) return ToggleRow(id);
@@ -201,8 +189,7 @@
         return OnSelectionChange.InvokeAsync([id]);
     }
 
-    // Case d'en-tête : coche/décoche toutes les lignes affichées (après
-    // filtres), sans toucher aux lignes sélectionnées masquées par un filtre.
+    // lignes affichées seulement, la sélection masquée par un filtre reste
     private Task ToggleAllVisible()
     {
         var next = new HashSet<string>(Selection);
@@ -215,10 +202,7 @@
         return OnSelectionChange.InvokeAsync(next);
     }
 
-    // Exporte les lignes telles qu'affichées (triées/filtrées) plutôt que les
-    // données brutes, avec les libellés de colonne de l'affichage. Deux
-    // colonnes de même libellé n'en font qu'une (la dernière l'emporte),
-    // comme les clés d'un objet JavaScript.
+    // lignes telles qu'affichées ; libellés en double : la dernière colonne gagne
     private async Task ExportAsync()
     {
         var headers = new List<string>();
@@ -228,7 +212,7 @@
             if (indexByHeader.TryAdd(column.Header, headers.Count)) headers.Add(column.Header);
         }
         var displayed = _model.Rows();
-        // Aucune ligne : feuille vide, sans en-tête (comme json_to_sheet).
+        // feuille vide, sans en-tête
         if (displayed.Count == 0) headers.Clear();
         var rows = displayed.Select(row =>
         {

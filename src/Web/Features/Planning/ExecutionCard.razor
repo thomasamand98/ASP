@@ -1,10 +1,6 @@
 @inject Browser Browser
 
-@* Carte d'une exécution sur la grille. Sa couleur est celle de la
-   marchandise (Marchandise.CouleurPlanning) ; le contenu se réduit selon la
-   place disponible (voir les @container de PlanningPage.razor.css). La
-   poignée de fin (bord bas en mode colonne, bord droit en mode ligne) change
-   la fin de l'exécution. *@
+@* couleur = celle de la marchandise, contenu réduit via les @container *@
 <div @ref="_element" role="button" tabindex="0" draggable="@(_resizeOrigin is null ? "true" : "false")"
      data-drag-effect="move" data-drag-id="@Execution.Id" data-activate-keys
      class="@CardClass" style="@CardStyle" title="@Title" aria-pressed="@(Selected ? "true" : "false")"
@@ -56,21 +52,18 @@
 </div>
 
 @code {
-    // Redimensionnement par la poignée de fin de carte : axe « y » en mode
-    // colonne, « x » en mode ligne.
+    // "y" en mode colonne, "x" en mode ligne
     public sealed record ResizeConfig(string Axis, double PxPerMinute, Func<PlanningExecution, double, Task> OnResizeEnd);
 
     private ElementReference _element;
     private ElementReference _handle;
-    // Écart de durée (minutes) pendant un redimensionnement en cours.
+    // écart en minutes pendant le redimensionnement
     private double _deltaMinutes;
     private double? _resizeOrigin;
 
     [Parameter, EditorRequired] public PlanningExecution Execution { get; set; } = default!;
 
-    // Position et taille de la carte, en pixels (top / height en mode
-    // colonne, left / width en mode ligne) ; Left / Width peuvent être des
-    // expressions CSS.
+    // Left / Width peuvent être des expressions CSS
     [Parameter] public double Top { get; set; }
     [Parameter] public double Height { get; set; }
     [Parameter] public string? Left { get; set; }
@@ -80,18 +73,16 @@
 
     [Parameter] public bool Selected { get; set; }
 
-    // La carte est coupée par le bord de la journée (mode colonne) ou de la
-    // période (mode ligne) : on l'indique pour ne pas laisser croire qu'elle
-    // s'arrête là.
+    // carte coupée par le bord du jour ou de la période, pour ne pas croire qu'elle s'arrête là
     [Parameter] public bool ContinuesBefore { get; set; }
     [Parameter] public bool ContinuesAfter { get; set; }
 
-    // Absent quand la fin de l'exécution n'est pas visible sur ce segment.
+    // absent si la fin n'est pas sur ce segment
     [Parameter] public ResizeConfig? Resize { get; set; }
 
     [Parameter] public EventCallback<string> OnSelect { get; set; }
 
-    // Rectangle de la carte et position du pointeur au départ du glisser.
+    // au départ du glisser
     [Parameter] public Func<PlanningExecution, ElementRect, DragEventArgs, Task>? OnDragStart { get; set; }
     [Parameter] public EventCallback OnDragEnd { get; set; }
 
@@ -115,7 +106,7 @@
             var parts = new List<string>();
             if (LeftPx is not null)
             {
-                // Mode ligne : left, width, top, height en pixels.
+                // mode ligne : tout en px
                 var width = (WidthPx ?? 0) + (Resize?.Axis == "x" ? extra : 0);
                 parts.Add($"left: {PlanningBoard.Px(LeftPx.Value)}");
                 parts.Add($"width: {PlanningBoard.Px(width)}");
@@ -155,7 +146,7 @@
     {
         if (_resizeOrigin is not { } origin || Resize is null) return;
         var minutes = DateUtils.Snap((Position(e) - origin) / Resize.PxPerMinute);
-        // Durée minimale : un pas de la grille.
+        // minimum un pas de grille
         var minDelta = DateUtils.SnapMinutes - (Execution.End - Execution.Start) / DateUtils.MinuteMs;
         _deltaMinutes = Math.Max(minutes, minDelta);
     }

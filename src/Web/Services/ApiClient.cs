@@ -5,18 +5,10 @@ using Horizon.Shared;
 
 namespace Horizon.Web.Services;
 
-// Point d'appel unique vers l'API : préfixe l'URL de base, joint le jeton
-// d'accès et lit les messages d'erreur du serveur. `path` est relatif à
-// l'API, sans « / » initial (ex. "societes?page=1"). Tous les écrans passent
-// par ici — aucun HttpClient utilisé directement.
-//
-// Sur un 401 (jeton d'accès expiré), la session est renouvelée une fois puis
-// la requête rejouée ; si le renouvellement échoue, l'utilisateur est
-// renvoyé à l'écran de connexion. Toute réponse non réussie lève une
-// ApiException dont le message est celui du serveur.
+// sur 401 : un renouvellement de session puis on rejoue la requête
 public sealed class ApiClient(HttpClient http, AuthSession session)
 {
-    // `build` crée la requête (rappelé pour la rejouer après renouvellement).
+    // build rappelé pour rejouer la requête
     public async Task<HttpResponseMessage> SendAsync(Func<HttpRequestMessage> build)
     {
         async Task<HttpResponseMessage> Send()
@@ -29,7 +21,7 @@ public sealed class ApiClient(HttpClient http, AuthSession session)
             }
             catch (HttpRequestException)
             {
-                // Même message que fetch() dans le navigateur.
+                // même message que fetch()
                 throw new ApiException("Failed to fetch", 0);
             }
         }
@@ -56,8 +48,7 @@ public sealed class ApiClient(HttpClient http, AuthSession session)
         return (await response.Content.ReadFromJsonAsync<T>(JsonConfig.Options))!;
     }
 
-    // Écriture (POST/PATCH/DELETE) : la réponse JSON est lue si elle en
-    // contient une (DELETE renvoie un corps vide).
+    // corps vide possible (DELETE)
     public async Task<T?> SendJsonAsync<T>(HttpMethod method, string path, object? body = null)
     {
         var response = await SendAsync(method, path, body);

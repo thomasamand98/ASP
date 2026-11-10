@@ -3,9 +3,7 @@ using Horizon.Shared.Models;
 
 namespace Horizon.Web.Features.Planning;
 
-// Formes manipulées par l'écran Planning, construites depuis GET /planning :
-// les dates ISO de l'API sont converties en millisecondes (heure locale)
-// pour simplifier les calculs de position sur la grille.
+// dates de l'API converties en ms (heure locale) pour les calculs de position
 public sealed record PlanningExecution(string Id, string? CommandeId, string? ChauffeurId, string? RemorqueId, string? Tracteur, string? RemorqueImmat,
     double Start, double End, string Client, PlanningMarchandise Marchandise, string? Reference, string Depart, string Arrivee, string Statut,
     string Nature, double Montant, string RefPlanning, string? Instruction)
@@ -36,19 +34,14 @@ public sealed record PlanningData(List<PlanningChauffeur> Chauffeurs, List<Plann
     private static double? Optional(string? iso) => string.IsNullOrEmpty(iso) ? null : Clock.Parse(iso);
 }
 
-// Ligne (mode ligne) ou colonne (mode colonne) du planning.
 public sealed record PlanningResource(string Id, string Label, string? Sublabel);
 
-// Élément en cours de glisser-déposer (« commande », « dechargement » ou
-// « execution »). GrabOffsetMinutes : décalage entre le début de la carte et
-// l'endroit où elle a été saisie, pour qu'une carte déplacée ne « saute » pas
-// sous le curseur.
+// GrabOffsetMinutes : pour que la carte ne saute pas sous le curseur
 public sealed record DragItem(string Kind, string Id, double DurationMinutes, double GrabOffsetMinutes);
 
 public sealed record DropPreview(string ResourceId, double Start, double End);
 
-// Portion d'une exécution visible dans un intervalle (une journée en mode
-// colonne, la période en mode ligne).
+// jour en mode colonne, période en mode ligne
 public sealed record Segment(string Id, PlanningExecution Execution, double Start, double End, bool ContinuesBefore, bool ContinuesAfter);
 
 public static class PlanningBoard
@@ -60,8 +53,7 @@ public static class PlanningBoard
         ["termine"] = "Terminée",
     };
 
-    // Ligne/colonne regroupant les exécutions sans chauffeur (ou sans
-    // remorque en mode « Remorque ») — affichée seulement s'il y en a.
+    // sans chauffeur (ou sans remorque en mode Remorque), seulement s'il y en a
     public const string UnassignedId = "__non_affecte__";
 
     public static string ResourceIdOf(PlanningExecution execution, string groupBy) =>
@@ -77,7 +69,6 @@ public static class PlanningBoard
     public static Dictionary<string, (int Lane, int Lanes)> Lanes(IEnumerable<Segment> segments) =>
         DateUtils.LayoutLanes(segments.Select(s => (s.Id, s.Start, s.End)));
 
-    // Valeur CSS numérique (style React : nombre → px), écrite comme en JavaScript.
     public static string Px(double value) => $"{Horizon.Shared.JsNumber.ToString(value)}px";
 
     public static string Num(double value) => Horizon.Shared.JsNumber.ToString(value);

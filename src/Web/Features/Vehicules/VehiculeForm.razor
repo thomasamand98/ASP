@@ -3,11 +3,7 @@
 @inject Browser Browser
 @inject EnumerationLabels Enumerations
 
-@* Fiche d'un véhicule, en création (Initial null) ou en modification (fiche
-   complète chargée par CrudPage). Mise en page reprise de l'écran WinDev :
-   Entreprise, puis cartes Identification et Documents.
-   Date_validite_assurance n'est pas affichée (absente de l'écran WinDev,
-   vide en base) mais reste conservée telle quelle. *@
+@* Date_validite_assurance pas affichée (absente de WinDev) mais conservée *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -22,7 +18,7 @@
                 <FicheField Label="Entreprise">
                     <select class="veh-societe" value="@_form.IDSOCIETES" @onchange="e => _form.IDSOCIETES = (string)e.Value!">
                         <option value=""></option>
-                        @* Société liée pas encore dans la liste chargée. *@
+                        @* société liée pas encore dans la liste *@
                         @if (_form.IDSOCIETES.Length > 0 && !SortedSocietes.Any(s => s.IDSOCIETES == _form.IDSOCIETES))
                         {
                             <option value="@_form.IDSOCIETES">@(Initial?.Societe?.Nom_societe ?? _form.IDSOCIETES)</option>
@@ -91,10 +87,7 @@
 @code {
     private static readonly IReadOnlyList<FicheTab> Tabs = [new("general", "Général"), new("documents", "Documents")];
 
-    // Champs envoyés à l'API (CreateVehiculeDto) : IDSOCIETES en texte ("" =
-    // aucune société), dates « AAAA-MM-JJ ». Type est un code de
-    // l'énumération « type_vehicule » (1 Tracteur, 2 Remorque...) ;
-    // Avec_compresseur un code 0/1.
+    // Type = code type_vehicule (1 Tracteur, 2 Remorque...)
     private sealed class Model
     {
         public double Type { get; set; }
@@ -126,10 +119,9 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public VehiculeDetail? Initial { get; set; }
 
-    // Valeurs préremplies en création (projection depuis une seule ligne).
+    // projection depuis une seule ligne
     [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
 
-    // Liste du sélecteur Société, chargée par VehiculesPage.
     [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
     [Parameter] public Func<CreateVehiculeDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
@@ -159,8 +151,6 @@
             Avec_compresseur = Initial?.Avec_compresseur ?? 0,
         };
         if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
         _types = await Enumerations.LoadAsync("type_vehicule");

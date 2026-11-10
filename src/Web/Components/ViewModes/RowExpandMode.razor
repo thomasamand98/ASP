@@ -1,6 +1,4 @@
-@* Ligne + bloc : la création reprend le bloc rétractable en haut de page
-   (comme InlinePanelMode), mais la modification déplie directement la ligne
-   concernée dans le tableau (câblage dans CrudPage, via RowFicheContent). *@
+@* l'édition dans la ligne est câblée dans CrudPage *@
 <div class="vm-rowexpand">
     <div class="vm-rowexpand-panel@(Open && State == "create" ? " open" : string.Empty)">
         @if (State == "create")

@@ -1,15 +1,12 @@
 @implements IAsyncDisposable
 @inject Browser Browser
 
-@* Graphique à barres du chiffre d'affaires, dessiné en SVG : une barre par
-   série et par mois (ou jour), grille et axes, infobulle qui suit le survol.
-   Largeur = celle du conteneur (suivie par un observateur de taille). *@
+@* largeur suivie par un ResizeObserver *@
 <div @ref="_container" style="width: 100%; height: @(Height)px">
     @if (_width > 0)
     {
         <div class="chart-wrapper" @ref="_wrapper" style="position: relative; cursor: default; width: @(Px(_width)); height: @(Px(Height))">
             <svg role="application" class="chart-surface" width="@Px(_width)" height="@Height" viewBox="0 0 @Px(_width) @Height" style="width: 100%; height: 100%; display: block">
-                @* Grille horizontale. *@
                 <g>
                     @foreach (var tick in _yTicks)
                     {
@@ -17,7 +14,7 @@
                     }
                 </g>
 
-                @* Catégorie survolée (derrière les barres). *@
+                @* catégorie survolée, derrière les barres *@
                 @if (_active is { } active)
                 {
                     <rect x="@Px(PlotLeft + active * _band)" y="@Px(PlotTop + 0.5)" width="@Px(_band)" height="@Px(PlotHeight - 1)" fill="var(--surface)" pointer-events="none"></rect>
@@ -47,7 +44,6 @@
                     }
                 </g>
 
-                @* Zone sensible à la souris. *@
                 <rect x="@Px(PlotLeft)" y="@Px(PlotTop)" width="@Px(PlotWidth)" height="@Px(PlotHeight)" fill="transparent"
                       @onmousemove="OnMouseMove" @onmouseleave="OnMouseLeave"></rect>
             </svg>
@@ -113,8 +109,7 @@
 
     private static string Px(double value) => ChartMath.Svg(value);
 
-    // Étiquette d'axe : <text> est un élément réservé de Razor, d'où le balisage
-    // construit à la main.
+    // <text> est réservé par Razor, balisage fait à la main
     private static MarkupString Label(double x, double y, string anchor, string dy, string text) =>
         new($"<text x=\"{Px(x)}\" y=\"{Px(y)}\" text-anchor=\"{anchor}\" font-size=\"{FontSize}\" fill=\"var(--text)\"><tspan x=\"{Px(x)}\" dy=\"{dy}\">{System.Net.WebUtility.HtmlEncode(text)}</tspan></text>");
 
@@ -151,15 +146,13 @@
     [JSInvokable]
     public void OnWidth(double width)
     {
-        // Largeur entière, comme le conteneur du graphique d'origine.
         width = Math.Floor(width + 0.5);
         if (width == _width) return;
         _width = width;
         StateHasChanged();
     }
 
-    // Calcule graduations, barres et étiquettes à la taille courante : les
-    // tailles de texte viennent du navigateur, d'où l'appel asynchrone.
+    // async : tailles de texte mesurées par le navigateur
     private async Task LayoutAsync()
     {
         var points = Points;
@@ -182,8 +175,7 @@
         var plotWidth = width - MarginRight - PlotLeft;
         _band = points.Count > 0 ? plotWidth / points.Count : 0;
 
-        // Graduations : celle du haut est descendue pour que son texte ne
-        // déborde pas du haut du graphique.
+        // graduation du haut descendue pour que le texte ne déborde pas
         _yTicks = [.. tickValues.Select((v, i) =>
         {
             var y = Scale((double)v);
@@ -193,9 +185,7 @@
 
         var centers = Enumerable.Range(0, points.Count).Select(i => PlotLeft + (i + 0.5) * _band).ToList();
         var widths = Enumerable.Range(0, points.Count).Select(i => sizes[(yTexts.Count + i) * 2]).ToList();
-        // Les limites de collision sont celles du graphique entier (0 à sa
-        // largeur), pas de la seule zone de tracé : une étiquette peut
-        // légèrement déborder dans la marge sans être écartée pour autant.
+        // collisions sur toute la largeur, une étiquette peut déborder un peu dans la marge
         _xLabels = [.. ChartMath.VisibleXTicks(centers, widths, 0, _width, MinTickGap).Select(i => new XLabel(centers[i], xTexts[i]))];
 
         var bars = new List<Bar>();
@@ -218,7 +208,7 @@
         StateHasChanged();
     }
 
-    // Rectangle aux coins arrondis (rayon 4) du côté opposé à l'axe.
+    // coins arrondis côté opposé à l'axe
     private static string BarPath(double x, double y, double w, double h, bool positive)
     {
         var r = Math.Min(4, Math.Min(w / 2, h / 2));
@@ -238,8 +228,7 @@
 
     private void OnMouseLeave() => _active = null;
 
-    // L'infobulle se place à droite et sous le curseur (au centre de la
-    // catégorie en horizontal), et passe de l'autre côté si elle déborde.
+    // à droite et sous le curseur, de l'autre côté si ça déborde
     private (double X, double Y) TooltipPosition()
     {
         if (_active is not { } index) return (0, 0);

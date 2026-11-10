@@ -3,17 +3,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Page « Modèles de documents » (groupe Gestion documentaire) : liste de
-   tous les modèles créés (tous types confondus), et éditeur
-   (DocumentTemplateEditor) pour glisser-déposer les champs de fusion
-   dedans, en-tête/contenu/pied de page. La fiche contrat, elle, ne charge
-   que les modèles de type « CONTRAT » pour son bouton « Voir le PDF » —
-   d'où le filtre par type choisi ici à la création, pas à l'affichage de
-   cette liste. *@
-@* `dtp-page` : seul point commun entre les trois états (liste / éditeur /
-   chargement) rendus par ce composant, pour que le CSS isolé (préfixé
-   `dtp-page ::deep`, voir DocumentTemplatesPage.razor.css) s'applique quel
-   que soit l'état affiché. *@
+@* dtp-page autour des trois états pour le CSS isolé *@
 <div class="dtp-page">
 @if (_opening)
 {
@@ -106,8 +96,7 @@ else
     private bool _loading = true;
     private string? _error;
     private bool _creating;
-    // Fiche complète (avec le HTML des trois zones, absent de la liste) du
-    // modèle ouvert dans l'éditeur — chargée à la demande (voir OpenAsync).
+    // la liste n'a pas le HTML des zones
     private DocumentTemplateDetail? _open;
     private bool _opening;
     private string _nameDraft = "";
@@ -154,8 +143,7 @@ else
         _templates = [.. _templates, ToSummary(created)];
         _creating = false;
         OpenEditor(created);
-        // Appelée depuis le formulaire de la modale (composant enfant) : son
-        // propre @onsubmit ne redessine que lui-même, pas cette page.
+        // appelé depuis la modale, redessiner la page
         StateHasChanged();
     }
 
@@ -191,8 +179,7 @@ else
         if (_open?.IDDOCUMENT_TEMPLATES == id) _open = null;
     }
 
-    // Pas d'endpoint dédié : charge la fiche complète et recrée un modèle à
-    // partir de son contenu (les trois zones, même type).
+    // pas d'endpoint de duplication
     private async Task DuplicateAsync(string id)
     {
         var detail = await Api.GetAsync<DocumentTemplateDetail>($"document-templates/{id}");
@@ -231,9 +218,7 @@ else
         var updated = await Api.SendJsonAsync<DocumentTemplateDetail>(HttpMethod.Patch, $"document-templates/{open.IDDOCUMENT_TEMPLATES}", dto) ?? throw new InvalidOperationException();
         _templates = [.. _templates.Select(t => t.IDDOCUMENT_TEMPLATES == updated.IDDOCUMENT_TEMPLATES ? ToSummary(updated) : t)];
         _open = updated;
-        // Appelée depuis l'éditeur (composant enfant) : son propre bouton
-        // Enregistrer ne redessine que lui-même, pas cette page (le nom/badge
-        // de l'en-tête doivent pourtant refléter la réponse du serveur).
+        // idem depuis l'éditeur, pour le nom dans l'en-tête
         StateHasChanged();
     }
 
@@ -253,9 +238,7 @@ else
         {
             _editorScope.Detach();
             _open = null;
-            // Appelée aussi comme OnCancel de l'éditeur (composant enfant) :
-            // son propre bouton Fermer ne redessine que lui-même, pas cette
-            // page, qui doit pourtant revenir à la liste.
+            // aussi appelé par Fermer dans l'éditeur
             StateHasChanged();
         }
     }

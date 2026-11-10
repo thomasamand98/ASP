@@ -1,11 +1,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Onglet « Documents » d'une fiche (Société, Personnel, Véhicule) : les
-   documents liés à l'enregistrement par la table lien_documents. Ajout d'un
-   ou plusieurs fichiers, ouverture (double clic ou bouton) et suppression
-   des lignes sélectionnées. Tout est enregistré immédiatement, hors du
-   formulaire de la fiche. *@
+@* tout est enregistré tout de suite, hors du formulaire de la fiche *@
 @if (_documents is null)
 {
     if (_error is not null)
@@ -42,13 +38,10 @@ else
 }
 
 @code {
-    // Même limite que Uploads.MaxFileSize côté API : vérifiée ici aussi pour
-    // éviter d'envoyer le fichier pour rien avant d'obtenir un 413.
+    // même limite que Uploads.MaxFileSize, évite d'envoyer pour rien avant un 413
     private const long MaxDocumentFileSize = 50 * 1024 * 1024;
 
-    // Formats affichés dans un nouvel onglet ; les autres sont téléchargés.
-    // Liste fermée : un fichier déposé en HTML ou SVG, ouvert depuis un blob,
-    // exécuterait ses scripts avec les droits de l'application.
+    // liste fermée : un HTML ou SVG ouvert depuis un blob exécuterait ses scripts
     private static readonly Dictionary<string, string> Affichables = new()
     {
         ["pdf"] = "application/pdf",
@@ -73,12 +66,11 @@ else
     private bool _busy;
     private InputFile? _fileInput;
 
-    // Catégorie des liens affichés (DocumentCategorie) et identifiant de
-    // l'enregistrement auquel ils se rapportent (ex. Societe + IDSOCIETES).
+    // ex. Societe + IDSOCIETES
     [Parameter, EditorRequired] public int Type { get; set; }
     [Parameter, EditorRequired] public string ReferentId { get; set; } = "";
 
-    // Date locale « AAAA-MM-JJ HH:MM » : triable telle quelle comme du texte.
+    // AAAA-MM-JJ HH:MM, triable comme du texte
     private static string FormatDateHeure(DocumentRow row) =>
         Format.ParseLocal(row.Date_heure_creation) is { } d ? d.ToString("yyyy'-'MM'-'dd HH':'mm", CultureInfo.InvariantCulture) : "";
 
@@ -108,7 +100,7 @@ else
     private async Task AddFilesAsync(InputFileChangeEventArgs e)
     {
         var files = e.GetMultipleFiles(int.MaxValue);
-        // Permet de re-sélectionner le même fichier après une erreur.
+        // pour pouvoir re-sélectionner le même fichier après une erreur
         await Browser.ClearValueAsync(_fileInput!.Element!.Value);
         if (files.Count == 0) return;
         _busy = true;
@@ -151,9 +143,7 @@ else
         if (echecs.Count > 0) await Browser.AlertAsync($"Échec de l'ajout :\n{string.Join('\n', echecs)}");
     }
 
-    // Le fichier est récupéré par l'API authentifiée puis affiché ou
-    // téléchargé depuis un blob. L'onglet est ouvert avant l'attente réseau,
-    // sinon le navigateur bloquerait le popup.
+    // onglet ouvert avant l'appel réseau, sinon popup bloqué
     private async Task OpenAsync(DocumentRow row)
     {
         var mime = Affichables.GetValueOrDefault(row.Extension?.ToLowerInvariant() ?? "");

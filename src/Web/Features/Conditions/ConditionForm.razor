@@ -3,10 +3,7 @@
 @inject Browser Browser
 @inject EnumerationLabels Enumerations
 
-@* Fiche d'une condition d'exécution, en création (Initial null) ou en
-   modification (pré-remplie avec la ligne du tableau). Type_Prestation est
-   un code de l'énumération « type_prestation » (1 Routier, 2 Manutention,
-   3 Valorisation) ; CMR_or_FDR un code 0/1. *@
+@* Type_Prestation : 1 Routier, 2 Manutention, 3 Valorisation *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -20,8 +17,7 @@
             </label>
             <FicheField Label="Type de prestation">
                 <select value="@JsNumber.ToString(_form.Type_Prestation)" @onchange="e => _form.Type_Prestation = JsNumber.Parse(e.Value as string)">
-                    @* Le code courant reste sélectionnable même s'il n'est pas (encore)
-                       dans l'énumération — chargement en cours, ou 0 hérité de la base. *@
+                    @* code courant gardé même hors énumération (ex. 0 hérité de la base) *@
                     @if (!_types.ContainsKey(JsNumber.ToString(_form.Type_Prestation)))
                     {
                         <option value="@JsNumber.ToString(_form.Type_Prestation)">@(_form.Type_Prestation != 0 ? JsNumber.ToString(_form.Type_Prestation) : "")</option>
@@ -40,7 +36,7 @@
 </form>
 
 @code {
-    // Type proposé à la création : Routier.
+    // Routier par défaut
     private const double DefaultTypePrestation = 1;
 
     private sealed class Model
@@ -69,8 +65,6 @@
             CMR_or_FDR = Initial?.CMR_or_FDR ?? 0,
             Libelle = Initial?.Libelle ?? "",
         };
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
         _types = await Enumerations.LoadAsync("type_prestation");

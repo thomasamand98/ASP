@@ -3,8 +3,7 @@ using Horizon.Web.Common;
 
 namespace Horizon.Web.Features.Dashboard;
 
-// Séries du chiffre d'affaires. Ordre fixe = ordre des couleurs --series-N
-// (validé daltonisme, voir tokens.css) : ne pas réordonner.
+// ordre = ordre des couleurs --series-N (validé daltonisme), ne pas réordonner
 public sealed record CaSeries(string Key, string Label, string Color, Func<ChiffreAffairesPoint, double> Value)
 {
     public static readonly IReadOnlyList<CaSeries> All =
@@ -19,14 +18,14 @@ public sealed record CaSeries(string Key, string Label, string Color, Func<Chiff
 
     public static readonly string[] MonthsLong = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 
-    // Étiquette d'axe : « 05/03 » (jour) ou « Mars » (mois).
+    // "05/03" ou "Mars"
     public static string LabelShort(string cle, string granularite)
     {
         if (granularite == "jour") return $"{cle[8..10]}/{cle[5..7]}";
         return Format.Capitalize(MonthsShort[int.Parse(cle[5..7]) - 1]);
     }
 
-    // Titre d'infobulle et de ligne de tableau : « 05/03/2026 » ou « Mars 2026 ».
+    // "05/03/2026" ou "Mars 2026"
     public static string LabelLong(string cle, string granularite)
     {
         if (granularite == "jour") return $"{cle[8..10]}/{cle[5..7]}/{cle[0..4]}";

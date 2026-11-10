@@ -3,10 +3,7 @@ using Microsoft.JSInterop;
 
 namespace Horizon.Web.Features.Documents;
 
-// Enveloppe des fonctions `horizon.docEditor` (voir wwwroot/js/interop.js) :
-// manipulation du DOM des zones contentEditable de l'éditeur de modèles de
-// document, qui doit rester en JavaScript (Range/Selection, glisser-déposer
-// HTML5) — voir DocumentTemplateEditor.razor.
+// Range/Selection et drag & drop HTML5 : forcément en JS
 public sealed class DocEditorJs(IJSRuntime js)
 {
     public ValueTask RegisterZoneAsync<T>(ElementReference el, string key, DotNetObjectReference<T> target) where T : class =>
@@ -49,7 +46,5 @@ public sealed class DocEditorJs(IJSRuntime js)
     public ValueTask FocusAndSelectAsync(ElementReference el, int start, int end) => js.InvokeVoidAsync("horizon.docEditor.focusAndSelect", el, start, end);
 }
 
-// Groupe de type liste sérialisé pour JS : colonnes déjà résolues côté C#
-// (voir MergeFieldGroup.Columns), pour que interop.js n'ait pas à reproduire
-// la logique de secours (colonnes par défaut, 4 premiers champs...).
+// colonnes déjà résolues ici, pas de logique de repli côté JS
 public sealed record RepeatGroupPayload(string Label, string ListPath, IReadOnlyList<MergeField> Columns);

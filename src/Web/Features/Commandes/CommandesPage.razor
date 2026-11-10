@@ -1,8 +1,7 @@
 @inject ApiClient Api
 @inject EnumerationLabels Enumerations
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 <CrudPage T="Commande" TDto="CreateCommandeDto" TDetail="Commande"
           Title="Commandes" LoadingLabel="Chargement des commandes..."
           Source="_list" Columns="_columns" GetRowId="c => c.IDCOMMANDES"
@@ -20,12 +19,10 @@
 @code {
     private ApiList<Commande> _list = default!;
     private CrudApi<CreateCommandeDto, Commande, Commande> _api = default!;
-    // Liste du sélecteur Contrat, chargée une fois tant que l'onglet reste
-    // ouvert (pas à chaque ouverture de fiche).
+    // une fois tant que l'onglet reste ouvert, pas à chaque fiche
     private ApiList<Contrat> _contrats = default!;
     private IReadOnlyList<Column<Commande>> _columns = [];
-    // Commandes du jour par défaut ; toutes en projection, pour ne masquer
-    // aucune ligne liée.
+    // du jour par défaut, toutes en projection pour ne masquer aucune ligne liée
     private Period? _period;
 
     [Parameter] public ProjectionView? Projection { get; set; }
@@ -45,8 +42,7 @@
         _contrats.Changed += StateHasChanged;
         _columns = MakeColumns(new Dictionary<string, string>());
         var loading = Task.WhenAll(_list.RefetchAsync(), _contrats.RefetchAsync());
-        // Libellés de l'énumération « unite_prestation » indexés par code — le
-        // code brut s'affiche tant qu'ils ne sont pas chargés.
+        // code brut affiché tant que les libellés ne sont pas chargés
         _columns = MakeColumns(await Enumerations.LoadAsync("unite_prestation"));
         await loading;
     }

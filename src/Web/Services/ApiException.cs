@@ -2,14 +2,12 @@ using System.Text.Json;
 
 namespace Horizon.Web.Services;
 
-// Erreur renvoyée par l'API : `Message` est celui du serveur (déjà en
-// français, ex. « Vous devez renseigner le nom »), affichable tel quel.
+// message du serveur, déjà en français, affichable tel quel
 public sealed class ApiException(string message, int status) : Exception(message)
 {
     public int Status { get; } = status;
 
-    // L'API répond toujours { statusCode, message } en cas d'erreur (voir
-    // Api/Common/ExceptionMiddleware.cs).
+    // erreurs de l'API toujours au format { statusCode, message }
     public static async Task<string> ReadMessageAsync(HttpResponseMessage response)
     {
         try
@@ -25,7 +23,7 @@ public sealed class ApiException(string message, int status) : Exception(message
         }
         catch (JsonException)
         {
-            // Corps absent ou non JSON (ex. réponse d'un proxy) : message générique.
+            // pas du JSON (proxy...), message générique
         }
         return $"Erreur {(int)response.StatusCode}";
     }

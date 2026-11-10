@@ -1,6 +1,4 @@
-/* Bloc de création en haut de page — identique dans l'esprit à
-   InlinePanelMode.css (grid-template-rows 0fr/1fr pour une animation de
-   hauteur fluide sans hauteur fixe à calculer). */
+/* grid-template-rows 0fr/1fr : anime la hauteur sans la connaître */
 .vm-rowexpand-panel {
   display: grid;
   grid-template-rows: 0fr;

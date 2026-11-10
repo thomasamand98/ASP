@@ -129,12 +129,10 @@
   margin-top: auto;
 }
 
-/* Les boutons icônes se calent à droite du bouton texte. */
+/* icônes calées à droite du bouton texte */
 .dtp-page ::deep .dtp-card-actions .btn + .icon-btn {
   margin-left: auto;
 }
-
-/* ---------- Modale de création ---------- */
 
 .dtp-page ::deep .dtp-create-form {
   display: flex;

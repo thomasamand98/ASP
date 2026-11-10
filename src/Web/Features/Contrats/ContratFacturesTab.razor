@@ -1,9 +1,6 @@
 @inject EnumerationLabels Enumerations
 
-@* Onglet « Factures » de la fiche contrat — lecture seule, les factures
-   viennent avec la fiche. L'état est un code de l'énumération
-   « etat_facture » : son libellé, ou le code brut tant que les libellés ne
-   sont pas chargés. *@
+@* lecture seule *@
 @if (Factures.Count == 0)
 {
     <p class="muted">Aucune facture sur ce contrat.</p>

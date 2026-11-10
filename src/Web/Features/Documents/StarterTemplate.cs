@@ -1,27 +1,13 @@
 namespace Horizon.Web.Features.Documents;
 
-// Contenu de départ proposé à la création d'un nouveau modèle : reprend la
-// mise en page de l'état de contrat HT&T fourni en référence, répartie sur
-// les trois zones de l'éditeur (en-tête, répété sur chaque page ; contenu ;
-// pied de page, répété sur chaque page) — en s'appuyant uniquement sur les
-// champs de fusion réels (voir MergeFields). Non figé : l'utilisateur peut
-// tout modifier, déplacer ou supprimer une fois dans l'éditeur.
-//
-// Le HTML généré ici doit rester strictement dans le même format que celui
-// que produit interop.js (docEditor.createChipElement/createRepeatBlockElement)
-// au moment du dépose (mêmes classes/attributs data-merge-field,
-// data-repeat-list, data-chip-remove...), sans quoi les jetons déposés ici
-// ne seraient pas reconnus par l'éditeur (suppression, mise en forme) ni,
-// plus tard, par le moteur de fusion.
+// HTML identique à celui de docEditor (interop.js), sinon jetons non reconnus
 public static class StarterTemplate
 {
     private static string Chip(string path, string label, string kind = "text") => TemplateChipHtml.Chip(new MergeField(path, label, kind));
 
     private static string RepeatTag(string label) => TemplateChipHtml.RepeatTag(label);
 
-    // En-tête : le logo en haut à gauche — la raison sociale à côté sert de
-    // repère tant qu'aucun logo n'est importé, le champ image est simplement
-    // retiré à la fusion si aucun logo n'est défini.
+    // champ image retiré à la fusion si pas de logo
     public static readonly string Header = $"""
         <div class="dte-header-row">
           {Chip("Entite.Logo", "Logo", "image")}
@@ -105,9 +91,7 @@ public static class StarterTemplate
         </div>
         """;
 
-    // Pied de page : répété sur chaque page à l'impression — le numéro de
-    // page est un texte littéral rempli par Chromium (classes spéciales,
-    // voir interop.js docEditor.insertPageNumber), pas un champ de fusion.
+    // pageNumber / totalPages remplis par Chromium
     public static readonly string Footer = $"""
         <div class="dte-header-row">
           <p>Nos conditions générales de vente sont consultables : ICI &nbsp;—&nbsp; {Chip("Entite.Email_contact", "E-mail")}</p>

@@ -1,5 +1,4 @@
-/* Champ « Rechercher » des tableaux — voir TableSearch.razor. Même hauteur
-   et même arrondi que le bouton Exporter posé à côté (DataTable.css). */
+/* même hauteur que le bouton Exporter */
 .table-search {
   display: inline-flex;
   align-items: center;
@@ -35,7 +34,7 @@
   padding: 0.4rem 0;
 }
 
-/* La croix native des input[type=search] ferait doublon avec la nôtre. */
+/* croix native en doublon avec la nôtre */
 .table-search input::-webkit-search-cancel-button {
   appearance: none;
 }

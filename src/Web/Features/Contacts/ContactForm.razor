@@ -3,9 +3,7 @@
 @inject Browser Browser
 @inject ApiClient Api
 
-@* Fiche contact, en création (Initial null) ou en modification (fiche
-   complète chargée par CrudPage). Utilisée aussi par les onglets Contacts des
-   fiches Société et Point. *@
+@* aussi utilisée par les onglets Contacts des fiches Société et Point *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -164,14 +162,11 @@
 @code {
     private static readonly string[] CivilitesConnues = ["Monsieur", "Madame", "Mademoiselle"];
 
-    // Suggestions seulement : la fonction reste en texte libre.
+    // suggestions seulement, texte libre
     private static readonly string[] Fonctions =
         ["Directeur Général", "Gérant", "Directeur", "Responsable logistique", "Responsable exploitation", "Comptable", "Commercial", "Assistant(e)", "Secrétaire"];
 
-    // Champs envoyés à l'API (CreateContactDto). Personne_physique /
-    // Adresse_entreprise sont des codes 0/1. IDSOCIETES : société principale
-    // (lien SocieteContacts géré par l'API), "" = aucune. L'adresse propre du
-    // contact est aplatie, enregistrée à part par l'API.
+    // IDSOCIETES = société principale, "" = aucune
     public sealed class Model
     {
         public string Civilite { get; set; } = "";
@@ -201,27 +196,23 @@
     private bool _submitting;
     private ElementReference _formRef;
     private UnsavedForm _guard = default!;
-    // Adresse chargée, avec l'id de sa société : une adresse d'une autre
-    // société que celle choisie compte comme « en cours de chargement ».
+    // adresse d'une autre société = encore en chargement
     private (string Id, SocieteAdresseLignes? Adresse)? _loadedAdresse;
     private string? _adresseRequestedFor;
 
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public ContactDetail? Initial { get; set; }
 
-    // Sociétés pour la liste « Société », chargées par la page.
     [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
 
-    // Société présélectionnée en création (onglet Contacts de la fiche
-    // Société, projection) — ignorée en modification.
+    // ignorée en modification
     [Parameter] public string? DefaultSocieteId { get; set; }
     [Parameter] public Func<CreateContactDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
 
     private List<ContactDetailSociete> AutresSocietes => Initial?.SocieteContacts.Skip(1).ToList() ?? [];
 
-    // Une civilité enregistrée mais absente de la liste reste proposée, pour
-    // ne pas être perdue à l'enregistrement.
+    // sinon perdue à l'enregistrement
     private IEnumerable<string> Civilites =>
         _form.Civilite.Length > 0 && !CivilitesConnues.Contains(_form.Civilite) ? [_form.Civilite, .. CivilitesConnues] : CivilitesConnues;
 
@@ -249,8 +240,7 @@
             (a.Adresse1, a.Adresse2, a.Adresse3, a.CP, a.Localite, a.Pays, a.Pays_full_name);
     }
 
-    // (chargée, adresse) : non chargée pendant le chargement ; adresse null
-    // si la société n'en a pas.
+    // adresse null si la société n'en a pas
     private (bool Loaded, SocieteAdresseLignes? Adresse) SocieteAdresse =>
         _loadedAdresse is { } loaded && loaded.Id == _form.IDSOCIETES ? (true, loaded.Adresse) : (false, null);
 
@@ -305,8 +295,6 @@
             Service_bureau = principal?.Service_bureau ?? "",
         };
         SetAdresse(AdresseValues.From(Initial?.Adresse));
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
     }
@@ -319,13 +307,12 @@
         await LoadCompanyAddressAsync();
     }
 
-    // Adresse de la société principale, affichée à la place de l'adresse du
-    // contact quand « Adresse de l'entreprise » est activé.
+    // remplace l'adresse du contact si "Adresse de l'entreprise" est coché
     private async Task LoadCompanyAddressAsync()
     {
         if (_form.Adresse_entreprise != 1 || _form.IDSOCIETES.Length == 0)
         {
-            // Rechargée si on réactive l'option (comme l'effet d'origine).
+            // rechargée si on réactive l'option
             _adresseRequestedFor = null;
             return;
         }

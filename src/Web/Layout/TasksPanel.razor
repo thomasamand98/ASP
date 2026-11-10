@@ -2,11 +2,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Bandeau latéral droit, présent sur tous les écrans : replié en une fine
-   barre avec le nombre de tâches échues (non traitées, date d'alerte
-   atteinte), il se déplie par-dessus le contenu pour les lister. Chaque
-   tâche peut être marquée comme traitée ou reprogrammée à une autre date
-   (elle disparaît alors jusqu'à cette date). *@
+@* tâches échues (date d'alerte atteinte), traitées ou reprogrammées *@
 <div class="tasks-backdrop@(_open ? " open" : "")" @onclick="() => _open = false"></div>
 <aside class="tasks-panel@(_open ? " open" : "")" aria-label="Tâches à faire" inert="@(!_open)">
     <header class="tasks-panel-header">
@@ -117,7 +113,7 @@
         }
         catch (OperationCanceledException)
         {
-            // Panneau retiré (déconnexion).
+            // panneau retiré à la déconnexion
         }
     }
 
@@ -135,8 +131,7 @@
         }
     }
 
-    // Date DATE renvoyée en minuit UTC : on garde le jour tel quel, sans
-    // conversion de fuseau (qui décalerait d'un jour à l'ouest de Greenwich).
+    // minuit UTC, pas de conversion sinon on recule d'un jour à l'ouest de Greenwich
     private static string FormatDay(string? iso)
     {
         if (string.IsNullOrEmpty(iso)) return "";

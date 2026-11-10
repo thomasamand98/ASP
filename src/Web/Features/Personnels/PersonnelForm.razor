@@ -3,13 +3,10 @@
 @inject Browser Browser
 @inject ApiClient Api
 
-@* Fiche personnel, en création (Initial null) ou en modification (fiche
-   complète, adresse comprise). Les onglets Contrat / Contact / Documents ne
-   concernent qu'un personnel existant — désactivés en création. *@
 <div class="pf">
     <FicheTabs AriaLabel="Sections de la fiche personnel" Value="@_tab" ValueChanged="SetTab" Tabs="Tabs" />
 
-    @* Gardé monté : un contrat en cours de saisie survit au changement d'onglet. *@
+    @* gardé monté pour ne pas perdre un contrat en cours de saisie *@
     @if (Initial is not null)
     {
         <FichePanel Active="@(_tab == "contrat")">
@@ -190,11 +187,9 @@
 @code {
     private static readonly string[] CivilitesConnues = ["Monsieur", "Madame", "Mademoiselle"];
 
-    // Suggestions seulement : la colonne est en texte libre et contient déjà
-    // d'autres graphies (MARIE, CELIB...), conservées telles quelles.
+    // suggestions seulement, la colonne contient d'autres graphies (MARIE, CELIB...)
     private static readonly string[] EtatsCivils = ["Célibataire", "Marié(e)", "Cohabitant(e)", "Divorcé(e)", "Séparé(e)", "Veuf / Veuve", "Isolé(e)"];
 
-    // Validités (documents du chauffeur), affichées avec leur état d'expiration.
     private static readonly (string Field, string Label)[] Validites =
     [
         ("Date_validite_CAP", "C.A.P."),
@@ -205,12 +200,9 @@
         ("Date_validite_SIPSI", "SIPSI"),
     ];
 
-    // En deçà, la validité est signalée comme « bientôt expirée ».
+    // seuil "bientôt expirée"
     private const int ExpiryWarningDays = 60;
 
-    // Champs envoyés à l'API (CreatePersonnelDto) : dates « AAAA-MM-JJ »,
-    // adresse aplatie (enregistrée à part par l'API), codes 0/1 pour
-    // Routier / Manutention / Atelier.
     private sealed class Model
     {
         public string Civilite_Personnel { get; set; } = "";
@@ -278,7 +270,7 @@
         }
     }
 
-    // Une civilité enregistrée mais absente de la liste reste proposée.
+    // civilité absente de la liste quand même proposée
     private IEnumerable<string> Civilites =>
         _form.Civilite_Personnel.Length > 0 && !CivilitesConnues.Contains(_form.Civilite_Personnel)
             ? [_form.Civilite_Personnel, .. CivilitesConnues]
@@ -298,8 +290,7 @@
 
     private void SetValidity(string field, string value) => typeof(Model).GetProperty(field)!.SetValue(_form, value);
 
-    // État d'une date de validité « AAAA-MM-JJ » par rapport à aujourd'hui.
-    // Les dates en 2099 ou après sont une convention WinDev pour « sans limite ».
+    // 2099 et plus = sans limite (convention WinDev)
     private static (string Tone, string Label) ValidityOf(string day)
     {
         if (day.Length == 0) return ("none", "Non renseignée");
@@ -323,8 +314,7 @@
                    class="@cssClass" @oninput="e => set((string)e.Value!)" />
         </label>;
 
-    // Un pays enregistré mais absent de la liste reste proposé, pour ne pas
-    // être perdu à l'enregistrement.
+    // sinon perdu à l'enregistrement
     private RenderFragment PaysSelect(string current, Action<string> set)
     {
         var choices = current.Length > 0 && !_pays.Any(p => p.ISO == current) ? [new PaysOption("current", current, current), .. _pays] : _pays;
@@ -337,8 +327,7 @@
         </select>;
     }
 
-    // Villes du code postal saisi, avec un léger anti-rebond — la table en
-    // compte ~39 000, impossible à charger en une fois.
+    // ~39 000 villes, impossible de tout charger
     private async Task SetCp(string cp)
     {
         _form.CP = cp;
@@ -353,7 +342,7 @@
         }
         catch (Exception)
         {
-            // Recherche remplacée par une plus récente, ou serveur injoignable.
+            // recherche remplacée ou serveur injoignable
         }
     }
 
@@ -401,26 +390,22 @@
             Pays = a?.Pays ?? "",
             Pays_full_name = a?.Pays_full_name ?? "",
         };
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
-        // Liste des pays : ~240 lignes, chargée une seule fois.
+        // ~240 pays, chargés une fois
         try
         {
             _pays = (await Api.GetAsync<PaysResponse>("pays")).pays;
         }
         catch (Exception)
         {
-            // Pays enregistrés toujours proposés.
         }
         if (_form.CP.Trim().Length > 0) await SetCp(_form.CP);
     }
 
     protected override void OnParametersSet() => _guard?.Register(Scope);
 
-    // Le formulaire est recréé à chaque retour sur l'onglet Principal : il
-    // faut alors le suivre à nouveau.
+    // formulaire recréé à chaque retour sur l'onglet Principal
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!_track || _tab != "principal") return;

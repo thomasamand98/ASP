@@ -1,7 +1,5 @@
 @inject Browser Browser
 
-@* Case d'une ressource pour une journée (mode « Colonne ») : ses cartes, et
-   la zone de dépôt d'un glisser (horaire arrondi au quart d'heure). *@
 <div @ref="_cell" class="pl-col-cell@(Weekend ? " is-weekend" : string.Empty)"
      style="height: @PlanningBoard.Px(24 * ColumnView.HourPx); --hour: @PlanningBoard.Px(ColumnView.HourPx)"
      data-drop-effect="@Board.DropEffect"
@@ -51,7 +49,7 @@
 
     private double ToPx(double t) => (t - DayStart) / DateUtils.MinuteMs / 60 * ColumnView.HourPx;
 
-    // Horaire correspondant à la position du curseur, arrondi au quart d'heure.
+    // arrondi au quart d'heure
     private double? StartAt(DragEventArgs e)
     {
         if (Board.DragItem is not { } item) return null;

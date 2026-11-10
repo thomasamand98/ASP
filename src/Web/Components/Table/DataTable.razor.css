@@ -1,10 +1,4 @@
-/* DataTable responsive : aligné sur le même seuil que le menu burger
-   (voir Sidebar.css / AppLayout.css, 768px) pour ne jamais laisser le
-   tableau dans un entre-deux illisible (ni carte, ni table confortable).
-   Au-dessus de 768px, les colonnes se répartissent sur 100% de la largeur
-   disponible (table-layout: fixed) et le texte retourne à la ligne —
-   pas de scroll horizontal, tout reste visible ; en dessous, chaque
-   ligne devient une carte empilée label/valeur. */
+/* 768px comme le menu burger : table fixe au-dessus, cartes en dessous */
 .data-table {
   overflow-x: auto;
   font-size: 0.85rem;
@@ -16,10 +10,7 @@
   table-layout: fixed;
 }
 
-/* Colonne "Description" (Contrats) : en table-layout: fixed, la largeur
-   des colonnes est calculée à partir de celle des cellules d'en-tête
-   (min-width y est ignoré, il faut width) — ciblée via data-label (posé
-   sur th et td). */
+/* table-layout fixed : width obligatoire sur le th, min-width ignoré */
 .data-table th[data-label="Description"] {
   width: 300px;
 }
@@ -71,9 +62,7 @@
   background: var(--accent-bg);
 }
 
-/* Colonne des cases à cocher (multisélection, voir DataTable.razor) —
-   largeur fixe, sinon table-layout: fixed lui donnerait une part égale
-   aux autres colonnes. */
+/* largeur fixe, sinon fixed lui donne une part égale */
 .data-table .data-table-select-cell {
   width: 36px;
   text-align: center;
@@ -85,8 +74,7 @@
   accent-color: var(--accent);
 }
 
-/* Ligne "dépliée" insérée sous la ligne concernée — voir RowExpandMode.razor
-   (mode "Ligne + bloc"), sous components/view-modes/. */
+/* mode Ligne + bloc */
 .data-table-expanded-row td {
   padding: 0;
   border-bottom: 2px solid var(--accent-border);
@@ -105,8 +93,6 @@
   }
 }
 
-/* Passe à la ligne quand les filtres (période, archivage...) ne tiennent
-   plus à côté de la recherche. */
 .data-table-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -115,11 +101,9 @@
   margin-bottom: 0.5rem;
 }
 
-/* Exporter reste calé à droite, qu'il y ait ou non un contenu à gauche
-   (voir toolbarStart dans DataTable.razor). */
 .data-table-export-button {
   margin-left: auto;
-  /* Vert Excel, lisible dans les deux thèmes. */
+  /* vert Excel, ok dans les deux thèmes */
   color: var(--success);
 }
 
@@ -168,7 +152,6 @@
     font-weight: 700;
   }
 
-  /* En carte : la case à cocher se place en haut à droite, sans libellé. */
   .data-table tbody tr {
     position: relative;
   }

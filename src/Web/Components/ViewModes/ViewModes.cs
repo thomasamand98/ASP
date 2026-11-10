@@ -1,11 +1,6 @@
 namespace Horizon.Web.Components.ViewModes;
 
-// Modes de saisie/affichage d'une fiche dans une page tableau (CrudPage).
-// Chacun reçoit le tableau déjà construit (Table) et le formulaire déjà rendu
-// (Form), et décide seul comment les agencer. Le choix par l'utilisateur est
-// désactivé (SelectionEnabled) : toutes les pages utilisent le mode
-// « Onglet » ; les autres restent disponibles — repasser SelectionEnabled à
-// true pour réafficher le sélecteur et relire le choix enregistré.
+// sélecteur désactivé, tout le monde en mode Onglet pour l'instant
 public sealed record ViewModeDefinition(string Id, string Label, string Description, string Icon);
 
 public static class ViewModeRegistry

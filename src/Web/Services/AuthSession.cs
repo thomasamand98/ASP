@@ -4,16 +4,10 @@ using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 namespace Horizon.Web.Services;
 
-// Session de l'utilisateur. Le jeton d'accès (court, 15 min) n'est gardé
-// qu'en mémoire — jamais dans localStorage, lisible par un script injecté.
-// Recharger la page le fait disparaître : il est alors redemandé à l'API
-// grâce au cookie de renouvellement httpOnly (voir RefreshAsync).
+// jeton d'accès en mémoire seulement, pas dans localStorage (XSS)
 public sealed class AuthSession(HttpClient http, AppConfig config)
 {
-    // Session automatique, utilisée tant que l'écran de connexion est
-    // désactivé (voir AppConfig.LoginScreen). L'API accepte pour l'instant
-    // n'importe quel identifiant : ces valeurs sont un simple espace réservé,
-    // et non de vrais identifiants. À supprimer avec la vraie authentification.
+    // TODO à virer avec la vraie auth, l'API accepte n'importe quel login pour l'instant
     private const string AutoLogin = "utilisateur";
     private const string AutoPassword = "session-automatique";
 
@@ -24,8 +18,7 @@ public sealed class AuthSession(HttpClient http, AppConfig config)
 
     public bool LoginScreenEnabled => config.LoginScreen;
 
-    // Session perdue en cours d'utilisation (renouvellement refusé, voir
-    // ApiClient) : AuthGate y branche le retour à l'écran de connexion.
+    // renouvellement refusé en cours de route
     public event Action? SessionLost;
 
     public void NotifySessionLost()
@@ -36,9 +29,7 @@ public sealed class AuthSession(HttpClient http, AppConfig config)
 
     private sealed record SessionResponse(string accessToken, string login);
 
-    // Les requêtes /auth incluent les cookies (`credentials: 'include'`) :
-    // nécessaire pour que le navigateur envoie et enregistre le cookie de
-    // renouvellement, l'API étant sur une autre origine.
+    // cookies inclus pour le refresh, API sur une autre origine
     private Task<HttpResponseMessage> AuthRequestAsync(string path, object? body = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"auth/{path}");
@@ -47,7 +38,6 @@ public sealed class AuthSession(HttpClient http, AppConfig config)
         return http.SendAsync(request);
     }
 
-    // Renvoie l'identifiant de l'utilisateur connecté.
     public async Task<string> LoginAsync(string login, string password)
     {
         HttpResponseMessage response;
@@ -65,8 +55,7 @@ public sealed class AuthSession(HttpClient http, AppConfig config)
         return session.login;
     }
 
-    // Plusieurs appels simultanés partagent une seule connexion, pour ne pas
-    // consommer inutilement la limite de tentatives.
+    // appels simultanés mutualisés, pour ménager la limite de tentatives
     public Task<string> LoginAutomaticallyAsync()
     {
         return _autoLoginInFlight ??= Run();
@@ -84,10 +73,7 @@ public sealed class AuthSession(HttpClient http, AppConfig config)
         }
     }
 
-    // Échange le cookie de renouvellement contre un nouveau jeton d'accès ;
-    // renvoie l'identifiant, ou null sans session valide. Plusieurs appels
-    // simultanés (chargement de page, plusieurs requêtes en 401 en même
-    // temps) partagent une seule requête.
+    // null sans session valide, une seule requête pour plusieurs 401 simultanés
     public Task<string?> RefreshAsync()
     {
         return _refreshInFlight ??= Run();
@@ -127,7 +113,7 @@ public sealed class AuthSession(HttpClient http, AppConfig config)
         }
         catch (HttpRequestException)
         {
-            // Serveur injoignable : la session locale est de toute façon terminée.
+            // serveur injoignable, tant pis
         }
     }
 }

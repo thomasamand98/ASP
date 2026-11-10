@@ -1,7 +1,4 @@
-/* Reste visible en haut du contenu au scroll (même logique que .page-header
-   dans index.css, qui est décalé de la hauteur de cette barre — voir son
-   `top`). Sous 768px, décalée sous le bouton burger fixe (voir
-   AppLayout.css / Sidebar.css, même valeur 3.25rem). */
+/* sticky, .page-header est décalé de sa hauteur ; sous le burger en mobile */
 .tab-bar {
   position: sticky;
   top: 0;
@@ -41,8 +38,6 @@
   border-color: var(--accent-border);
 }
 
-/* Glisser-déposer pour réordonner (voir TabBar.razor) : l'onglet en cours de
-   déplacement s'estompe, celui survolé indique où il atterrira. */
 .tab-bar-tab.dragging {
   opacity: 0.4;
 }

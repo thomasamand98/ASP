@@ -3,11 +3,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Page « Société » du groupe Configuration : contrairement aux autres pages,
-   pas de CrudPage/DataTable/Modal — une seule fiche existe (ressource
-   singleton GET/PATCH /entite), affichée directement comme un formulaire de
-   page. Le bouton Enregistrer vit dans l'en-tête (attribut `form`, voir
-   FormId) pour rester visible en haut. *@
+@* une seule fiche (singleton GET/PATCH /entite), pas de CrudPage *@
 @if (_loading)
 {
     <p>Chargement des coordonnées de l'entreprise...</p>
@@ -18,8 +14,6 @@ else if (_error is not null)
 }
 else if (_form is not null)
 {
-    @* Fermer l'onglet avec des modifications demande « Enregistrer / Annuler
-       les modifications » (voir UnsavedChanges). *@
     <div @ref="_root">
         <div class="page-header">
             <h2>Coordonnée entreprise</h2>
@@ -79,8 +73,7 @@ else if (_form is not null)
         try
         {
             _data = await Api.SendJsonAsync<EntiteDetail>(HttpMethod.Patch, "entite", FormModel.ToDto<UpdateEntiteDto>(_form));
-            // La fiche reste affichée : ce qui vient d'être enregistré (et la
-            // version renvoyée par le serveur) devient la référence.
+            // ce qui vient d'être enregistré devient la référence
             await _guard.MarkCleanAsync();
         }
         catch (Exception e)

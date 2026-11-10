@@ -2,10 +2,6 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Fiche d'une marchandise, en création (Initial null) ou en modification
-   (fiche complète chargée par CrudPage) : cartes « Marchandise » (nom +
-   couleur planning) et « Déchets » (déchet lié, en lecture seule, choisi via
-   la recherche). *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -60,9 +56,7 @@
 </form>
 
 @code {
-    // Champs envoyés à l'API (CreateMarchandiseDto) : CouleurPlanning est une
-    // couleur WinDev en texte ("0" = aucune) ; IDDECHETS "" = aucun déchet ;
-    // Is_dechet/Archive sont des codes 0/1.
+    // CouleurPlanning : couleur WinDev en texte, "0" = aucune
     private sealed class Model
     {
         public string Nom_marchandise { get; set; } = "";
@@ -73,7 +67,7 @@
     }
 
     private Model _form = new();
-    // Code/description du déchet lié, pour l'affichage seulement.
+    // affichage seulement
     private Dechet? _dechet;
     private bool _picking;
     private bool _submitting;
@@ -85,7 +79,6 @@
     [Parameter] public Func<CreateMarchandiseDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
 
-    // Number(CouleurPlanning) || 0.
     private long ColorValue
     {
         get
@@ -106,8 +99,6 @@
             Archive = Initial?.Archive ?? 0,
         };
         _dechet = Initial?.Dechet is { } d && _form.IDDECHETS.Length > 0 ? new Dechet(_form.IDDECHETS, d.Code, d.Description_dechet) : null;
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
     }

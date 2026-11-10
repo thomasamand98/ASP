@@ -1,5 +1,3 @@
-/* ---------- Logo (glisser-déposer) ---------- */
-
 .entite-form ::deep .entite-logo-drop {
   position: relative;
   display: flex;
@@ -84,7 +82,6 @@
   align-items: start;
 }
 
-/* Champs empilés d'un bloc e-mail (serveur, compta, planning). */
 .entite-form ::deep .entite-email-column {
   display: flex;
   flex-direction: column;
@@ -100,9 +97,7 @@
   }
 }
 
-/* Sélecteur de fichier posé, invisible, sur toute la zone du logo : il reçoit
-   le clic et le dépôt d'un fichier (Blazor n'expose pas le contenu des
-   fichiers déposés autrement). */
+/* Blazor ne donne pas accès aux fichiers déposés autrement */
 .entite-form ::deep .entite-logo-file {
   position: absolute;
   inset: 0;

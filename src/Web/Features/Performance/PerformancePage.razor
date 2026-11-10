@@ -5,12 +5,7 @@
 @using Microsoft.AspNetCore.Components.WebAssembly.Http
 @inject ApiClient Api
 
-@* Page de test (Configuration > Performance) : lance un traitement long côté
-   API — fictif (60 s) ou réel (impression de tous les contrats en PDF,
-   enregistrés sur le serveur) — et vérifie qu'on peut continuer à travailler
-   pendant ce temps. Le chronomètre prouve que le navigateur reste libre,
-   les pings mesurent si le serveur répond encore. La page reste montée
-   quand on change d'onglet : le traitement continue en arrière-plan. *@
+@* page de test : reste montée en changeant d'onglet, le traitement continue *@
 <div class="perf-page">
     <div class="page-header">
         <h2>Performance</h2>
@@ -314,10 +309,10 @@
 </div>
 
 @code {
-    // Réponse de POST /performance/traitement-long.
+    // POST /performance/traitement-long
     private sealed record Resultat(string mode, double dureeDemandeeMs, double dureeReelleMs, string debut, string fin, double? iterations);
 
-    // Réponse de POST /performance/impression-contrats.
+    // POST /performance/impression-contrats
     private sealed record ContratImprime(string id, string? numero, double exemplaires, double dureeMs, double octets);
 
     private sealed record EchecImpression(string id, string? numero, string message);
@@ -326,13 +321,12 @@
         string dossier, double total, double exemplaires, double impressions, double dureeTotaleMs, double? dureeMoyenneMs,
         double? dureeMinMs, double? dureeMaxMs, double octetsTotal, string debut, string fin, List<ContratImprime> contrats, List<EchecImpression> echecs);
 
-    // Réponse de GET /performance/ping.
+    // GET /performance/ping
     private sealed record Avancement(double faits, double total);
 
     private sealed record ReponsePing(string heure, Avancement? impression);
 
-    // Classe (pas record) : chaque ping est identifié par son instance, sa
-    // latence est complétée à la réponse.
+    // classe et pas record : chaque ping identifié par son instance
     private sealed class Ping(DateTime heure)
     {
         public DateTime Heure { get; } = heure;
@@ -341,20 +335,19 @@
 
     private sealed record Tache(string Type, double Debut);
 
-    // Une ligne du tableau des mesures de transfert (GET /performance/transfert,
-    // répété) : durées en ms, médianes des répétitions sauf min/max.
+    // durées en ms, médianes des répétitions sauf min/max
     private sealed record MesureTransfert(double Cle, double TailleKo, bool Compression, double OctetsJson, double OctetsEnvoyes,
         double TotalMs, double MinMs, double MaxMs, double JsonMs, double CompressionMs);
 
     private sealed record Mode(string Id, string Label, string Description);
 
-    // Même plafonds que l'API (PerformanceController).
+    // mêmes plafonds que PerformanceController
     private const int TailleMaxKo = 51_200;
     private const int RepetitionsMax = 50;
     private const int ExemplairesMax = 20;
     private const int DureeS = 60;
     private const int IntervallePingMs = 2000;
-    // Au-delà, le serveur est considéré comme bloqué pour ce ping.
+    // au-delà, serveur considéré bloqué
     private const int LatenceLenteMs = 1000;
 
     private static readonly Mode[] Modes =
@@ -374,11 +367,11 @@
     private string _templateId = "";
     private int _exemplaires = 1;
     private List<Ping> _pings = [];
-    // Sur tout le traitement, pas seulement les derniers pings affichés.
+    // sur tout le traitement, pas que les pings affichés
     private double? _latenceMax;
     private int _tailleKo = 100;
     private int _repetitions = 5;
-    // Mode de la mesure de transfert en cours (true : avec compression).
+    // true = avec compression
     private bool? _transfertEnCours;
     private List<MesureTransfert> _mesures = [];
     private string? _erreurTransfert;
@@ -395,7 +388,6 @@
     private double EcouleMs => _tache is { } tache ? _maintenant - tache.Debut : 0;
     private double EcouleS => TraitementEnCours ? Math.Min(DureeS, EcouleMs / 1000) : 0;
 
-    // toFixed(1) de JavaScript.
     private static string ToFixed1(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 
     private static string Secondes(double ms, int decimales = 1) => $"{Format.Number(ms / 1000, decimales, decimales)} s";
@@ -404,10 +396,8 @@
 
     private static string Ko(double octets) => $"{Format.Number(octets / 1024, 0, 1)} Ko";
 
-    // Heure locale « HH:MM:SS » d'un instant ISO renvoyé par l'API.
     private static string Heure(string iso) => Format.ParseLocal(iso) is { } date ? date.ToString("HH':'mm':'ss", CultureInfo.InvariantCulture) : "";
 
-    // Math.min(max, Math.max(1, Math.trunc(valueAsNumber) || 1)).
     private static int Borne(string? saisie, int max)
     {
         var nombre = Math.Truncate(JsNumber.Parse(saisie ?? ""));
@@ -422,7 +412,7 @@
         return triees.Count % 2 == 1 ? triees[milieu] : (triees[milieu - 1] + triees[milieu]) / 2;
     }
 
-    // Modèles utilisables pour l'impression : ceux de type CONTRAT.
+    // modèles CONTRAT seulement
     protected override async Task OnInitializedAsync()
     {
         try
@@ -456,7 +446,7 @@
         _tache = null;
     }
 
-    // Chronomètre : se met à jour tant que le navigateur n'est pas bloqué.
+    // avance tant que le navigateur n'est pas bloqué
     private async Task ChronometreAsync(CancellationToken ct)
     {
         try
@@ -473,10 +463,7 @@
         }
     }
 
-    // Ping du serveur pendant le traitement, toutes les 2 s. Un seul ping à
-    // la fois : s'ils s'accumulaient sans réponse, ils occuperaient les
-    // quelques connexions que le navigateur ouvre vers le serveur et
-    // bloqueraient le reste de l'application.
+    // un seul ping à la fois, sinon ils saturent les connexions du navigateur
     private async Task PingsAsync(CancellationToken ct)
     {
         var enAttente = false;
@@ -500,7 +487,7 @@
             }
             catch (Exception)
             {
-                // Ping perdu : reste « en attente ».
+                // ping perdu, reste en attente
             }
             finally
             {
@@ -564,8 +551,7 @@
         }
     }
 
-    // Demandes envoyées l'une après l'autre : en parallèle, elles se
-    // partageraient le débit et le serveur.
+    // en séquence, en parallèle elles se partageraient le débit
     private async Task MesurerTransfertAsync(bool compression)
     {
         _transfertEnCours = compression;
@@ -585,8 +571,7 @@
                     request.SetBrowserRequestCache(BrowserRequestCache.NoStore);
                     return request;
                 });
-                // Données « prêtes à l'emploi » : lues et analysées par .NET,
-                // comme le reste de l'application les utiliserait.
+                // vrai parse .NET, comme le reste de l'appli
                 using (JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
                 {
                 }

@@ -1,8 +1,6 @@
 @inject ApiClient Api
 
-@* Onglet Pointage du menu : feuille de pointage d'un salarié (voir
-   PointageSheet). `Projection` : page ouverte en résultat d'une projection —
-   reste la liste filtrée sur les lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 @if (Projection is null)
 {
     <PointageSheet />
@@ -23,13 +21,9 @@ else
 }
 
 @code {
-    // Extrait « HH:MM » d'un horodatage ISO — les champs Heure_* sont des TIME
-    // côté MySQL, renvoyés comme un datetime sur une date arbitraire (souvent
-    // 1970-01-01) : on ignore la partie date pour éviter tout décalage de
-    // fuseau horaire.
+    // TIME MySQL sur une date arbitraire, on ignore la date pour éviter le décalage de fuseau
     private static string Time(string? value) => string.IsNullOrEmpty(value) ? "" : value.Length > 11 ? value[11..Math.Min(16, value.Length)] : "";
 
-    // Convertit un « HH:MM » en heures décimales.
     private static double ParseHours(string hhmm)
     {
         var parts = hhmm.Split(':');
@@ -38,7 +32,6 @@ else
         return (double.IsNaN(h) || h == 0 ? 0 : h) + (double.IsNaN(m) || m == 0 ? 0 : m) / 60;
     }
 
-    // Différence en heures décimales entre deux horodatages ISO.
     private static double? DiffHours(string? start, string? end)
     {
         if (string.IsNullOrEmpty(start) || string.IsNullOrEmpty(end)) return null;
@@ -46,7 +39,6 @@ else
         return ms >= 0 ? ms / 3_600_000 : null;
     }
 
-    // Formate un nombre d'heures décimal en « HhMM ».
     private static string FormatHours(double? hours)
     {
         if (hours is not { } value) return "";
@@ -55,9 +47,7 @@ else
         return $"{JsNumber.ToString(h)}h{JsNumber.ToString(m).PadLeft(2, '0')}";
     }
 
-    // H. total / H. travaillé ne sont pas des champs stockés — calculés ici à
-    // titre d'estimation (total = fin − début ; travaillé = total − coupure,
-    // sans tenir compte des pauses). À ajuster si la vraie règle métier diffère.
+    // estimation : travaillé = total - coupure, sans les pauses
     private static double? Total(Pointage row) => DiffHours(row.Date_heure_debut, row.Date_heure_fin);
 
     private static double? Travaille(Pointage row)
@@ -86,8 +76,7 @@ else
 
     private ApiList<Pointage> _list = default!;
     private CrudApi<CreatePointageDto, Pointage, PointageDetail> _api = default!;
-    // Listes des sélecteurs Personnel et Statut, chargées une fois tant que
-    // l'onglet reste ouvert.
+    // chargées une fois tant que l'onglet reste ouvert
     private ApiList<Personnel> _personnel = default!;
     private List<TypeStatut> _statuts = [];
 
@@ -113,7 +102,7 @@ else
         }
         catch (Exception)
         {
-            // Sélecteur Statut vide.
+            // sélecteur Statut vide
         }
     }
 }

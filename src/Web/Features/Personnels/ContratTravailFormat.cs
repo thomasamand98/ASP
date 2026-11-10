@@ -3,14 +3,12 @@ using Horizon.Web.Common;
 
 namespace Horizon.Web.Features.Personnels;
 
-// Règles d'affichage des contrats de travail (onglet Contrat de la fiche
-// personnel).
 public static class ContratTravailFormat
 {
-    // Tri des dates « AAAA-MM-JJ… » : l'ordre des caractères suffit.
+    // format AAAA-MM-JJ, l'ordre des caractères suffit
     public static readonly StringComparer LocaleComparer = StringComparer.Ordinal;
 
-    // Libellés et unités des taux (écran WinDev : Taux brut, T.H. nuit...).
+    // libellés de l'écran WinDev (Taux brut, T.H. nuit...)
     public sealed record Rate(string Field, string Label, string Unit, Func<TauxHoraire, string?> Get);
 
     public static readonly IReadOnlyList<Rate> Rates =
@@ -35,15 +33,14 @@ public static class ContratTravailFormat
 
     public static readonly string[] TypesContrat = ["CDI", "CDD", "Intérim", "Étudiant", "Flexi-job"];
 
-    // new Date().toISOString().slice(0, 10) : date du jour en UTC.
+    // date du jour en UTC
     public static string Today() => DateTime.UtcNow.ToString("yyyy'-'MM'-'dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private static string Day(string value) => value[..Math.Min(10, value.Length)];
 
-    // Les dates en 2099 ou après sont une convention WinDev pour « sans limite ».
+    // 2099 et plus = sans limite (convention WinDev)
     public static bool IsOpenEnded(string? day) => string.IsNullOrEmpty(day) || Horizon.Shared.JsNumber.Parse(day[..Math.Min(4, day.Length)]) >= 2099;
 
-    // (tonalité, libellé) : « future », « past » ou « current ».
     public static (string Tone, string Label) StatusOf(string? debut, string? fin)
     {
         var now = Today();
@@ -52,18 +49,15 @@ public static class ContratTravailFormat
         return ("current", "En cours");
     }
 
-    // Taux applicable : le plus récent dont la date d'application est passée
-    // à la date de référence (aujourd'hui, ou la fin d'un contrat terminé).
-    // Les taux arrivent triés du plus récent au plus ancien.
+    // le plus récent déjà applicable (taux triés du plus récent au plus ancien)
     public static TauxHoraire? ApplicableRate(ContratTravail c)
     {
         var reference = IsOpenEnded(c.Date_fin) ? Today() : new[] { Today(), Day(c.Date_fin!) }.Order(StringComparer.Ordinal).First();
         return c.TauxHoraireContratTravails.FirstOrDefault(t => string.IsNullOrEmpty(t.Date_application) || string.CompareOrdinal(Day(t.Date_application), reference) <= 0);
     }
 
-    // Les Decimal arrivent en « 13.400000 » : affichés sans zéros superflus.
+    // arrivent en 13.400000, on retire les zéros
     public static string RateInput(string? value) => value is null ? "" : Horizon.Shared.JsNumber.ToString(Horizon.Shared.JsNumber.Parse(value));
 
-    // Mise en forme réutilisée par l'éditeur.
     public static string DateLabel(string? value) => ContratFormat.Date(value);
 }

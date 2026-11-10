@@ -4,11 +4,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Page de test de l'OCR Mistral (Configuration > Test OCR) : on dépose un PDF
-   ou une image, on choisit éventuellement une extraction structurée (prompt +
-   JSON Schema, voir OcrPreset), on lance l'OCR et on compare le fichier
-   d'origine (à gauche) au résultat de POST /mistral/ocr (à droite) : le JSON
-   extrait puis le Markdown brut. *@
+@* page de test OCR Mistral : fichier à gauche, résultat de POST /mistral/ocr à droite *@
 <div class="ocr-page">
     <div class="page-header">
         <h2>Test OCR (Mistral)</h2>
@@ -17,8 +13,7 @@
         </button>
     </div>
 
-    @* Le sélecteur de fichier invisible couvre toute la zone : clic et
-       glisser-déposer natifs. *@
+    @* input file invisible sur toute la zone : clic et drop natifs *@
     <div class="ocr-drop@(_dragOver ? " drag-over" : "")" style="position: relative"
          @ondragenter="() => _dragOver = true" @ondragleave="() => _dragOver = false" @ondrop="() => _dragOver = false">
         @if (_file is { } file)
@@ -104,14 +99,12 @@
 </div>
 
 @code {
-    // Même limite que côté API : vérifiée ici aussi pour éviter d'envoyer
-    // 50 Mo pour rien avant d'obtenir un 413.
+    // même limite que l'API, pour ne pas envoyer 50 Mo pour rien avant un 413
     private const long MaxOcrFileSize = 50 * 1024 * 1024;
 
     private sealed record SelectedFile(string Name, string Type, long Size, byte[] Bytes);
 
-    // Annotation : JSON extrait, déjà mis en forme (indentation de 2), ou
-    // null sans schéma.
+    // JSON indenté, null sans schéma
     private sealed record OcrResult(string Text, string? Annotation, double DurationMs);
 
     private sealed record OcrResponse(string text, JsonElement annotation);
@@ -140,8 +133,7 @@
 
     private static bool IsSupported(string type) => type == "application/pdf" || type.StartsWith("image/", StringComparison.Ordinal);
 
-    // Vérifié ici avant l'envoi pour un message immédiat — l'API refait la
-    // même vérification.
+    // l'API vérifie aussi, ici juste pour un message immédiat
     private static string? SchemaError(string schema)
     {
         if (schema.Trim().Length == 0) return null;
@@ -160,7 +152,7 @@
     {
         _dragOver = false;
         var next = e.File;
-        // Permet de re-sélectionner le même fichier après une erreur.
+        // pour pouvoir re-sélectionner le même fichier après une erreur
         if (_fileInput?.Element is { } input) await Browser.ClearValueAsync(input);
         _result = null;
         _copied = null;
@@ -180,7 +172,7 @@
         {
             await stream.ReadExactlyAsync(bytes);
         }
-        // URL locale pour l'aperçu du fichier, libérée au changement de fichier.
+        // URL de l'aperçu, libérée au changement de fichier
         if (_previewUrl is not null) await Browser.RevokeObjectUrlAsync(_previewUrl);
         _file = new SelectedFile(next.Name, next.ContentType, next.Size, bytes);
         _previewUrl = await Browser.CreateObjectUrlAsync(bytes, next.ContentType);
@@ -215,9 +207,7 @@
         var watch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            // Champs « schema »/« prompt » seulement s'ils sont renseignés,
-            // comme le FormData du front d'origine (l'API lit les champs
-            // quel que soit leur ordre par rapport au fichier).
+            // schema/prompt envoyés seulement s'ils sont remplis
             var fields = new List<(string, string)>();
             if (_schema.Trim().Length > 0)
             {

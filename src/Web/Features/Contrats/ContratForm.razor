@@ -3,12 +3,7 @@
 @inject Browser Browser
 @inject ApiClient Api
 
-@* Fiche complète d'un contrat, sur le modèle de la fiche Société : onglets
-   Détail / Prestations / Factures. Initial vaut null en création, sinon la
-   fiche complète (GET /contrats/:id) chargée par CrudPage. Les onglets
-   Prestations/Factures et les conditions CMR se rattachent à un contrat
-   existant — désactivés tant qu'il n'est pas créé. Le formulaire n'existe
-   que sur l'onglet Détail (retiré, pas masqué, sur les autres onglets). *@
+@* onglets Prestations/Factures et CMR désactivés tant que le contrat n'est pas créé *@
 <div class="contrat-form">
     <FicheTabs AriaLabel="Sections de la fiche contrat" Value="@_tab" ValueChanged="SetTab" Tabs="Tabs" Actions="PdfButton" />
 
@@ -27,8 +22,7 @@
                         <div class="contrat-row">
                             <label class="field">
                                 Numéro
-                                @* Attribué à la création, puis figé (affiché avec sa version) :
-                                   les factures et commandes s'y réfèrent. *@
+                                @* figé après création, factures et commandes s'y réfèrent *@
                                 <input value="@(Initial is not null ? ContratFormat.Numero(Initial.Num_contrat, Initial.Version_contrat) : _form.Num_contrat)"
                                        @oninput="e => _form.Num_contrat = (string)e.Value!" maxlength="50" readonly="@(Initial is not null)" />
                             </label>
@@ -147,11 +141,7 @@
 </div>
 
 @code {
-    // Champs du contrat affichés dans la fiche (CreateContratDto) : dates en
-    // « AAAA-MM-JJ », ids en texte, Taux_tva en texte (Decimal), codes 0/1.
-    // Une valeur vide efface le champ côté serveur. Version_contrat,
-    // Type_contrat, Qt_client_facturation, Suivant et IDMARCHANDISES ne sont
-    // pas dans la fiche : jamais envoyés, donc jamais écrasés.
+    // Version_contrat, Type_contrat, Suivant... jamais envoyés donc jamais écrasés
     private sealed class Model
     {
         public string Num_contrat { get; set; } = "";
@@ -176,8 +166,7 @@
     private List<ConditionCmr> _conditions = [];
     private bool _submitting;
     private bool _track;
-    // Numéro de la dernière requête société lancée : une réponse arrivée en
-    // retard après un nouveau changement de société est ignorée.
+    // pour ignorer une réponse arrivée en retard
     private int _societeRequest;
     private ElementReference _formRef;
     private UnsavedForm _guard = default!;
@@ -185,14 +174,11 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public ContratDetail? Initial { get; set; }
 
-    // Sociétés, types de facture et modèles « CONTRAT » (bouton « Voir le
-    // PDF »), chargés une fois par la page.
     [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
     [Parameter] public IReadOnlyList<TypeFacture> TypesFacture { get; set; } = [];
     [Parameter] public IReadOnlyList<DocumentTemplateSummary> DocumentTemplates { get; set; } = [];
 
-    // Société présélectionnée en création (onglet Contrats de la fiche
-    // Société, projection) — ignorée en modification.
+    // ignorée en modification
     [Parameter] public string? DefaultSocieteId { get; set; }
     [Parameter] public Func<CreateContratDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
@@ -211,7 +197,6 @@
         }
     }
 
-    // Bouton « Voir le PDF », seulement pour un contrat enregistré.
     private RenderFragment? PdfButton => Initial is null ? null : @<ContratPdfButton ContratId="@Initial.IDCONTRATS" Templates="DocumentTemplates" />;
 
     protected override async Task OnInitializedAsync()
@@ -231,25 +216,21 @@
             Taux_tva = Initial?.Taux_tva ?? "",
             Commissionnaire = Initial?.Commissionnaire ?? "",
             Archive = Initial?.Archive ?? 0,
-            // "0" est le défaut de la base pour « pas d'année d'archivage ».
+            // "0" = pas d'année d'archivage en base
             Annee_archivage = Initial?.Annee_archivage is { Length: > 0 } annee && annee != "0" ? annee : "",
         };
         _client = Initial?.Societe?.Client;
         _conditions = Initial?.ConditionCmrs ?? [];
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
         _track = true;
-        // Société présélectionnée en création : charge son numéro client et
-        // son taux de TVA, exactement comme un choix manuel.
+        // même chose qu'un choix manuel : numéro client + TVA
         if (Initial is null && DefaultSocieteId is { Length: > 0 }) await SocieteChangedAsync(DefaultSocieteId);
     }
 
     protected override void OnParametersSet() => _guard?.Register(Scope);
 
-    // Le formulaire est recréé à chaque retour sur l'onglet Détail : il faut
-    // alors le suivre à nouveau.
+    // formulaire recréé à chaque retour sur Détail
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!_track || _tab != "detail") return;
@@ -263,8 +244,7 @@
         _tab = tab;
     }
 
-    // Changer de société met à jour le numéro client affiché et reprend son
-    // taux de TVA par défaut, comme dans l'ancienne fiche WinDev.
+    // reprend le taux de TVA de la société, comme dans WinDev
     private async Task SocieteChangedAsync(string id)
     {
         _form.IDSOCIETES = id;
@@ -290,7 +270,7 @@
     private void ArchiveChanged(bool archived)
     {
         _form.Archive = archived ? 1 : 0;
-        // Année en cours proposée à l'archivage, effacée au désarchivage.
+        // année en cours à l'archivage, vidée au désarchivage
         _form.Annee_archivage = archived
             ? _form.Annee_archivage.Length > 0 ? _form.Annee_archivage : DateTime.Now.Year.ToString(CultureInfo.InvariantCulture)
             : "";

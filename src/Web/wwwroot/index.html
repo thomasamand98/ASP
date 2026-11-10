@@ -7,7 +7,7 @@
     <title>Horizon</title>
     <base href="/" />
     <script>
-      // Thème appliqué avant le premier rendu (voir Services/ThemeService.cs).
+      // avant le premier rendu pour éviter le flash, même clé que ThemeService
       try {
         var t = localStorage.getItem('theme')
         if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -15,15 +15,12 @@
       } catch (e) {}
     </script>
     <link rel="preload" id="webassembly" />
-    <!-- Styles globaux : les jetons d'abord, puis la base, puis les
-         composants partagés ; les styles isolés des composants (Web.styles.css)
-         viennent après et peuvent donc surcharger à spécificité égale. -->
+    <!-- Web.styles.css en dernier pour pouvoir surcharger -->
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/controls.css" />
     <link rel="stylesheet" href="css/utilities.css" />
-    <!-- Fiches en cartes (classes .fiche-*), utilisées directement par les
-         formulaires de tous les écrans : globales, pas isolées. -->
+    <!-- fiche.css global, utilisé par tous les formulaires -->
     <link rel="stylesheet" href="css/fiche.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="Web.styles.css" />

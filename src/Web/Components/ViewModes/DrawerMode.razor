@@ -1,5 +1,3 @@
-@* Panneau latéral (« fiche ») qui glisse depuis la droite sur toute la
-   hauteur, au-dessus du tableau (qui reste visible en arrière-plan assombri). *@
 <div class="vm-drawer-layout">
     @Table
     <div class="vm-drawer-backdrop@(Open ? " open" : string.Empty)" @onclick="OnClose" aria-hidden="true"></div>

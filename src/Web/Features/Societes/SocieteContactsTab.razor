@@ -1,9 +1,6 @@
 @inject ApiClient Api
 
-@* Onglet « Contacts » de la fiche Société : la même table que la page
-   Contacts (recherche, filtres, export, Nouveau/Modifier/Supprimer), limitée
-   aux contacts liés à cette société — « Nouveau » crée le contact déjà lié à
-   la société. *@
+@* Nouveau crée le contact déjà lié à la société *@
 <CrudPage T="Contact" TDto="CreateContactDto" TDetail="ContactDetail"
           Title="Contacts" LoadingLabel="Chargement des contacts..."
           Source="_list" Columns="Columns" GetRowId="c => c.IDCONTACTS"
@@ -16,8 +13,7 @@
 </CrudPage>
 
 @code {
-    // Colonnes de la page Contacts, sans Société : toujours la société de la
-    // fiche ici (Fonction/Service affichent le lien avec cette société).
+    // sans Société, Fonction/Service = lien avec cette société
     private static readonly IReadOnlyList<Column<Contact>> Columns = [.. ContactsPage.Columns.Where(c => c.Id != "societe")];
 
     private ApiList<Contact> _list = default!;

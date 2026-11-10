@@ -11,11 +11,7 @@
   gap: 1rem;
 }
 
-/* auto-fit plutôt qu'une media query sur le viewport : la fiche vit dans
-   des conteneurs de largeurs très différentes selon le mode d'affichage
-   choisi (voir components/view-modes/) — modale, tiroir étroit, colonne de
-   la vue divisée... Les deux colonnes passent seules l'une sous l'autre
-   dès que le conteneur n'a plus la place. */
+/* auto-fit : la fiche peut être en modale, tiroir, vue divisée... */
 .societe-form ::deep .societe-form-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -60,8 +56,6 @@
   gap: 0.65rem;
 }
 
-/* Onglets Contacts/Contrats/Messages : tables standard (CrudPage /
-   DataTable), seul le message de chargement est propre à la fiche. */
 .societe-form ::deep .societe-tab-loading {
   color: var(--text);
   font-size: 0.85rem;

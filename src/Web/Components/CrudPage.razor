@@ -5,10 +5,6 @@
 @inject Browser Browser
 @inject UnsavedChangesService Unsaved
 
-@* Assemble la liste (ApiList), le tableau et la fiche de création /
-   modification / suppression d'un écran — gère les 3 états : chargement,
-   erreur, données prêtes. Chaque écran ne fournit que ses libellés, ses
-   colonnes et son formulaire. *@
 @if (!_hasLoaded)
 {
     if (Source.Error is not null)
@@ -44,21 +40,14 @@ else
 
 @code {
     private HashSet<string> _selectedIds = [];
-    // Ligne ouverte en modification (double clic) — distincte de la
-    // sélection, qui peut contenir plusieurs lignes.
+    // double clic, différent de la sélection
     private string? _editId;
     private string? _modalMode;
     private TDetail? _editRecord;
     private bool _detailLoading;
     private string _viewModeId = ViewModeRegistry.Default;
-    // Passe à true au premier chargement terminé : les rechargements suivants
-    // (page, recherche, après enregistrement) gardent la page affichée —
-    // sinon le champ Rechercher serait recréé à chaque frappe et perdrait le
-    // focus.
+    // sinon le champ Rechercher est recréé à chaque frappe et perd le focus
     private bool _hasLoaded;
-    // Zone de la fiche ouverte (voir Components/UnsavedChanges) : la fermer,
-    // ou en ouvrir une autre à sa place, demande d'abord quoi faire d'une
-    // saisie modifiée.
     private GuardScope _formScope = default!;
 
     [CascadingParameter] public GuardScope? Scope { get; set; }
@@ -74,45 +63,33 @@ else
     [Parameter, EditorRequired] public Func<string, TDto, Task<T>> Update { get; set; } = default!;
     [Parameter, EditorRequired] public Func<string, Task> Remove { get; set; } = default!;
 
-    // Récupère la fiche complète d'un enregistrement avant de l'ouvrir, pour
-    // les écrans dont le formulaire a besoin de plus de champs que la liste.
-    // Absent : la fiche s'ouvre avec la ligne du tableau (TDetail = T).
+    // absent : la fiche s'ouvre avec la ligne du tableau (TDetail = T)
     [Parameter] public Func<string, Task<TDetail>>? GetDetail { get; set; }
 
     [Parameter, EditorRequired] public string DeleteConfirmMessage { get; set; } = "";
     [Parameter, EditorRequired] public string CreateModalTitle { get; set; } = "";
     [Parameter, EditorRequired] public string EditModalTitle { get; set; } = "";
 
-    // Rend le formulaire de saisie, avec les données propres à chaque écran.
     [Parameter, EditorRequired] public RenderFragment<FormContext<TDetail, TDto>> RenderForm { get; set; } = default!;
 
-    // Distingue l'onglet de création quand plusieurs tables de la même
-    // entité coexistent avec des valeurs par défaut différentes (ex. onglet
-    // Contrats de chaque fiche Société) — sinon un seul onglet « Nouveau »
-    // par titre.
+    // ex. onglet Contrats de chaque fiche Société, sinon un seul onglet Nouveau par titre
     [Parameter] public string? NewRecordScope { get; set; }
 
-    // Table affichée (clé de Relations) : active le bouton Projection.
+    // clé de Relations, active le bouton Projection
     [Parameter] public string? Entity { get; set; }
 
-    // En-tête affiché à la place de Title (ex. « Contrats de 3 sociétés »
-    // pour un résultat de projection) — Title reste utilisé pour les
-    // identifiants d'onglet des fiches.
+    // ex. "Contrats de 3 sociétés", Title reste utilisé pour les ids d'onglet
     [Parameter] public string? Heading { get; set; }
 
-    // Filtres affichés à droite du champ Rechercher (ex. ArchiveFilter).
     [Parameter] public RenderFragment? ToolbarExtra { get; set; }
 
-    // Champ Rechercher (recherche serveur sur toutes les colonnes texte).
     [Parameter] public bool Searchable { get; set; }
 
     private bool IsTabMode => _viewModeId == ViewModeRegistry.Tab;
 
     private bool IsRowExpandMode => _viewModeId == ViewModeRegistry.RowExpand;
 
-    // Ne garde que les ids encore présents dans les données — une ligne
-    // sélectionnée peut disparaître (changement de page, rechargement
-    // serveur) sans que la sélection ne soit remise à zéro explicitement.
+    // une ligne sélectionnée peut disparaître après un rechargement
     private HashSet<string> Selection
     {
         get
@@ -134,8 +111,7 @@ else
         _hasLoaded = !Source.Loading;
     }
 
-    // Choix du mode désactivé : on ignore un ancien choix enregistré, sinon
-    // l'utilisateur resterait bloqué sur un mode qu'il ne peut plus changer.
+    // sélecteur masqué : ignorer l'ancien choix, sinon mode bloqué
     private string InitialViewMode()
     {
         if (!ViewModeRegistry.SelectionEnabled) return ViewModeRegistry.Default;
@@ -144,7 +120,7 @@ else
 
     private async Task ChangeViewModeAsync(string id)
     {
-        // Changer de mode remonte la fiche ouverte ailleurs : sa saisie serait perdue.
+        // changer de mode remonte la fiche, saisie perdue
         if (_modalMode is not null && !await Unsaved.ConfirmLeaveAsync(_formScope)) return;
         _modalMode = null;
         _viewModeId = id;
@@ -157,23 +133,19 @@ else
         StateHasChanged();
     }
 
-    // Quitte la fiche ouverte (croix, fond, Annuler...) après confirmation si
-    // elle a été modifiée.
     private async Task RequestCloseFormAsync()
     {
         if (await Unsaved.ConfirmLeaveAsync(_formScope)) _modalMode = null;
     }
 
-    // Mode « Onglet » : un id stable par enregistrement, pour réactiver son
-    // onglet plutôt que d'en rouvrir un second au redouble-clic.
+    // id stable pour réactiver l'onglet au lieu d'en ouvrir un second
     private string RecordTabId(string? recordId)
     {
         if (recordId is not null) return $"record:{Title}:{recordId}";
         return NewRecordScope is not null ? $"record:{Title}:new:{NewRecordScope}" : $"record:{Title}:new";
     }
 
-    // Libellé de l'onglet d'une ligne : valeur de la première colonne si
-    // c'est un champ simple (ex. « Sociétés: YARA TERTRE »), sinon l'id.
+    // première colonne si champ simple, sinon l'id
     private string RowLabel(T row)
     {
         var first = Columns.Count > 0 ? Columns[0] : null;
@@ -200,7 +172,7 @@ else
         {
             var saved = mode == "edit" && recordId is not null ? await Update(recordId, dto) : await Create(dto);
             await ApplySavedAsync(mode == "edit" ? recordId : null, saved);
-            // Juste enregistré : rien à confirmer.
+            // juste enregistré
             await Tabs.CloseTabAsync(tabId, force: true);
         }
         catch (Exception e)
@@ -211,8 +183,6 @@ else
 
     private static string ErrorMessage(Exception e) => e is ApiException ? e.Message : e.Message;
 
-    // Ouvre la fiche de `recordId` (ou une fiche de création si null) dans son
-    // propre onglet de l'application.
     private void OpenRecordTab(string mode, string? recordId, TDetail? initial, string label)
     {
         var tabId = RecordTabId(recordId);
@@ -248,15 +218,14 @@ else
         }
         if (_detailLoading) return;
         var id = GetRowId(row);
-        // Déjà ouverte : on garde la saisie en cours.
+        // déjà ouverte, on garde la saisie
         if (_modalMode == "edit" && _editId == id) return;
         if (_modalMode is not null && !await Unsaved.ConfirmLeaveAsync(_formScope)) return;
         _selectedIds = [id];
         _editId = id;
         if (GetDetail is null)
         {
-            // Pas de fiche détaillée à charger : la ligne du tableau sert
-            // directement de valeurs initiales (TDetail = T).
+            // TDetail = T, la ligne sert de valeurs initiales
             _editRecord = (TDetail)(object)row!;
             _modalMode = "edit";
             return;
@@ -298,9 +267,7 @@ else
         return row is null ? Task.CompletedTask : RowDoubleClickAsync(row);
     }
 
-    // Supprime toutes les lignes sélectionnées, une requête par ligne. Les
-    // échecs (ex. ligne encore référencée ailleurs) n'empêchent pas les
-    // autres suppressions : les lignes en échec restent sélectionnées.
+    // une requête par ligne, les lignes en échec restent sélectionnées
     private async Task DeleteAsync()
     {
         var ids = Selection.ToList();
@@ -362,15 +329,12 @@ else
         Projection!.Open(Entity!, target, ids, single is null ? null : RowLabel(single));
     }
 
-    // Formulaire de la fiche ouverte. @key : une autre fiche ouverte à la
-    // place repart de ses propres valeurs.
+    // @key : une autre fiche repart de ses propres valeurs
     private RenderFragment? FormContent => _modalMode is null ? null : @<GuardBoundary @key="@($"{_modalMode}:{_editId ?? "new"}")" Scope="_formScope">
         @RenderForm(new FormContext<TDetail, TDto>(_modalMode == "edit" ? _editRecord : default, SubmitAsync, RequestCloseFormAsync))
     </GuardBoundary>;
 
-    // Mode « Ligne + bloc » : la modification déplie la ligne directement
-    // dans le tableau au lieu d'utiliser le bloc du haut — le formulaire ne
-    // va donc que dans un seul des deux emplacements à la fois.
+    // Ligne + bloc : l'édition se fait dans la ligne, pas dans le bloc du haut
     private RenderFragment? ModeFormSlot => IsRowExpandMode ? (_modalMode == "create" ? FormContent : null) : FormContent;
 
     private RenderFragment TableArea => @<text>
@@ -384,7 +348,7 @@ else
                    RenderExpandedRow="ExpandedRow" />
         @if (Source.Paginated)
         {
-            // PageSize 0 (« Tous ») : une seule page, l'API renvoie tout sans découpage.
+            // PageSize 0 = tout, une seule page
             var pageCount = Source.PageSize > 0 ? Math.Max(1, (int)Math.Ceiling(Source.Total / (double)Source.PageSize)) : 1;
             <div class="pagination-bar">
                 <span class="pagination-info">

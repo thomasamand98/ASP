@@ -1,10 +1,7 @@
-/* Styles de base : typographie, conteneurs racine, en-tête de page. */
-
 :root {
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  /* Contrôles natifs (barres de défilement, sélecteurs de date...) du
-     thème clair ; tokens.css passe à `dark` avec le thème sombre. */
+  /* tokens.css passe à dark avec le thème sombre */
   color-scheme: light;
   color: var(--text);
   background: var(--bg);
@@ -32,7 +29,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Conteneur principal (voir App.tsx). */
 .app-shell {
   width: 100%;
   max-width: 1700px;
@@ -77,10 +73,7 @@ code {
   color: var(--text-h);
 }
 
-/* En-tête de chaque <Entite>Page.tsx (titre + PageActions) : reste
-   collé en haut au scroll pour garder "Nouveau"/"Supprimer" toujours
-   accessibles, même avec un long tableau en dessous. Décalé sous la barre
-   d'onglets ; sous 768px, décalé en plus sous le bouton burger fixe. */
+/* collé en haut pour garder Nouveau/Supprimer accessibles, sous la barre d'onglets */
 .page-header {
   display: flex;
   justify-content: space-between;

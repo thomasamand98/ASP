@@ -1,6 +1,4 @@
-/* Feuille de pointage (voir PointageSheet.razor). S'appuie sur les jetons
-   globaux d'index.css (--bg, --border, --accent...) pour suivre le thème
-   clair / sombre ; même langage visuel que l'écran Planning. */
+/* jetons globaux pour suivre le thème clair / sombre */
 
 .pt {
 
@@ -11,8 +9,6 @@
   line-height: 1.35;
   letter-spacing: normal;
 }
-
-/* ---------- Barre d'outils ---------- */
 
 .pt ::deep .pt-toolbar {
   display: flex;
@@ -66,7 +62,7 @@
   font-weight: 600;
 }
 
-/* Tant qu'aucun salarié n'est choisi, le sélecteur attire l'œil. */
+/* attire l'œil tant qu'aucun salarié n'est choisi */
 .pt ::deep .pt-field--salarie select.is-empty {
   border-color: color-mix(in srgb, var(--brand) 60%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent);
@@ -103,8 +99,6 @@
   font-weight: 600;
 }
 
-/* ---------- État vide (aucun salarié choisi) ---------- */
-
 .pt ::deep .pt-empty {
   display: flex;
   flex-direction: column;
@@ -136,8 +130,6 @@
 .pt ::deep .pt-empty p {
   max-width: 26rem;
 }
-
-/* ---------- Corps : feuille + récapitulatif ---------- */
 
 .pt ::deep .pt-body {
   display: grid;
@@ -232,8 +224,7 @@
   width: 7rem;
 }
 
-/* Prend la place restante sans élargir le tableau (max-width: 0 + width:
-   100%) ; le texte long est coupé, complet au survol (title). */
+/* max-width: 0 pour ne pas élargir le tableau, texte complet au survol */
 .pt ::deep .pt-col-remark {
   width: 100%;
   max-width: 0;
@@ -349,8 +340,6 @@
   opacity: 1;
 }
 
-/* ---------- Récapitulatif ---------- */
-
 .pt ::deep .pt-summary {
   display: flex;
   flex-direction: column;
@@ -449,8 +438,6 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-
-/* ---------- Responsive ---------- */
 
 @media (max-width: 1100px) {
   .pt ::deep .pt-body {

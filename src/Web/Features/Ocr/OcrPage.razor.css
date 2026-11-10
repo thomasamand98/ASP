@@ -146,7 +146,7 @@
   }
 }
 
-/* Champs : styles globaux (.field) ; seules les tailles propres à l'OCR. */
+/* .field global, juste les tailles ici */
 .ocr-page ::deep .ocr-field select {
   max-width: 24rem;
 }

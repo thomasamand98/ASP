@@ -1,5 +1,3 @@
-/* Fiche affichée dans la ligne dépliée du tableau (édition) — voir
-   RowFicheContent.razor. */
 .vm-rowexpand-fiche {
   padding: 1rem 1.25rem;
 }

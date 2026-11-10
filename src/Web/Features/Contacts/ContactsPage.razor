@@ -1,7 +1,6 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 <CrudPage T="Contact" TDto="CreateContactDto" TDetail="ContactDetail"
           Title="Contacts" LoadingLabel="Chargement des contacts..."
           Source="_list" Columns="Columns" GetRowId="c => c.IDCONTACTS"
@@ -15,9 +14,7 @@
 </CrudPage>
 
 @code {
-    // Colonnes partagées avec l'onglet Contacts de la fiche Société. La
-    // société/fonction/service viennent de la relation SocieteContacts (le
-    // premier élément).
+    // société/fonction/service : premier lien SocieteContacts
     public static readonly IReadOnlyList<Column<Contact>> Columns =
     [
         Col.Key<Contact>("Civilite", "Civilité", c => c.Civilite),
@@ -33,7 +30,6 @@
 
     private ApiList<Contact> _list = default!;
     private CrudApi<CreateContactDto, Contact, ContactDetail> _api = default!;
-    // Pour la liste « Société » de la fiche.
     private ApiList<Societe> _societes = default!;
 
     [Parameter] public ProjectionView? Projection { get; set; }

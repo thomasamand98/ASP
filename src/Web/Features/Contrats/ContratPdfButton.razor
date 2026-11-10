@@ -1,12 +1,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Bouton « Voir le PDF » de la fiche contrat : l'API fusionne le modèle choisi
-   avec les données du contrat (GET /contrats/:id/pdf) et le PDF obtenu
-   s'ouvre dans un nouvel onglet. La route exige le jeton d'accès, qu'un lien
-   classique n'enverrait pas : le PDF est récupéré par l'API authentifiée puis
-   affiché depuis un blob. L'onglet est ouvert avant l'attente réseau, sinon
-   le navigateur bloquerait le popup. *@
+@* route authentifiée : PDF récupéré en blob, onglet ouvert avant l'appel sinon popup bloqué *@
 @if (Templates.Count == 0)
 {
     <span class="contrat-pdf" title="Créez d’abord un modèle de contrat dans Gestion documentaire">
@@ -40,7 +35,6 @@ else
 
     [Parameter, EditorRequired] public string ContratId { get; set; } = "";
 
-    // Modèles de type « CONTRAT », chargés une fois par la page.
     [Parameter] public IReadOnlyList<DocumentTemplateSummary> Templates { get; set; } = [];
 
     protected override void OnInitialized() => _templateId = Templates.FirstOrDefault()?.IDDOCUMENT_TEMPLATES ?? "";

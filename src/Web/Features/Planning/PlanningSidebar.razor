@@ -1,6 +1,4 @@
-@* Panneau gauche du Planning : les commandes à planifier (QT > QT_planifié)
-   et les déchargements en attente. Chaque élément se glisse sur la grille
-   pour créer une exécution. *@
+@* commandes à planifier (QT > QT_planifié) et déchargements en attente *@
 <aside class="pl-side" aria-label="Éléments à planifier">
     <div class="pl-side-tabs" role="tablist">
         <button type="button" role="tab" aria-selected="@(_tab == "commandes" ? "true" : "false")" class="@(_tab == "commandes" ? "is-active" : string.Empty)" @onclick="@(() => _tab = "commandes")">
@@ -142,7 +140,7 @@
 
     private double TotalPlanifie => Commandes.Sum(c => Math.Min(c.QtPlanifie, c.Qt));
 
-    // Regroupement par date de commande, comme les séparateurs de l'écran WinDev.
+    // par date de commande, comme les séparateurs WinDev
     private static List<(double? Day, List<CommandeEnCours> Items)> Groups(List<CommandeEnCours> commandes)
     {
         var groups = new List<(double? Day, List<CommandeEnCours> Items)>();

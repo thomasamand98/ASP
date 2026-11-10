@@ -2,9 +2,7 @@
 @inject UnsavedChangesService Service
 @inject Browser Browser
 
-@* Dialogue « Modifications non enregistrées » : demandé par
-   UnsavedChangesService.ConfirmLeaveAsync quand on quitte une zone
-   modifiée. Échap ou clic sur le fond : on reste sur la saisie. *@
+@* Échap ou clic sur le fond : on reste *@
 @if (Service.IsAsking)
 {
     <div class="unsaved-overlay" @onclick="() => { if (!Service.Saving) Service.Finish(false); }">
@@ -19,7 +17,7 @@
             </p>
             <div class="unsaved-actions">
                 <button type="button" class="btn" @onclick="Service.Discard" disabled="@Service.Saving">Annuler les modifications</button>
-                @* Focus initial : Entrée enregistre, le choix le plus sûr. *@
+                @* focus sur Enregistrer, le choix le plus sûr *@
                 <button type="button" class="btn primary" @ref="_saveButton" @onclick="Service.SaveAsync" disabled="@Service.Saving">
                     @(Service.Saving ? "Enregistrement..." : "Enregistrer les modifications")
                 </button>

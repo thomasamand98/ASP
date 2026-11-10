@@ -1,10 +1,6 @@
 namespace Horizon.Web.Services;
 
-// Libellés d'une catégorie d'énumération (GET /enumerations?categorie=),
-// indexés par `Valeur` — pour afficher le libellé d'un code stocké tel quel
-// en base (ex. l'unité 2 d'une prestation → « Tonne », catégorie
-// « unite_prestation »). Rechargés à chaque ouverture d'écran ; vide si le
-// chargement échoue : l'appelant retombe alors sur le code brut.
+// libellés par code, vide en cas d'erreur (l'appelant affiche le code brut)
 public sealed class EnumerationLabels(ApiClient api)
 {
     private sealed record Row(string? Valeur, string? Valeur_affiche);

@@ -1,6 +1,4 @@
-/* Bandeau « Tâches à faire » (voir TasksPanel.razor) : une barre fixe à
-   droite de l'écran et un panneau qui glisse par-dessus le contenu, sous
-   les tiroirs de fiche et les modales. */
+/* sous les tiroirs de fiche et les modales */
 
 .tasks-rail {
   position: fixed;

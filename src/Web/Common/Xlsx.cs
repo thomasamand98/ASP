@@ -5,13 +5,7 @@ using System.Text;
 
 namespace Horizon.Web.Common;
 
-// Classeur Excel (.xlsx) d'une seule feuille, équivalent de
-// XLSX.utils.json_to_sheet + book_append_sheet + writeFile (SheetJS) utilisés
-// par le front d'origine : une ligne d'en-tête (les libellés), puis une
-// ligne par enregistrement ; texte en cellule texte, nombre en cellule
-// numérique, booléen en cellule booléenne, null laissé vide. Écrit à la main
-// (SpreadsheetML + ZIP) plutôt qu'avec une bibliothèque : quelques Ko au
-// lieu de plusieurs Mo à télécharger dans le navigateur.
+// écrit à la main, une lib ferait plusieurs Mo à télécharger
 public static class Xlsx
 {
     public static byte[] Write(string sheetName, IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<object?>> rows)
@@ -69,7 +63,7 @@ public static class Xlsx
         data.Append("</row>");
     }
 
-    // 0 → A, 25 → Z, 26 → AA...
+    // 0 = A, 25 = Z, 26 = AA...
     private static string ColumnName(int index)
     {
         var name = "";
@@ -77,8 +71,7 @@ public static class Xlsx
         return name;
     }
 
-    // Caractères de contrôle interdits en XML retirés (sauf tabulation et
-    // retours à la ligne).
+    // retire les caractères de contrôle interdits en XML
     private static string Escape(string text) =>
         SecurityElement.Escape(new string([.. text.Where(c => c >= 0x20 || c is '\t' or '\n' or '\r')]))!;
 

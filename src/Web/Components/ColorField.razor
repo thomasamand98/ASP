@@ -1,7 +1,4 @@
-@* Pastille de couleur : un clic ouvre la palette native du navigateur
-   (<input type="color"> posé, transparent, sur la pastille) ; la valeur est
-   lue et renvoyée en entier WinDev, tel que stocké en base (voir
-   Shared/WindevColor.cs). « × » efface la couleur (0). *@
+@* input color transparent posé sur la pastille, valeur en entier WinDev *@
 <span class="color-field">
     <span class="color-field-swatch@(Hex is null ? " color-field-swatch--none" : string.Empty)" style="@(Hex is null ? null : $"background: {Hex}")">
         <input type="color" aria-label="@Label" title="@(Hex is null ? $"{Label} : aucune" : $"{Label} : {Hex}")"
@@ -14,7 +11,7 @@
 </span>
 
 @code {
-    // Couleur WinDev (entier) ; 0 = pas de couleur.
+    // entier WinDev, 0 = pas de couleur
     [Parameter] public long Value { get; set; }
     [Parameter] public EventCallback<long> ValueChanged { get; set; }
     [Parameter, EditorRequired] public string Label { get; set; } = "";

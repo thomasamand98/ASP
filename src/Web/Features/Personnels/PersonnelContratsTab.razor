@@ -1,10 +1,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Onglet « Contrat » de la fiche personnel : contrats de travail du plus
-   récent au plus ancien, chacun avec ses taux horaires (celui en vigueur mis
-   en avant, les précédents dans l'historique). Un seul contrat modifiable à
-   la fois, directement dans sa carte. *@
+@* un seul contrat modifiable à la fois, dans sa carte *@
 @if (_loading)
 {
     <p class="muted">Chargement des contrats…</p>
@@ -58,13 +55,12 @@ else
 @code {
     private const string NewId = "new";
 
-    // Valeurs de la fiche personnel reprises dans un nouveau contrat.
     public sealed record ContratDefaults(string Qualification, double Routier, double Manutention, double Atelier);
 
     private List<ContratTravail> _contrats = [];
     private bool _loading = true;
     private string? _error;
-    // Contrat en cours de modification : son id, NewId, ou null.
+    // son id, NewId, ou null
     private string? _editing;
 
     [Parameter, EditorRequired] public string PersonnelId { get; set; } = "";
@@ -97,7 +93,7 @@ else
         return Task.CompletedTask;
     }
 
-    // Même ordre que l'API : début le plus récent d'abord.
+    // même ordre que l'API, début le plus récent d'abord
     private static List<ContratTravail> Sort(IEnumerable<ContratTravail> contrats) =>
         [.. contrats.OrderByDescending(c => c.Date_debut ?? "", ContratTravailFormat.LocaleComparer)];
 

@@ -1,7 +1,4 @@
-@* Option d'un <select> dont les options arrivent après le premier rendu
-   (listes chargées depuis l'API) : `selected` est posé explicitement, sinon
-   le navigateur garde la première option — Blazor ne réapplique pas la
-   valeur du <select> quand seules ses options changent (React le fait). *@
+@* selected explicite : Blazor ne réapplique pas la valeur du select quand les options arrivent après *@
 <option value="@Value" selected="@(Value == Current)">@ChildContent</option>
 
 @code {

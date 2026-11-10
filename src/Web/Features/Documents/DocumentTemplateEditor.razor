@@ -3,18 +3,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Éditeur d'un modèle de document : trois zones contentEditable côte à côte
-   dans une même page A4 — en-tête et pied de page, répétés sur chaque page à
-   l'impression, et le contenu principal, affiché une fois. Chaque zone
-   glisse-dépose ses propres champs de fusion (MergeFieldPalette) et blocs
-   répétables liés aux listes du contrat (Prestations...) — la palette et la
-   barre d'outils agissent sur la « zone active » (dernière zone où le
-   curseur se trouvait, voir OnActiveZoneChanged), pas nécessairement celle
-   qui a le focus au moment du clic (les boutons de la palette/barre
-   d'outils le lui font perdre). Le contenu de chaque zone est manipulé
-   directement en DOM, en JS (pas piloté par un état Blazor à chaque frappe)
-   pour ne pas perdre la position du curseur à chaque rendu — voir
-   interop.js, docEditor. *@
+@* contenu des zones géré en JS, pas par Blazor (sinon le curseur saute à chaque rendu) *@
 <div class="dte">
     <EditorToolbar OnCommand="Exec" OnInsertFreeTable="InsertFreeTableAsync" OnInsertPageBreak="InsertPageBreakAsync"
                    OnInsertRepeatGroup="InsertRepeatGroupByIdAsync" OnInsertPageNumber="@(_activeZone == "content" ? null : InsertPageNumberAsync)"
@@ -61,12 +50,7 @@
     private ElementReference _headerCanvas, _contentCanvas, _footerCanvas, _codeTextarea;
     private string _activeZone = "content";
     private bool _dirty;
-    // Zone actuellement éditée en code HTML brut plutôt qu'en visuel (bouton
-    // </> de la barre d'outils) — une seule à la fois. Tant qu'elle est
-    // active, le canvas contentEditable correspondant est masqué et
-    // `_codeHtml` fait foi pour cette zone : le canvas n'est réécrit qu'au
-    // moment de sortir du mode code (voir FlushCodeZoneAsync), pas à chaque
-    // frappe dans le textarea.
+    // une seule zone à la fois en mode code, _codeHtml fait foi jusqu'au flush
     private string? _codeZone;
     private string _codeHtml = "";
     private string? _codeZoneRegistered;
@@ -120,10 +104,7 @@
 
     private void MarkDirty() => _dirty = true;
 
-    // Réécrit le canvas de la zone en cours d'édition « code » avec le
-    // contenu du textarea, puis sort du mode code — sans effet si aucune
-    // zone n'y est (appelé avant de lire les canvas, à l'enregistrement ou à
-    // la réinitialisation).
+    // avant toute lecture des canvas
     private async Task FlushCodeZoneAsync()
     {
         if (_codeZone is not { } zone) return;
@@ -140,9 +121,7 @@
             MarkDirty();
             return;
         }
-        // Une autre zone était en mode code : la refermer d'abord (son
-        // propre textarea ne serait sinon plus affiché ni modifiable une
-        // fois qu'on aurait quitté cette zone).
+        // refermer d'abord l'autre zone en mode code
         await FlushCodeZoneAsync();
         _codeHtml = await DocEditor.GetZoneHtmlAsync(CanvasRef(_activeZone));
         _codeZone = _activeZone;
@@ -154,12 +133,7 @@
         MarkDirty();
     }
 
-    // Insère du HTML dans le textarea de code source de la zone active, à la
-    // position donnée — utilisé par InsertFieldAsync/InsertGroupAsync quand
-    // la palette est utilisée pendant que cette zone est en mode code, et
-    // par OnCodeDrop (glisser-déposer), pour ne pas écrire silencieusement
-    // dans le canvas caché (qui serait de toute façon écrasé par le contenu
-    // du textarea à la sortie du mode code).
+    // en mode code : le canvas caché serait écrasé au flush
     private async Task InsertHtmlIntoCodeAsync(string html, int start, int end)
     {
         start = Math.Clamp(start, 0, _codeHtml.Length);
@@ -217,8 +191,7 @@
         await DocEditor.InsertPageBreakAsync(_activeZone);
     }
 
-    // Numéro de page (en-tête/pied uniquement) : pas un champ de fusion — un
-    // texte littéral que Chromium remplit lui-même à l'impression.
+    // numéro rempli par Chromium à l'impression, pas un champ de fusion
     private async Task InsertPageNumberAsync()
     {
         MarkDirty();
@@ -265,9 +238,7 @@
         }
         if (payload is null) return;
 
-        // Un groupe (liste) se dépose toujours comme un bloc de premier
-        // niveau : un <div>/<table> inséré au milieu d'un paragraphe
-        // produirait du HTML imbriqué invalide.
+        // groupe toujours en bloc de premier niveau, jamais dans un paragraphe
         if (payload.Type == "group")
         {
             if (payload.GroupId is not { } groupId || MergeFields.FindGroup(groupId) is not { } group) return;
@@ -277,18 +248,13 @@
             return;
         }
 
-        // Un champ simple se dépose au fil du texte, à la position exacte du
-        // pointeur.
         if (payload.Path is not { } path || MergeFields.FindField(path) is not { } field) return;
         await DocEditor.InsertFieldAtPointAsync(key, field, x, y);
         MarkDirty();
         StateHasChanged();
     }
 
-    // Glisser-déposer depuis la palette pendant l'édition du code HTML brut :
-    // pas d'équivalent de la position par point pour un <textarea> (son
-    // contenu n'est pas du DOM adressable par point), donc insertion à la
-    // position du curseur relevée par interop.js au moment du dépose.
+    // pas de position par point dans un textarea : on prend le curseur
     [JSInvokable]
     public Task OnCodeDrop(string key, string raw, int start, int end)
     {
@@ -323,8 +289,6 @@
         _dirty = false;
     }
 
-    // Quitter l'éditeur modifié (Fermer, retour à la liste, fermeture de
-    // l'onglet) demande « Enregistrer / Annuler les modifications ».
     private async Task CloseAsync()
     {
         if (await Unsaved.ConfirmLeaveAsync(LeaveTarget.Of(_guard))) await OnCancel();

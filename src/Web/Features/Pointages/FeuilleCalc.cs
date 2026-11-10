@@ -23,12 +23,9 @@ public sealed record SheetTotals
 
 public sealed record SheetAmounts(double ChequeRepas, double Nuitees, double HeuresNuit, double Samedis, double Standby);
 
-// Calculs de la feuille de pointage (jours, heures travaillées, totaux,
-// montants).
 public static class FeuilleCalc
 {
-    // Colonne TIME (Heure_*, Debut_pause...) : renvoyée comme un datetime du
-    // 01/01/1970 en UTC — seules les heures et minutes comptent.
+    // colonne TIME renvoyée en datetime du 01/01/1970 UTC, seules h et min comptent
     public static double TimeMinutes(string? value)
     {
         if (string.IsNullOrEmpty(value)) return 0;
@@ -38,10 +35,9 @@ public static class FeuilleCalc
         return (double.IsNaN(h) ? 0 : h) * 60 + (double.IsNaN(m) ? 0 : m);
     }
 
-    // Heure locale d'un horodatage (Date_heure_debut / Date_heure_fin).
     public static string ClockTime(string? value) => Format.ParseLocal(value) is { } date ? Format.Time(date) : "";
 
-    // Durée en minutes → « 07:36 » (une journée) ou « 45 h 36 » (un total).
+    // "07:36" pour une journée, "45 h 36" pour un total
     public static string FormatDuration(double minutes, bool total = false)
     {
         var sign = minutes < 0 ? "-" : "";
@@ -51,7 +47,6 @@ public static class FeuilleCalc
         return total ? $"{sign}{h} h {m}" : $"{sign}{h.ToString("00", CultureInfo.InvariantCulture)}:{m}";
     }
 
-    // H. total = fin − début.
     public static double TotalMinutes(PointageFeuille p)
     {
         if (string.IsNullOrEmpty(p.Date_heure_debut) || string.IsNullOrEmpty(p.Date_heure_fin)) return 0;
@@ -59,9 +54,7 @@ public static class FeuilleCalc
         return ms > 0 ? ms / 60_000 : 0;
     }
 
-    // H. travaillé : Heure_jour quand il est renseigné (journée au forfait,
-    // ex. 07:36 sans heures de début et de fin), sinon total − coupure −
-    // pause. Règle déduite de l'écran WinDev et de l'ancienne liste.
+    // Heure_jour si renseigné (forfait), sinon total - coupure - pause (règle WinDev)
     public static double WorkedMinutes(PointageFeuille p)
     {
         var forfait = TimeMinutes(p.Heure_jour);
@@ -70,7 +63,7 @@ public static class FeuilleCalc
         return Math.Max(TotalMinutes(p) - TimeMinutes(p.Heure_coupure) - pause, 0);
     }
 
-    // Une entrée par jour de la période, avec ses pointages (souvent 0 ou 1).
+    // souvent 0 ou 1 pointage par jour
     public static List<SheetDay> BuildDays(IEnumerable<DateTime> days, IEnumerable<PointageFeuille> pointages)
     {
         var byDay = new Dictionary<string, List<PointageFeuille>>();
@@ -88,8 +81,7 @@ public static class FeuilleCalc
         })];
     }
 
-    // Un jour compte comme presté s'il a des heures travaillées ou un statut
-    // « de travail ».
+    // presté = heures travaillées ou statut de travail
     private static bool IsWorked(PointageFeuille p) => WorkedMinutes(p) > 0 || p.TypeStatut?.Statut_de_travail == 1;
 
     public static SheetTotals ComputeTotals(IEnumerable<SheetDay> days)
@@ -117,18 +109,14 @@ public static class FeuilleCalc
         return totals;
     }
 
-    // Number(valeur) || 0.
+    // NaN = 0
     public static double Rate(string? value)
     {
         var n = JsNumber.Parse(value ?? "0");
         return double.IsNaN(n) ? 0 : n;
     }
 
-    // Montants de la période à partir des taux du contrat. Chèques repas =
-    // jours prestés × taux (vérifié sur l'écran WinDev : 6 × 8 € = 48 €) ; les
-    // autres suivent la même logique quantité × taux. Heures supplémentaires
-    // et balance ne sont pas calculées : leur règle (heures dues) n'est pas
-    // connue.
+    // quantité x taux (vérifié sur WinDev : 6 x 8 € = 48 €), heures sup et balance pas gérées
     public static SheetAmounts? ComputeAmounts(SheetTotals totals, FeuilleTaux? taux)
     {
         if (taux is null) return null;

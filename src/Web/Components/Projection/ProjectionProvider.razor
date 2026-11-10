@@ -1,7 +1,4 @@
-@* Ouvre le résultat d'une projection (bouton Projection de CrudPage) dans un
-   onglet de l'application : la page standard de la table cible, filtrée
-   côté serveur sur les lignes d'origine. Même sélection → même onglet
-   (réactivé plutôt que dupliqué). *@
+@* même sélection = même onglet, réactivé *@
 <CascadingValue Value="_context" IsFixed="true">@ChildContent</CascadingValue>
 
 @code {
@@ -23,7 +20,7 @@
         Tabs.OpenOrActivateTab($"projection:{source}:{target}:{sortedIds}", heading, Page(target, view));
     }
 
-    // Page à afficher dans l'onglet résultat, par table cible.
+    // par table cible
     private static RenderFragment Page(string target, ProjectionView view) => target switch
     {
         "societes" => @<SocietesPage Projection="view" />,

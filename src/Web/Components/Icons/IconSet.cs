@@ -1,8 +1,6 @@
 namespace Horizon.Web.Components.Icons;
 
-// Icônes SVG de l'application (trait, couleur du texte), reprises telles
-// quelles du front d'origine : clé « module.Nom » (ex. « layout.Dashboard »).
-// Utilisées par <Icon Name="..." />.
+// clé "module.Nom", ex. "layout.Dashboard"
 public static class IconSet
 {
     public static readonly IReadOnlyDictionary<string, string> All = new Dictionary<string, string>

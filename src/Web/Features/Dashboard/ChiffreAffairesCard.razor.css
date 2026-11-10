@@ -56,7 +56,7 @@
   width: auto;
 }
 
-/* Même bascule segmentée que le choix du thème (layout/Sidebar.css). */
+/* même bascule que le choix du thème */
 .ca-card ::deep .ca-view-toggle {
   display: flex;
   padding: 2px;
@@ -149,7 +149,7 @@
   opacity: 0.5;
 }
 
-/* Recharts pose un contour de focus sur le SVG au clic : inutile ici. */
+/* pas de contour de focus au clic sur le SVG */
 .ca-card ::deep .ca-chart :focus:not(:focus-visible) {
   outline: none;
 }

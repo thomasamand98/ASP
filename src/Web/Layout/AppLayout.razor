@@ -15,9 +15,7 @@
                 <div class="app-content-page">
                     @foreach (var id in _openTabIds)
                     {
-                        @* Chaque page ouverte reste montée en arrière-plan (juste
-                           masquée) pour conserver son état (filtres, pagination,
-                           ligne sélectionnée...) au changement d'onglet. *@
+                        @* pages gardées montées et juste masquées, pour garder filtres et pagination *@
                         <div @key="id" hidden="@(id != _activeId)">
                             <GuardBoundary Scope="ScopeOf(id)">@ContentOf(id)</GuardBoundary>
                         </div>
@@ -34,9 +32,7 @@
     private const string OpenTabsStorageKey = "mvc-template:openTabs";
     private const string DefaultTabId = "dashboard";
 
-    // Menu de navigation : une entrée sans Items (ex. « Tableau de bord ») est
-    // directement sélectionnable. Pour ajouter un thème, ajouter un groupe ;
-    // pour ajouter une table à un thème existant, ajouter un item à ses Items.
+    // entrée sans Items = sélectionnable directement
     private static readonly IReadOnlyList<MenuNode> Menu =
     [
         new("dashboard", "Tableau de bord", "layout.Dashboard", @<DashboardPage />),
@@ -84,19 +80,13 @@
 
     private static readonly IReadOnlyList<MenuNode> MenuItems = [.. Menu.SelectMany(node => node.Items ?? [node])];
 
-    // Onglets ouverts façon navigateur : cliquer sur une entrée du menu déjà
-    // ouverte l'active simplement, sinon un nouvel onglet est ajouté à la suite.
     private List<string> _openTabIds = [];
     private string _activeId = DefaultTabId;
     private bool _mobileOpen;
 
-    // Onglets ouverts dynamiquement (fiche en mode « Onglet », projection) :
-    // ne survivent pas à un rechargement — seuls les ids d'entrées du menu
-    // sont relus au démarrage.
+    // onglets dynamiques (fiche, projection), perdus au rechargement
     private readonly Dictionary<string, (string Label, RenderFragment Content)> _dynamicTabs = [];
 
-    // Zone de saisie de chaque onglet (voir Components/UnsavedChanges) :
-    // fermer l'onglet vérifie d'abord les fiches modifiées qu'il contient.
     private readonly Dictionary<string, GuardScope> _tabScopes = [];
 
     private TabsContext _tabs = default!;
@@ -111,8 +101,7 @@
         _activeId = stored is not null && _openTabIds.Contains(stored) ? stored : _openTabIds[0];
     }
 
-    // Onglets ouverts lors du dernier passage — filtrés sur les entrées de
-    // menu qui existent toujours, jamais vide (retombe sur le Tableau de bord).
+    // jamais vide, retombe sur le Tableau de bord
     private List<string> InitialOpenTabIds()
     {
         try
@@ -155,7 +144,7 @@
     private RenderFragment? ContentOf(string id) =>
         _dynamicTabs.TryGetValue(id, out var tab) ? tab.Content : MenuItems.FirstOrDefault(item => item.Id == id)?.Page;
 
-    // Bloque le défilement de la page pendant que le tiroir mobile est ouvert.
+    // tiroir mobile ouvert
     private async Task ToggleMobileAsync()
     {
         _mobileOpen = !_mobileOpen;
@@ -168,8 +157,6 @@
         await Browser.LockScrollAsync(false);
     }
 
-    // Sélection depuis le menu : ajoute l'onglet s'il n'est pas déjà ouvert,
-    // puis l'active dans tous les cas (jamais de doublon).
     private void Select(string itemId)
     {
         if (!_openTabIds.Contains(itemId)) _openTabIds.Add(itemId);
@@ -183,18 +170,13 @@
         Persist();
     }
 
-    // Glisser-déposer d'un onglet : remplace l'ordre, l'onglet actif ne change pas.
     private void Reorder(List<string> ids)
     {
         _openTabIds = ids;
         Persist();
     }
 
-    // Ferme un onglet (de menu ou dynamique) : si ce n'était pas l'onglet
-    // actif, rien d'autre à faire. Sinon, bascule sur son voisin (précédent,
-    // sinon suivant) ou, s'il ne reste plus rien, rouvre le Tableau de bord.
-    // Une saisie modifiée dans l'onglet déclenche d'abord « Enregistrer /
-    // Annuler les modifications », sauf avec `force`.
+    // bascule sur le voisin, ou le Tableau de bord s'il ne reste rien ; force = sans confirmation
     private async Task CloseTabAsync(string itemId, bool force)
     {
         if (!force && _tabScopes.TryGetValue(itemId, out var scope) && !await Unsaved.ConfirmLeaveAsync(scope)) return;
@@ -216,9 +198,7 @@
         StateHasChanged();
     }
 
-    // Ouvre la fiche d'un enregistrement dans son propre onglet, ou réactive
-    // celui déjà ouvert pour cet id sans toucher à son contenu (pour ne pas
-    // perdre la saisie en cours si on redouble-clique la même ligne).
+    // déjà ouvert : on réactive sans toucher à la saisie
     private void OpenOrActivateTab(string id, string label, RenderFragment content)
     {
         _dynamicTabs.TryAdd(id, (label, content));

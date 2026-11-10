@@ -3,17 +3,14 @@
   <PropertyGroup>
     <RootNamespace>Horizon.Web</RootNamespace>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
-    <!-- Dates et nombres affichés en fr-BE quel que soit le navigateur
-         (équivalent de toLocaleDateString('fr-BE') côté React). -->
+    <!-- toutes les données ICU, pour fr-BE quel que soit le navigateur -->
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Le framework Blazor WebAssembly et son serveur de développement. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.12" PrivateAssets="all" />
-    <!-- Remplace DOMPurify (JS) : nettoie le HTML d'un modèle de document
-         avant de le poser dans l'éditeur (règle n°5, pas de JS ajouté). -->
+    <!-- nettoie le HTML des modèles de document avant l'éditeur -->
     <PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
   </ItemGroup>
 

@@ -1,10 +1,7 @@
 @implements IDisposable
 @inject ApiClient Api
 
-@* Carte « Chiffre d'affaires » du tableau de bord : facturé et production de
-   la période choisie (année en cours par défaut), comparés à la même période
-   un an plus tôt. Bascule Graphique / Tableau : le tableau donne les valeurs
-   exactes (et remplace le graphique pour qui ne distingue pas les couleurs). *@
+@* le tableau donne les valeurs exactes, utile si on ne distingue pas les couleurs *@
 <section class="ca-card" aria-labelledby="ca-card-title">
     <header class="ca-card-header">
         <h3 id="ca-card-title" class="ca-card-title">
@@ -43,8 +40,7 @@
         </div>
     </header>
 
-    @* Légende + totaux de la période : l'identité de chaque série ne repose
-       jamais sur la seule couleur. *@
+    @* séries jamais identifiées par la seule couleur *@
     <ul class="ca-totals">
         @for (var index = 0; index < CaSeries.All.Count; index++)
         {
@@ -133,8 +129,7 @@
     private string Granularite => _data?.granularite ?? "mois";
     private IReadOnlyList<ChiffreAffairesPoint> Points => _data?.points ?? [];
 
-    // Période en cours : l'évolution ne compare que ce qui est écoulé (jusqu'au
-    // mois ou jour courant), pas 9 mois de cette année à 12 de l'an dernier.
+    // période en cours : on ne compare que ce qui est écoulé
     private bool InProgress => string.CompareOrdinal(_to, DateUtils.ToInputValue(DateTime.Now)) > 0;
 
     private IReadOnlyList<ChiffreAffairesPoint> Elapsed
@@ -161,7 +156,7 @@
 
     private static (string From, string To) CompleteYear(int year) => ($"{year}-01-01", $"{year}-12-31");
 
-    // Même jour décalé d'un an (un 29 février devient le 28).
+    // 29 février devient le 28
     private static string ShiftYear(string day, int years)
     {
         var (y, m, d) = (int.Parse(day[..4]), int.Parse(day[5..7]), int.Parse(day[8..10]));
@@ -185,7 +180,7 @@
     {
         if (value.Length == 0) return Task.CompletedTask;
         var (from, to) = isFrom ? (value, _to) : (_from, value);
-        // Une période inversée devient une période d'un jour sur la borne modifiée.
+        // période inversée : un seul jour sur la borne modifiée
         (_from, _to) = string.CompareOrdinal(from, to) <= 0 ? (from, to) : (value, value);
         return LoadAsync();
     }

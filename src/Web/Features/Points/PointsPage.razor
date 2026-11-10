@@ -1,7 +1,6 @@
 @inject ApiClient Api
 
-@* `Projection` : page ouverte en résultat d'une projection — filtrée sur les
-   lignes d'origine, avec son propre en-tête. *@
+@* Projection : liste filtrée sur les lignes d'origine *@
 <CrudPage T="Point" TDto="CreatePointDto" TDetail="PointDetail"
           Title="Points" LoadingLabel="Chargement des points..."
           Source="_list" Columns="Columns" GetRowId="p => p.IDPOINTS"
@@ -26,8 +25,7 @@
 
     private ApiList<Point> _list = default!;
     private CrudApi<CreatePointDto, Point, PointDetail> _api = default!;
-    // Liste du sélecteur Société, chargée une fois tant que l'onglet reste
-    // ouvert (pas à chaque ouverture de fiche).
+    // une fois tant que l'onglet reste ouvert, pas à chaque fiche
     private ApiList<Societe> _societes = default!;
 
     [Parameter] public ProjectionView? Projection { get; set; }

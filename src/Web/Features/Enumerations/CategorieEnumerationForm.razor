@@ -2,10 +2,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Formulaire de la modale de création/modification d'une catégorie (voir
-   EnumerationsPage). `Initial` vaut null en création. Le nom technique
-   (`Nom`) d'une catégorie système est verrouillé : le code applicatif la
-   retrouve par ce nom. *@
+@* Nom verrouillé pour une catégorie système, le code la retrouve par ce nom *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="enum-form">
     <label class="field">
         Libellé affiché

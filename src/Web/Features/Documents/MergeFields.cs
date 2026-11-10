@@ -1,32 +1,17 @@
 namespace Horizon.Web.Features.Documents;
 
-// Arbre des champs de fusion disponibles pour l'éditeur de modèles de
-// document (voir DocumentTemplateEditor.razor). Un champ « simple » se
-// dépose sous forme d'un jeton dans le texte ; un champ de type « liste » se
-// dépose sous forme d'un tableau répétable (une ligne par élément de la
-// liste au moment de la fusion, côté backend — non implémenté ici).
-//
-// Les chemins (`Path`) reprennent le nom des entités exposées par l'API,
-// pour qu'un futur moteur de fusion puisse les résoudre sans table de
-// correspondance supplémentaire. `[]` marque une collection : un champ sous
-// une liste a un chemin du type `Contrat.Prestations[].Prix_unitaire`.
-
-// Kind "image" (ex. Entite.Logo) : le champ se dépose comme une vignette
-// image plutôt qu'un jeton texte, résolue à la génération contre la data URI
-// base64 du logo.
+// chemins = noms de l'API, [] pour une collection (Contrat.Prestations[].Prix_unitaire)
 public sealed record MergeField(string Path, string Label, string Kind);
 
 public sealed record MergeFieldGroup(
     string Id,
     string Label,
     IReadOnlyList<MergeField> Fields,
-    // Chemin de la collection pour un groupe de type liste (répétable).
+    // seulement pour les groupes répétables
     string? ListPath = null,
-    // Sous-listes imbriquées (ex. les suppléments d'une prestation).
+    // ex. suppléments d'une prestation
     IReadOnlyList<MergeFieldGroup>? Children = null,
-    // Colonnes proposées par défaut quand on dépose le groupe entier (tableau
-    // répétable) — sous-ensemble de Fields, dans l'ordre d'affichage. À
-    // défaut, les 4 premiers champs du groupe sont utilisés.
+    // colonnes du tableau répétable, 4 premiers champs à défaut
     IReadOnlyList<string>? DefaultColumns = null)
 {
     public IReadOnlyList<MergeField> Columns(IReadOnlyList<string>? columnPaths = null)
@@ -124,8 +109,6 @@ public static class MergeFields
         ]),
     ];
 
-    // Aplatit l'arbre (groupes + sous-groupes) pour la recherche et pour
-    // retrouver un champ par chemin.
     public static IEnumerable<MergeFieldGroup> Flatten(IEnumerable<MergeFieldGroup> groups) =>
         groups.SelectMany(g => (IEnumerable<MergeFieldGroup>)[g, .. g.Children is null ? [] : Flatten(g.Children)]);
 
@@ -133,8 +116,6 @@ public static class MergeFields
 
     public static MergeFieldGroup? FindGroup(string id) => Flatten(Groups).FirstOrDefault(g => g.Id == id);
 
-    // Groupes de type liste (répétables), toutes profondeurs confondues —
-    // utilisés pour le sélecteur « Insérer un bloc répétable » de la barre
-    // d'outils.
+    // pour le menu "Insérer un bloc répétable"
     public static IEnumerable<MergeFieldGroup> ListGroups() => Flatten(Groups).Where(g => g.ListPath is not null);
 }

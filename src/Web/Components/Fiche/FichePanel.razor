@@ -1,7 +1,4 @@
-@* Contenu d'un onglet de fiche : monté à la première visite, puis seulement
-   masqué quand on change d'onglet. Une saisie en cours dans un onglet (ex.
-   contrat de travail, contact d'une société) n'est ainsi jamais perdue, et
-   fermer la fiche la signale toujours (voir Components/UnsavedChanges). *@
+@* monté à la première visite puis juste masqué, pour ne pas perdre la saisie *@
 @if (_visited)
 {
     <div hidden="@(!Active)">@ChildContent</div>

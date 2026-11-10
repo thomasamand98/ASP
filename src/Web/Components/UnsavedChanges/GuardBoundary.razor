@@ -1,10 +1,7 @@
 @implements IDisposable
 @inject UnsavedChangesService Service
 
-@* Délimite une zone (onglet, fiche, modale...) : les saisies affichées à
-   l'intérieur y sont rattachées. `Scope` est fourni quand le parent doit
-   pouvoir la vérifier (voir GuardScopes.CreateChild) ; sinon une zone propre
-   est créée. *@
+@* Scope fourni si le parent doit pouvoir la vérifier, sinon zone propre *@
 <CascadingValue Value="CurrentScope">@ChildContent</CascadingValue>
 
 @code {

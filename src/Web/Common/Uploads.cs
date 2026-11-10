@@ -3,11 +3,7 @@ using System.Text;
 
 namespace Horizon.Web.Common;
 
-// Corps multipart/form-data d'un envoi de fichier, encodé comme le FormData
-// du navigateur (nom de fichier en UTF-8 brut, guillemets et retours à la
-// ligne échappés en %22, %0D, %0A) : l'API reçoit exactement ce qu'elle
-// recevait du front d'origine. MultipartFormDataContent de .NET encoderait
-// les noms accentués autrement (RFC 2047).
+// à la main, MultipartFormDataContent encode les accents en RFC 2047
 public static class Uploads
 {
     public static HttpContent Form(IEnumerable<(string Name, string Value)> fields, string field, string fileName, string? contentType, byte[] bytes)
@@ -28,7 +24,7 @@ public static class Uploads
         return content;
     }
 
-    // Champs « type » et « referentId » puis le fichier (onglet Documents).
+    // onglet Documents : type, referentId puis le fichier
     public static HttpContent Form((string, string) first, (string, string) second, string fileName, string? contentType, byte[] bytes) =>
         Form([first, second], "file", fileName, contentType, bytes);
 

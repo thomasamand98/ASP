@@ -1,9 +1,7 @@
 @implements IDisposable
 @inject ApiClient Api
 
-@* Champs d'adresse d'une fiche (dans une grille .fiche-grid) : villes
-   proposées selon le code postal, pays choisi dans la liste de la table
-   `pays` (le nom complet est gardé avec le code ISO). *@
+@* villes proposées selon le CP, pays depuis la table pays *@
 <div class="fiche-grid">
     <FicheField Label="Adresse" Wide="true"><input value="@Value.Adresse1" maxlength="250" autocomplete="address-line1" @oninput="e => Patch(Value with { Adresse1 = Text(e) })" /></FicheField>
     <FicheField Label="Complément" Wide="true"><input value="@Value.Adresse2" maxlength="250" autocomplete="address-line2" @oninput="e => Patch(Value with { Adresse2 = Text(e) })" /></FicheField>
@@ -44,8 +42,7 @@
 
     private Task Patch(AdresseValues next) => OnChange.InvokeAsync(next);
 
-    // Un pays enregistré mais absent de la liste reste proposé, pour ne pas
-    // être perdu à l'enregistrement.
+    // pays enregistré mais absent de la liste : on le garde
     private IEnumerable<PaysOption> PaysChoices =>
         Value.Pays.Length > 0 && !_pays.Any(p => p.ISO == Value.Pays)
             ? [new PaysOption("current", Value.Pays, Value.Pays_full_name.Length > 0 ? Value.Pays_full_name : Value.Pays), .. _pays]
@@ -53,7 +50,7 @@
 
     private IEnumerable<VilleOption> Villes => Value.CP.Trim().Length > 0 ? _villes : [];
 
-    // Liste des pays : ~240 lignes, chargée une seule fois.
+    // ~240 lignes, chargée une seule fois
     protected override async Task OnInitializedAsync()
     {
         try
@@ -62,12 +59,10 @@
         }
         catch (Exception)
         {
-            // Liste indisponible : le pays enregistré reste affiché.
         }
     }
 
-    // Villes du code postal saisi, avec un léger anti-rebond — la table en
-    // compte ~39 000, impossible à charger en une fois.
+    // anti-rebond, ~39 000 villes impossibles à charger d'un coup
     protected override async Task OnParametersSetAsync()
     {
         var cp = Value.CP.Trim();
@@ -83,7 +78,7 @@
         }
         catch (Exception)
         {
-            // Recherche remplacée par une plus récente, ou serveur injoignable.
+            // remplacée par une recherche plus récente, ou serveur injoignable
         }
     }
 

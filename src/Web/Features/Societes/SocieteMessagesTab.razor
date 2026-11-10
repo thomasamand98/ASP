@@ -1,8 +1,6 @@
 @inject ApiClient Api
 
-@* Onglet « Messages envoyés » de la fiche Société : table standard
-   (recherche, filtres, tri, export) mais en lecture seule — ce sont des
-   journaux d'envoi, l'API n'expose ni création ni modification. *@
+@* lecture seule, l'API n'expose que la liste *@
 @if (_messages is null)
 {
     if (_error is not null)
@@ -49,7 +47,7 @@ else
 
     [Parameter, EditorRequired] public string SocieteId { get; set; } = "";
 
-    // Date « AAAA-MM-JJ HH:MM » : triable telle quelle comme du texte.
+    // triable comme du texte
     private static string FormatDateHeure(MessageRow m)
     {
         if (string.IsNullOrEmpty(m.Date_message)) return "";

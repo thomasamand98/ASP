@@ -1,10 +1,6 @@
 @implements IAsyncDisposable
 @inject Browser Browser
 
-@* Bouton « Projection » à côté de Nouveau/Modifier/Supprimer (voir
-   CrudPage) : ouvre la liste des tables liées ; en choisir une affiche ses
-   enregistrements liés aux lignes sélectionnées dans un nouvel onglet. Le
-   menu se ferme au clic ailleurs ou à Échap. *@
 <div class="projection" @ref="_root">
     <button type="button" class="btn" @onclick="ToggleAsync" disabled="@(SelectedCount == 0)" aria-haspopup="menu"
             aria-expanded="@(_open ? "true" : "false")" title="@(SelectedCount == 0 ? "Sélectionnez au moins une ligne" : null)">
@@ -34,7 +30,7 @@
 
     [Parameter, EditorRequired] public IReadOnlyList<Relation> Items { get; set; } = [];
 
-    // Nombre de lignes sélectionnées — 0 désactive le bouton.
+    // 0 désactive le bouton
     [Parameter] public int SelectedCount { get; set; }
     [Parameter] public EventCallback<string> OnSelect { get; set; }
 

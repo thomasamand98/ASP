@@ -1,8 +1,4 @@
-@* Sélecteur « Du … au … » posé à côté du champ Rechercher (ToolbarExtra de
-   CrudPage), sur le modèle de la période du planning et de la feuille de
-   pointage : flèches pour passer à la période précédente / suivante (de même
-   durée), « Aujourd'hui » et « Toutes ». Changer une borne décale l'autre si
-   la période devient inversée. *@
+@* une borne décale l'autre si la période s'inverse *@
 <div class="period-filter" role="group" aria-label="Période">
     <button type="button" class="icon-btn outlined" @onclick="() => ShiftAsync(-1)" disabled="@(Value is null)" aria-label="Période précédente">
         <Icon Name="planning.ChevronLeft" />

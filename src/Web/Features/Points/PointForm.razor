@@ -2,11 +2,7 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Fiche point, en création (Initial null) ou en modification (fiche
-   complète chargée par CrudPage). Le formulaire couvre les onglets
-   Principale et Carte ; l'onglet Contacts (fiches contact complètes, avec
-   leur propre enregistrement) est hors du <form> — pas de formulaires
-   imbriqués — et réservé à un point déjà enregistré. *@
+@* onglet Contacts hors du <form> (pas de formulaires imbriqués) *@
 <div class="fiche">
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
@@ -113,8 +109,7 @@
         </FichePanel>
     </form>
 
-    @* Gardé monté : une fiche contact en cours de saisie survit au
-       changement d'onglet. *@
+    @* gardé monté pour ne pas perdre une fiche contact en cours *@
     @if (Initial is not null)
     {
         <FichePanel Active="@(_tab == "contacts")">
@@ -127,9 +122,7 @@
     private static int _next;
     private readonly string _formId = $"point-form-{++_next}";
 
-    // Champs envoyés à l'API (CreatePointDto) : ids en texte, Archive code
-    // 0/1. L'adresse est aplatie et les plages horaires envoyées en entier :
-    // l'API enregistre les deux à part.
+    // adresse aplatie et plages envoyées en entier, l'API les enregistre à part
     private sealed class Model
     {
         public string Libelle { get; set; } = "";
@@ -159,10 +152,9 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public PointDetail? Initial { get; set; }
 
-    // Valeurs préremplies en création (projection depuis une seule ligne).
+    // projection depuis une seule ligne
     [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
 
-    // Liste du sélecteur Société, chargée par PointsPage.
     [Parameter] public IReadOnlyList<Societe> Societes { get; set; } = [];
     [Parameter] public Func<CreatePointDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
@@ -174,8 +166,7 @@
         new("carte", "Carte"),
     ];
 
-    // Libellé du point, calculé comme dans WinDev : « VILLE, NOM SOCIÉTÉ » ;
-    // s'ils sont vides, le libellé existant est gardé tel quel.
+    // "VILLE, NOM SOCIÉTÉ" comme dans WinDev, sinon on garde l'existant
     private string Libelle
     {
         get
@@ -205,9 +196,7 @@
         return name.Length > 0 ? name : "Sans nom";
     }
 
-    // Le contact par défaut se choisit parmi les contacts liés (à l'ouverture
-    // de la fiche) ; un contact par défaut enregistré mais non lié reste
-    // proposé.
+    // parmi les contacts liés, plus l'actuel s'il n'est pas lié
     private List<(string Id, string Label)> DefaultChoices
     {
         get
@@ -231,7 +220,7 @@
             (a.Adresse1, a.Adresse2, a.Adresse3, a.CP, a.Localite, a.Pays, a.Pays_full_name);
     }
 
-    // Choisir une société reprend son nom (modifiable ensuite).
+    // reprend le nom de la société, modifiable ensuite
     private void SelectSociete(string id)
     {
         var societe = Societes.FirstOrDefault(s => s.IDSOCIETES == id);
@@ -255,8 +244,6 @@
         };
         SetAdresse(AdresseValues.From(Initial?.Adresse));
         if (Initial is null) FormModel.ApplyDefaults(_form, Defaults);
-        // Quitter la fiche modifiée demande « Enregistrer / Annuler les
-        // modifications » (voir Components/UnsavedChanges).
         _guard = new UnsavedForm(Unsaved, Browser, () => _form, SaveAsync);
         _guard.Register(Scope);
     }

@@ -1,6 +1,4 @@
-/* Écran Configuration > Enumérations : catégories à gauche, valeurs de la
-   catégorie sélectionnée à droite. Sous 900px, les deux cartes s'empilent
-   (la liste des catégories devient une zone à hauteur limitée, scrollable). */
+/* sous 900px les deux cartes s'empilent */
 .enum-page {
 }
 
@@ -24,8 +22,6 @@
   outline: var(--focus-outline);
   outline-offset: 2px;
 }
-
-/* ---------- Recherche ---------- */
 
 .enum-page ::deep .enum-search {
   display: flex;
@@ -55,8 +51,6 @@
   font-size: 0.9rem;
   padding: 0.5rem 0;
 }
-
-/* ---------- Catégories ---------- */
 
 .enum-page ::deep .enum-category-list {
   list-style: none;
@@ -149,8 +143,6 @@
 .enum-page ::deep .enum-category .enum-lock {
   margin-left: 0;
 }
-
-/* ---------- Valeurs ---------- */
 
 .enum-page ::deep .enum-values-header {
   display: flex;
@@ -257,8 +249,7 @@
   text-align: right;
 }
 
-/* Les actions de ligne restent discrètes tant que la ligne n'est ni
-   survolée ni focalisée, sauf sur écran tactile où le survol n'existe pas. */
+/* actions discrètes hors survol/focus, sauf en tactile */
 
 .enum-page ::deep .enum-empty,
 .enum-page ::deep .enum-empty-small {
@@ -288,15 +279,12 @@
   color: var(--text);
 }
 
-/* ---------- Formulaires (modales) ---------- */
-
 .enum-page ::deep .enum-form {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
 }
 
-/* Case à cocher + libellé sur une ligne, l'aide passe dessous. */
 .enum-page ::deep .enum-checkbox {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -321,8 +309,6 @@
   max-width: 8rem;
 }
 
-/* ---------- Responsive ---------- */
-
 @media (max-width: 900px) {
   .enum-page ::deep .enum-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -333,8 +319,7 @@
   }
 }
 
-/* Mobile : chaque ligne devient une carte label/valeur, comme le DataTable
-   (voir components/DataTable.css). */
+/* mobile : une carte label/valeur par ligne */
 @media (max-width: 640px) {
   .enum-page ::deep .enum-table thead {
     display: none;

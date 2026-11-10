@@ -4,7 +4,7 @@
   gap: 1rem;
 }
 
-/* Même carte que le tableau de bord (dashboard/ChiffreAffairesCard.css). */
+/* même carte que le tableau de bord */
 .perf-page ::deep .perf-card {
   display: flex;
   flex-direction: column;
@@ -251,8 +251,7 @@
   width: 7rem;
 }
 
-/* Tableau des mesures de transfert : plus de colonnes que le tableau des
-   contrats, défile horizontalement dans un conteneur étroit. */
+/* plus de colonnes, défile horizontalement */
 .perf-page ::deep .perf-table-scroll {
   overflow-x: auto;
 }

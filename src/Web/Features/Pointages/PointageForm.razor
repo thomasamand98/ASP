@@ -2,16 +2,11 @@
 @inject UnsavedChangesService Unsaved
 @inject Browser Browser
 
-@* Fiche d'un pointage, en création (Initial null) ou en modification (fiche
-   complète). H. début / H. fin : seule l'heure est saisie, la date est celle
-   du pointage ; en base ce sont des instants complets, reconstruits à
-   l'enregistrement (une fin égale ou antérieure au début tombe le
-   lendemain). Les champs Heure_* sont des TIME envoyés comme
-   « 1970-01-01THH:MM:00.000Z ». *@
+@* heures début/fin reconstruites en instants à l'enregistrement, fin <= début = lendemain *@
 <form @ref="_formRef" @onsubmit="SaveAsync" @onsubmit:preventDefault="true" class="form">
     <label class="field">
         Date
-        @* Nécessaire pour dater les heures de début et de fin. *@
+        @* pour dater les heures de début et de fin *@
         <input type="date" required="@(_form.Date_heure_debut.Length > 0 || _form.Date_heure_fin.Length > 0)" value="@_form.Date_application"
                @oninput="e => _form.Date_application = (string)e.Value!" />
     </label>
@@ -49,8 +44,7 @@
         Statut
         <select value="@_form.IDType_Statut" @onchange="e => _form.IDType_Statut = (string)e.Value!">
             <option value="">@(Statuts.Count == 0 ? "Aucun statut (table types_statut vide)" : "—")</option>
-            @* Les statuts archivés ne sont plus proposés, sauf celui déjà porté
-               par ce pointage (sinon il serait perdu à l'enregistrement). *@
+            @* statuts archivés masqués, sauf celui du pointage *@
             @foreach (var s in Statuts.Where(s => s.Archive != 1 || s.IDType_Statut == _form.IDType_Statut))
             {
                 <SelectOption @key="s.IDType_Statut" Value="@s.IDType_Statut" Current="@_form.IDType_Statut">
@@ -70,7 +64,6 @@
         Remarque
         <textarea rows="3" value="@_form.Remarque" @oninput="e => _form.Remarque = (string)e.Value!"></textarea>
     </label>
-    @* Boutons en bas, après tous les champs. *@
     <div class="form-actions">
         <button type="button" class="btn" @onclick="() => _guard.ConfirmLeaveAsync(OnCancel)">Annuler</button>
         <button type="submit" class="btn primary" disabled="@_submitting">@(_submitting ? "Enregistrement..." : "Enregistrer")</button>
@@ -80,8 +73,7 @@
 @code {
     private const string ZeroTime = "1970-01-01T00:00:00.000Z";
 
-    // Champs du formulaire (CreatePointageDto) : Date_heure_* en « HH:MM »
-    // (convertis en instants à l'enregistrement), Heure_* en TIME ISO.
+    // Date_heure_* en HH:MM ici, Heure_* en TIME ISO
     private sealed class Model
     {
         public string IDPERSONNELS { get; set; } = "";
@@ -107,31 +99,27 @@
     [CascadingParameter] public GuardScope? Scope { get; set; }
     [Parameter] public PointageDetail? Initial { get; set; }
 
-    // Valeurs préremplies en création (projection, ou jour cliqué de la
-    // feuille) — ignorées en modification.
+    // projection ou jour cliqué, ignorées en modification
     [Parameter] public IReadOnlyDictionary<string, string>? Defaults { get; set; }
 
-    // Listes des sélecteurs, chargées par la page.
     [Parameter] public IReadOnlyList<Personnel> Personnel { get; set; } = [];
     [Parameter] public IReadOnlyList<TypeStatut> Statuts { get; set; } = [];
     [Parameter] public Func<CreatePointageDto, Task> OnSubmit { get; set; } = default!;
     [Parameter] public Func<Task> OnCancel { get; set; } = default!;
 
-    // Une fin égale ou antérieure au début tombe le lendemain.
+    // fin <= début : lendemain
     private static bool EndsNextDay(string debut, string fin) => debut.Length > 0 && fin.Length > 0 && string.CompareOrdinal(fin, debut) <= 0;
 
     private bool NextDay => EndsNextDay(_form.Date_heure_debut, _form.Date_heure_fin);
 
-    // « HH:MM » d'un champ TIME (« 1970-01-01THH:MM… »).
+    // TIME = 1970-01-01THH:MM...
     private static string TimeInput(string? value) => string.IsNullOrEmpty(value) ? "" : value.Length > 11 ? value[11..Math.Min(16, value.Length)] : "";
 
     private static string FromTimeInput(string value) => value.Length > 0 ? $"1970-01-01T{value}:00.000Z" : "";
 
-    // Heure locale « HH:MM » d'un instant.
     private static string ClockInput(string? value) => Format.ParseLocal(value) is { } d ? d.ToString("HH':'mm", CultureInfo.InvariantCulture) : "";
 
-    // Jour « AAAA-MM-JJ » + heure « HH:MM » (heure locale) → instant ISO ;
-    // nextDay : fin le lendemain (travail de nuit).
+    // nextDay : travail de nuit
     private static string ToInstant(string day, string time, bool nextDay = false)
     {
         if (day.Length == 0 || time.Length == 0) return "";

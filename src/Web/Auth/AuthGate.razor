@@ -1,18 +1,7 @@
 @implements IDisposable
 @inject AuthSession Session
 
-@* Garde d'accès de toute l'application : n'affiche ChildContent (l'app
-   elle-même) qu'une fois la session ouverte. Rendre l'application seulement
-   à ce moment évite qu'une page lance ses requêtes avant d'avoir un jeton,
-   et remet tout son état à zéro à chaque changement de session.
-
-   Au chargement, la session est reprise silencieusement grâce au cookie de
-   renouvellement. Sans session valide :
-   - écran de connexion activé (LoginScreen dans appsettings.json) : LoginPage ;
-   - sinon (par défaut, en attendant la vraie authentification) : une session
-     automatique est ouverte sans rien demander à l'utilisateur. Le système
-     de jetons (JWT, renouvellement, contrôle côté API) fonctionne à
-     l'identique. *@
+@* app rendue seulement une fois la session ouverte, aucune requête sans jeton *@
 @if (_status == Status.Checking || (_status == Status.Anonymous && !Session.LoginScreenEnabled))
 {
     <p style="text-align: center; margin-top: 3rem">Chargement...</p>
@@ -50,8 +39,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        // Session perdue en cours d'utilisation (renouvellement refusé, voir
-        // ApiClient) : retour à l'état « anonyme », d'où la session est rouverte.
+        // renouvellement refusé par l'API en cours de route
         Session.SessionLost += OnSessionLost;
         var login = await Session.RefreshAsync();
         if (login is not null) Authenticate(login);
@@ -64,7 +52,6 @@ else
         _status = Status.Authenticated;
     }
 
-    // Session automatique, seulement quand l'écran de connexion est désactivé.
     private async Task BecomeAnonymousAsync()
     {
         _status = Status.Anonymous;

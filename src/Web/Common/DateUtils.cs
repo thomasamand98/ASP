@@ -2,9 +2,7 @@ using System.Globalization;
 
 namespace Horizon.Web.Common;
 
-// Dates locales (heure du navigateur) du planning, de la feuille de pointage
-// et des filtres de période. Une « date » est un DateTime sans fuseau, en
-// heure locale, comme un Date de JavaScript manipulé avec getDate/setDate.
+// DateTime en heure locale du navigateur, sans fuseau
 public static class DateUtils
 {
     public const int MinuteMs = 60_000;
@@ -13,12 +11,12 @@ public static class DateUtils
 
     public static DateTime StartOfDay(DateTime date) => date.Date;
 
-    // Semaine du lundi au dimanche.
+    // lundi
     public static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
 
     public static DateTime AddDays(DateTime date, int days) => date.AddDays(days);
 
-    // Jours de `from` à `to` inclus.
+    // bornes incluses
     public static List<DateTime> DaysInRange(DateTime from, DateTime to)
     {
         var days = new List<DateTime>();
@@ -30,7 +28,6 @@ public static class DateUtils
 
     public static bool IsWeekend(DateTime date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 
-    // Valeur d'un <input type="date"> (AAAA-MM-JJ, heure locale).
     public static string ToInputValue(DateTime date) => date.ToString("yyyy'-'MM'-'dd", CultureInfo.InvariantCulture);
 
     public static DateTime? FromInputValue(string? value)
@@ -39,7 +36,7 @@ public static class DateUtils
         if (parts.Length < 3) return null;
         if (!int.TryParse(parts[0], out var y) || !int.TryParse(parts[1], out var m) || !int.TryParse(parts[2], out var d)) return null;
         if (y == 0 || m == 0 || d == 0) return null;
-        // new Date(y, m - 1, d) : débordements reportés (31/02 → 03/03).
+        // les débordements sont reportés : 31/02 devient 03/03
         try
         {
             return new DateTime(y, 1, 1).AddMonths(m - 1).AddDays(d - 1);
@@ -50,16 +47,14 @@ public static class DateUtils
         }
     }
 
-    // Arrondi JavaScript (Math.round : moitié vers +∞).
+    // .5 arrondi vers le haut, même pour les négatifs
     public static double JsRound(double value) => Math.Floor(value + 0.5);
 
     public static double Snap(double minutes) => JsRound(minutes / SnapMinutes) * SnapMinutes;
 
     public static double Clamp(double value, double min, double max) => Math.Min(Math.Max(value, min), max);
 
-    // Répartit en « couloirs » les éléments qui se chevauchent, pour les
-    // afficher côte à côte au lieu de les empiler. `Lanes` est le nombre de
-    // couloirs du groupe de chevauchement auquel appartient l'élément.
+    // éléments qui se chevauchent mis côte à côte, Lanes = couloirs du groupe
     public static Dictionary<string, (int Lane, int Lanes)> LayoutLanes(IEnumerable<(string Id, double Start, double End)> items)
     {
         var result = new Dictionary<string, (int Lane, int Lanes)>();

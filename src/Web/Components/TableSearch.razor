@@ -1,8 +1,6 @@
 @implements IDisposable
 
-@* Champ « Rechercher » au-dessus des tableaux (voir CrudPage) : garde sa
-   propre saisie pour rester fluide et ne transmet OnChange qu'une fois la
-   frappe terminée (300 ms), ou immédiatement à l'effacement (croix, Échap). *@
+@* saisie locale, OnChange après 300 ms ou tout de suite à l'effacement *@
 <div class="table-search">
     <Icon Name="table.Search" />
     <input type="search" value="@_input" @oninput="OnInput" @onkeydown="OnKeyDown"
@@ -14,8 +12,7 @@
 </div>
 
 @code {
-    // Délai après la dernière frappe avant de lancer la recherche — évite une
-    // requête serveur par caractère tapé.
+    // évite une requête par caractère
     private const int DebounceMs = 300;
 
     private string _input = "";
@@ -39,7 +36,6 @@
         }
         catch (TaskCanceledException)
         {
-            // Nouvelle frappe : la recherche précédente est abandonnée.
         }
     }
 

@@ -1,10 +1,4 @@
-@* Panneau latéral de champs de fusion : glisser-déposer dans le canvas, ou
-   bouton « + » pour insérer sans souris. Les groupes sans `ListPath` sont
-   des champs simples (un seul jeton) ; ceux avec `ListPath` représentent une
-   collection (Prestations...) et se déposent comme un tableau répétable.
-   Le vrai glisser-déposer (DataTransfer) est amorcé en JS par délégation
-   (voir interop.js) : chaque ligne porte juste son payload prêt dans
-   `data-merge-drag`. *@
+@* drag & drop géré en JS, payload dans data-merge-drag *@
 <aside class="dte-palette">
     <div class="dte-palette-search">
         <Icon Name="documents.Search" />
@@ -35,10 +29,6 @@
 
     private static string GroupDrag(MergeFieldGroup group) => System.Text.Json.JsonSerializer.Serialize(new { type = "group", groupId = group.Id });
 
-    // Un champ simple de la palette : glisser dépose un jeton de fusion dans
-    // le texte au point de dépose ; le bouton « + » l'insère à la position
-    // du curseur (ou en fin de document), pour rester utilisable sans
-    // souris.
     private RenderFragment FieldRow(MergeField field) =>
         @<div class="dte-palette-field" draggable="true" data-merge-drag="@FieldDrag(field)">
             <Icon Name="documents.Grip" />
@@ -82,8 +72,7 @@
             }
         </details>;
 
-    // Résultat de recherche : liste plate de champs correspondant au filtre,
-    // avec le libellé de leur groupe pour se repérer.
+    // liste à plat, avec le nom du groupe
     private RenderFragment SearchResults(string query)
     {
         var needle = query.ToLowerInvariant();

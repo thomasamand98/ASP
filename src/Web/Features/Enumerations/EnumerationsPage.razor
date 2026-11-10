@@ -3,10 +3,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Page « Énumérations » du groupe Configuration : liste des catégories à
-   gauche, valeurs de la catégorie sélectionnée à droite (maître/détail).
-   Pas de CrudPage : deux tables liées ne rentrent pas dans son modèle « une
-   table, une fiche » — les modales (Modal) sont en revanche les mêmes. *@
+@* pas de CrudPage : deux tables liées en maître/détail *@
 @if (_loading)
 {
     <p>Chargement des énumérations...</p>
@@ -87,7 +84,7 @@ else
 }
 
 @code {
-    // Modale ouverte : création (Item null) ou modification de l'élément.
+    // Item null = création
     private sealed record ModalState<T>(T? Item);
 
     private List<CategorieEnumeration> _categories = [];
@@ -97,16 +94,14 @@ else
     private string _valueSearch = "";
     private bool _loading = true;
     private string? _error;
-    // Valeurs de la catégorie « _valuesFor » : tant qu'elle ne correspond pas à
-    // la catégorie active, `loadingValues` est vrai et la liste vide — jamais
-    // les valeurs de la catégorie précédente, ni une réponse arrivée en retard.
+    // tant que _valuesFor n'est pas la catégorie active : liste vide, jamais les anciennes valeurs
     private string? _valuesFor;
     private string? _valuesError;
     private int _valuesToken;
     private ModalState<CategorieEnumeration>? _categorieModal;
     private ModalState<Enumeration>? _enumerationModal;
 
-    // Minuscules sans accents, pour que « etat » retrouve « État de la facture ».
+    // pour que "etat" retrouve "État de la facture"
     private static string Normalize(string? value)
     {
         var builder = new StringBuilder();
@@ -121,8 +116,7 @@ else
 
     private static bool IsSet(double? flag) => flag is { } f && f != 0;
 
-    // La sélection retombe sur la première catégorie tant que l'id choisi
-    // n'existe pas (premier chargement, ou catégorie supprimée).
+    // première catégorie si l'id choisi n'existe pas (1er chargement, supprimée)
     private string? ActiveId => _categories.Any(c => c.IDCATEGORIES_ENUMERATION == _selectedId) ? _selectedId : _categories.FirstOrDefault()?.IDCATEGORIES_ENUMERATION;
 
     private CategorieEnumeration? Selected => _categories.FirstOrDefault(c => c.IDCATEGORIES_ENUMERATION == ActiveId);
@@ -149,9 +143,7 @@ else
 
     private double NextOrdre => _enumerations.Aggregate(-1d, (max, e) => Math.Max(max, e.Ordre ?? 0)) + 1;
 
-    // Même tri que l'API (Ordre puis libellé) — réappliqué localement après un
-    // create/update pour que la ligne modifiée retrouve sa place sans refaire
-    // d'appel API.
+    // même tri que l'API, réappliqué en local après create/update
     private static List<Enumeration> Sort(IEnumerable<Enumeration> list) =>
         [.. list.OrderBy(e => e.Ordre ?? 0)
             .ThenBy(e => e.Valeur_affiche ?? "", FormModel.French)
@@ -176,7 +168,6 @@ else
         if (_error is null) await EnsureValuesAsync();
     }
 
-    // Charge les valeurs de la catégorie active si ce n'est pas déjà fait.
     private async Task EnsureValuesAsync()
     {
         if (ActiveId is not { } id || _valuesFor == id) return;
@@ -214,8 +205,7 @@ else
         await EnsureValuesAsync();
     }
 
-    // Le nombre de valeurs affiché à côté de la catégorie suit les
-    // création/suppression sans recharger la liste des catégories.
+    // compteur mis à jour sans recharger les catégories
     private void AdjustCount(string categorieId, int delta) =>
         _categories = [.. _categories.Select(c => c.IDCATEGORIES_ENUMERATION == categorieId ? c with { _count = new CategorieEnumerationCount(c._count.Enumerations + delta) } : c)];
 

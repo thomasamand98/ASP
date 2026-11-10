@@ -1,7 +1,4 @@
-/* Écran Planning (voir PlanningPage.razor). S'appuie sur les jetons
-   globaux d'index.css (--bg, --border, --accent...) pour suivre le thème
-   clair / sombre ; les couleurs de cartes viennent de la marchandise
-   (variable --m posée en style inline). */
+/* couleur des cartes : --m posée en inline depuis la marchandise */
 
 .planning {
   --pl-gutter: 3.4rem;
@@ -11,16 +8,13 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  /* Occupe la hauteur visible sous la barre d'onglets : les deux zones
-     (panneau et grille) défilent chacune de leur côté. */
+  /* panneau et grille défilent chacun de leur côté */
   height: calc(100svh - 9.5rem);
   min-height: 34rem;
   font-size: 0.875rem;
   line-height: 1.35;
   letter-spacing: normal;
 }
-
-/* ---------- Barre d'outils ---------- */
 
 .planning ::deep .pl-toolbar {
   display: flex;
@@ -49,7 +43,7 @@
   font-size: 0.8rem;
 }
 
-/* Jour de la semaine collé à sa date (« lundi 21/09/2026 »). */
+/* "lundi 21/09/2026" */
 .planning ::deep .pl-date-weekday {
   color: var(--text-h);
   font-weight: 600;
@@ -163,8 +157,6 @@
   color: var(--text-h);
 }
 
-/* ---------- Corps : panneau + grille ---------- */
-
 .planning ::deep .pl-body {
   flex: 1;
   min-height: 0;
@@ -185,8 +177,6 @@
   background: var(--bg);
   overflow: hidden;
 }
-
-/* ---------- Panneau latéral ---------- */
 
 .planning ::deep .pl-side {
   display: flex;
@@ -465,8 +455,6 @@
   background: var(--surface);
   font-size: 0.7rem;
 }
-
-/* ---------- Grille ---------- */
 
 .planning ::deep .pl-board {
   position: relative;
@@ -783,8 +771,6 @@
   left: -3px;
 }
 
-/* ---------- Cartes d'exécution ---------- */
-
 .planning ::deep .pl-card {
   position: absolute;
   z-index: 1;
@@ -888,7 +874,7 @@
   margin-top: auto;
 }
 
-/* La carte montre ce que sa taille permet, du moins au plus important. */
+/* contenu réduit selon la taille, du moins au plus important */
 @container (max-height: 74px) {
   .planning ::deep .pl-card-tags { display: none; }
 }
@@ -951,8 +937,6 @@
 .planning ::deep .pl-status-dot--termine {
   background: var(--success-solid);
 }
-
-/* ---------- Fiche de l'exécution sélectionnée ---------- */
 
 .planning ::deep .pl-details {
   position: absolute;
@@ -1027,8 +1011,6 @@
   color: var(--text-h);
 }
 
-/* ---------- Responsive ---------- */
-
 @media (max-width: 1200px) {
   .planning ::deep .pl-kpis {
     margin-left: 0;
@@ -1058,8 +1040,7 @@
   }
 }
 
-/* Sans cela, les lignes d'une carte basse se compressent et se chevauchent
-   au lieu d'être masquées par les @container ci-dessus. */
+/* sinon les lignes d'une carte basse se chevauchent au lieu d'être masquées */
 .planning ::deep .pl-card-inner > * {
   flex-shrink: 0;
 }
@@ -1073,9 +1054,7 @@
   .planning ::deep .pl-card-inner { display: none; }
 }
 
-/* ---------- Redimensionnement ---------- */
-
-/* Poignée de fin de carte : bord bas (mode colonne) ou droit (mode ligne). */
+/* poignée : bord bas en colonne, bord droit en ligne */
 .planning ::deep .pl-card-resize {
   position: absolute;
   z-index: 1;
@@ -1133,8 +1112,6 @@
   box-shadow: var(--shadow);
 }
 
-/* ---------- États de chargement et d'enregistrement ---------- */
-
 .planning ::deep .pl-board.is-loading .pl-board-scroll {
   opacity: 0.55;
   pointer-events: none;
@@ -1152,7 +1129,7 @@
   gap: 0.75rem;
 }
 
-/* En bas à gauche : la fiche de l’exécution occupe le bas à droite. */
+/* à gauche, la fiche de l'exécution est à droite */
 .planning ::deep .pl-notice {
   position: absolute;
   left: 0.9rem;

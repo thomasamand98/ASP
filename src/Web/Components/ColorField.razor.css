@@ -14,12 +14,12 @@
   cursor: pointer;
 }
 
-/* Pas de couleur : pastille barrée en diagonale. */
+/* pas de couleur : pastille barrée */
 .color-field-swatch--none {
   background: linear-gradient(to top right, transparent calc(50% - 1px), var(--danger) 50%, transparent calc(50% + 1px)), var(--bg);
 }
 
-/* L'input natif couvre la pastille, invisible : son clic ouvre la palette. */
+/* input natif invisible par-dessus, son clic ouvre la palette */
 .color-field-swatch input {
   position: absolute;
   inset: 0;

@@ -1,13 +1,7 @@
 @inject ThemeService Theme
 @inject UnsavedChangesService Unsaved
 
-@* Menu latéral : chaque groupe (ex. « Commercial ») est déroulable et liste
-   ses items ; cliquer sur un item le sélectionne via OnSelect, à charge de
-   l'appelant d'afficher le contenu correspondant. Une entrée sans
-   sous-liste (ex. « Tableau de bord ») se sélectionne directement, sans
-   flèche ni déroulé. En dessous de 768px, la sidebar devient un tiroir
-   masqué par défaut (piloté par Open/OnClose) : sélectionner un item la
-   referme automatiquement. *@
+@* tiroir sous 768px, refermé à la sélection *@
 @if (Open)
 {
     <div class="sidebar-backdrop" @onclick="OnClose"></div>
@@ -69,8 +63,7 @@
         </div>
     </div>
 
-    @* Utilisateur connecté et déconnexion — uniquement quand l'écran de
-       connexion est activé (voir Auth/AuthGate.razor). *@
+    @* seulement avec l'écran de connexion *@
     @if (Auth.CanSignOut)
     {
         <div class="sidebar-user">
@@ -96,12 +89,11 @@
     [Parameter, EditorRequired] public string ActiveId { get; set; } = "";
     [Parameter] public EventCallback<string> OnSelect { get; set; }
 
-    // Tiroir mobile (voir le media query dans Sidebar.razor.css) ; sans effet
-    // en desktop où la sidebar reste toujours visible.
+    // mobile seulement
     [Parameter] public bool Open { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 
-    // Le groupe contenant l'entrée active est déroulé à l'ouverture.
+    // groupe de l'entrée active déroulé au départ
     protected override void OnInitialized() =>
         _openGroups = [.. Nodes.Where(n => n.IsGroup && n.Items!.Any(item => item.Id == ActiveId)).Select(n => n.Id)];
 
@@ -116,8 +108,7 @@
         await OnClose.InvokeAsync();
     }
 
-    // Se déconnecter quitte toutes les saisies ouvertes : la sidebar est hors
-    // des onglets, sa zone est celle de toute l'application.
+    // sidebar hors des onglets : sa zone est celle de toute l'app
     private async Task SignOutAsync()
     {
         if (await Unsaved.ConfirmLeaveAsync(Unsaved.Root)) await Auth.SignOutAsync();

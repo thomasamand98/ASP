@@ -34,8 +34,7 @@
   color: var(--text);
 }
 
-/* Écran d'accueil : champs et bouton un peu plus grands que dans les
-   fiches (styles de base : .field et .btn, voir styles/controls.css). */
+/* un peu plus grands que dans les fiches */
 .login-field input {
   padding: 0.6rem 0.75rem;
   font-size: 0.95rem;

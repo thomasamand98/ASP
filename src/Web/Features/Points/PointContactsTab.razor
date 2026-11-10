@@ -1,12 +1,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Onglet « Contacts » de la fiche Point : une carte simplifiée par contact
-   lié au point (fonction, téléphones, email, « Recevoir le planning »),
-   comme dans WinDev. L'œil ouvre la fiche contact complète (ContactForm)
-   dans une modale ; « − » retire le contact du point sans le supprimer.
-   « Recevoir le planning » est enregistré immédiatement (lien
-   point_contacts, hors du formulaire du point). *@
+@* "Recevoir le planning" enregistré tout de suite (point_contacts), hors formulaire du point *@
 @if (_contacts.Loading && _contacts.Data.Count == 0)
 {
     <p class="fiche-empty">Chargement des contacts...</p>
@@ -35,8 +30,7 @@ else
             </ul>
         }
 
-        @* Modale rendue sur place (Blazor n'a pas de portail) : la fiche point
-           s'affiche dans un onglet, où la modale couvre bien toute la fenêtre. *@
+        @* rendue sur place, pas de portail en Blazor *@
         @if (_opened is { } opened)
         {
             <Modal Title="@(opened.Contact is null ? "Nouveau contact" : ContactName(opened.Contact))" OnClose="() => _opened = null">
@@ -62,17 +56,14 @@ else
 }
 
 @code {
-    // Au-delà, la fiche point n'affiche que les premiers contacts
-    // (MaxPageSize côté API).
+    // MaxPageSize côté API
     private const int MaxContacts = 500;
 
-    // Fiche complète ouverte depuis une carte : un contact existant, ou un
-    // nouveau contact (créé lié au point) si Contact est null.
+    // Contact null = nouveau contact lié au point
     private sealed record Opened(Contact? Contact);
 
     private ApiList<Contact> _contacts = default!;
     private CrudApi<CreateContactDto, Contact, ContactDetail> _api = default!;
-    // Pour la liste « Société » de la fiche complète.
     private ApiList<Societe> _societes = default!;
     private Opened? _openedValue;
     private ContactDetail? _detail;
@@ -103,7 +94,6 @@ else
         await Task.WhenAll(_contacts.RefetchAsync(), _societes.RefetchAsync());
     }
 
-    // Charge la fiche complète (GET /contacts/:id) avant d'afficher le formulaire.
     private async Task LoadDetailAsync(string contactId)
     {
         try
@@ -170,8 +160,7 @@ else
         }
     }
 
-    // Enregistrement de la fiche complète : la modale se ferme sur un succès,
-    // reste ouverte (avec la saisie) sur un échec.
+    // la modale reste ouverte avec la saisie en cas d'échec
     private async Task SubmitAsync(CreateContactDto dto)
     {
         if (_opened is not { } opened) return;
@@ -193,7 +182,7 @@ else
         }
     }
 
-    // Carte simplifiée, en lecture seule sauf « Recevoir le planning ».
+    // lecture seule sauf "Recevoir le planning"
     private RenderFragment ContactCard(Contact contact) => __builder =>
     {
         var name = ContactName(contact);

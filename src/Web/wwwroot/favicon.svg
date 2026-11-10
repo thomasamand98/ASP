@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="20 20 140 140" width="48" height="48">
-  <!-- Emblème du logo Horizon (voir src/components/HorizonLogo.tsx) -->
+  <!-- emblème du logo Horizon -->
   <defs>
     <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#FFB547"/>

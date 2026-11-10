@@ -1,8 +1,4 @@
-@* Barre d'onglets façon navigateur, au-dessus de la page active (voir
-   AppLayout) — un onglet par page ouverte depuis le menu latéral. Cliquer
-   sur son libellé l'active, la croix le ferme, on peut les réordonner par
-   glisser-déposer (glisser-déposer natif du navigateur). Toujours affichée,
-   même avec un seul onglet ouvert. *@
+@* réordonnables en drag and drop natif *@
 <div class="tab-bar" role="tablist">
     @foreach (var tab in Tabs)
     {
@@ -26,8 +22,7 @@
 </div>
 
 @code {
-    // Onglet en cours de glissement, et celui actuellement survolé (pour
-    // l'indicateur visuel de dépôt) — sans lien avec l'onglet actif.
+    // pour l'indicateur de dépôt, rien à voir avec l'onglet actif
     private string? _draggedId;
     private string? _dragOverId;
 
@@ -36,7 +31,6 @@
     [Parameter] public EventCallback<string> OnSelect { get; set; }
     [Parameter] public EventCallback<string> OnClose { get; set; }
 
-    // Nouvel ordre des ids après un glisser-déposer.
     [Parameter] public EventCallback<List<string>> OnReorder { get; set; }
 
     private void EndDrag()

@@ -1,9 +1,7 @@
 @implements IDisposable
 @inject UnsavedChangesService Unsaved
 
-@* Modale générique (fond + panneau). Fermer par la croix ou le fond demande
-   d'abord quoi faire d'une saisie modifiée dans la modale (voir
-   Components/UnsavedChanges). *@
+@* croix ou fond : passe par la confirmation des modifs non enregistrées *@
 <div class="modal-overlay" @onclick="RequestCloseAsync">
     <div class="modal-panel" @onclick:stopPropagation="true">
         <div class="modal-header">

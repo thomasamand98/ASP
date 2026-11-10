@@ -1,7 +1,4 @@
-/* Petites briques réutilisables : accessibilité, textes, pastilles, cartes,
-   messages. */
-
-/* Masqué visuellement, lu par les lecteurs d'écran. */
+/* lu par les lecteurs d'écran seulement */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -21,8 +18,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Pastille de statut. Variantes : .success, .warning, .danger, .brand ;
-   neutre par défaut. */
+/* neutre par défaut */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -56,7 +52,6 @@
   color: var(--on-brand);
 }
 
-/* Bloc bordé des fiches (sections, récapitulatifs). */
 .card {
   display: flex;
   flex-direction: column;
@@ -77,7 +72,6 @@
   text-transform: uppercase;
 }
 
-/* Message d'erreur encadré (soumission refusée, chargement échoué). */
 .alert-error {
   margin: 0;
   padding: 0.55rem 0.75rem;
@@ -88,14 +82,12 @@
   font-size: 0.82rem;
 }
 
-/* Erreur courte sous un champ ou un bouton. */
 .error-text {
   margin: 0;
   color: var(--danger);
   font-size: 0.8rem;
 }
 
-/* Liste vide / rien de sélectionné. */
 .empty-state {
   display: flex;
   flex-direction: column;

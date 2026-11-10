@@ -2,9 +2,7 @@ using Horizon.Shared;
 
 namespace Horizon.Web.Common;
 
-// Valeurs de cellule traitées comme en JavaScript (types string / number /
-// boolean / null), pour que le tri, le filtre, l'affichage et l'export du
-// tableau donnent exactement les mêmes résultats que le front d'origine.
+// sémantique JS pour le tri, le filtre et l'export du tableau
 public static class JsValue
 {
     public static bool IsNumber(object? value) => value is double or float or int or long or decimal or short or byte;
@@ -21,7 +19,6 @@ public static class JsValue
         _ => double.NaN,
     };
 
-    // String(valeur).
     public static string ToJsString(object? value) => value switch
     {
         null => "null",
@@ -31,8 +28,7 @@ public static class JsValue
         _ => "[object Object]",
     };
 
-    // Rendu React d'une valeur brute : texte et nombres affichés, rien pour
-    // null, undefined et les booléens.
+    // null et booléens n'affichent rien
     public static string Display(object? value) => value switch
     {
         null or bool => "",
@@ -41,8 +37,7 @@ public static class JsValue
         _ => ToJsString(value),
     };
 
-    // Conversion utilisée par les tris « text » de TanStack Table : nombres
-    // finis en texte, tout le reste (null, objets...) en chaîne vide.
+    // tri texte : nombres finis en texte, le reste vide
     public static string SortText(object? value) => value switch
     {
         string s => s,
@@ -50,7 +45,6 @@ public static class JsValue
         _ => "",
     };
 
-    // Number(valeur) pour les comparaisons relationnelles (< >).
     private static double ToNumber(object? value) => value switch
     {
         null => 0,
@@ -72,6 +66,5 @@ public static class JsValue
     private static bool Greater(object? a, object? b) =>
         a is string x && b is string y ? string.CompareOrdinal(x, y) > 0 : ToNumber(a) > ToNumber(b);
 
-    // compareBasic : a === b ? 0 : a > b ? 1 : -1.
     public static int CompareBasic(object? a, object? b) => StrictEquals(a, b) ? 0 : Greater(a, b) ? 1 : -1;
 }

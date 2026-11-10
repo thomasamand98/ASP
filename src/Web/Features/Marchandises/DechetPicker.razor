@@ -2,9 +2,7 @@
 @inject ApiClient Api
 @inject Browser Browser
 
-@* Recherche d'un déchet par code ou description (GET /dechets?search=),
-   relancée 250 ms après la dernière frappe. Entrée choisit le seul résultat
-   (sans enregistrer la fiche), Échap referme la recherche. *@
+@* relancée 250 ms après la dernière frappe *@
 <div class="mf-picker">
     <input @ref="_input" type="search" placeholder="Rechercher un code ou une description..." value="@_search"
            @oninput="e => SearchAsync((string)e.Value!)" @onkeydown="OnKeyDown"
@@ -75,7 +73,7 @@
         }
     }
 
-    // Entrée ne doit pas enregistrer la fiche : elle choisit le seul résultat.
+    // Entrée ne doit pas enregistrer la fiche
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && _results.Count == 1) await OnSelect.InvokeAsync(_results[0]);

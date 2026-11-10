@@ -1,11 +1,10 @@
-@* Pastille en lecture seule (tableaux, listes) ; rien si pas de couleur. *@
 @if (Hex is not null)
 {
     <span class="color-swatch" style="background: @Hex" title="@Hex" aria-label="Couleur @Hex"></span>
 }
 
 @code {
-    // Entier WinDev, ou texte pour les colonnes BigInt sérialisées.
+    // texte pour les colonnes BigInt sérialisées
     [Parameter] public object? Value { get; set; }
 
     private string? Hex => WindevColor.ToHex(Value);

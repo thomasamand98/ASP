@@ -23,8 +23,7 @@
         _api = new CrudApi<CreateConditionDto, Condition, Condition>(Api, "conditions");
         _columns = MakeColumns(new Dictionary<string, string>());
         var loading = _list.RefetchAsync();
-        // Libellés de l'énumération « type_prestation » indexés par code — le
-        // code brut s'affiche tant qu'ils ne sont pas chargés.
+        // code brut tant que les libellés ne sont pas chargés
         _columns = MakeColumns(await Enumerations.LoadAsync("type_prestation"));
         await loading;
     }
@@ -34,7 +33,6 @@
         Col.Of<Condition>("Type_Prestation", "Type de prestation",
             c => c.Type_Prestation is { } type ? typesPrestation.GetValueOrDefault(JsNumber.ToString(type)) ?? JsNumber.ToString(type) : ""),
         Col.Key<Condition>("Libelle", "Libellé", c => c.Libelle),
-        // Booléen 0/1 affiché « Oui » / « Non ».
         Col.Key<Condition>("CMR_or_FDR", "CMR / FDR", c => c.CMR_or_FDR, c => c.CMR_or_FDR is { } v && v != 0 ? "Oui" : "Non"),
     ];
 }

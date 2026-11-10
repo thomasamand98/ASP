@@ -1,5 +1,3 @@
-/* Fiche condition d'exécution : titre centré, ligne « CMR / Feuille de
-   route » + « Type de prestation », puis le libellé sur toute la largeur. */
 .cond-grid {
   display: grid;
   grid-template-columns: auto 1fr;

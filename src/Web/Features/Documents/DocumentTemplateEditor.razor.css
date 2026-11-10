@@ -5,8 +5,6 @@
   min-width: 0;
 }
 
-/* ---------- Barre d'outils ---------- */
-
 .dte ::deep .dte-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -31,10 +29,7 @@
   margin-left: auto;
 }
 
-/* `display: contents` : le fieldset reste dans l'arbre du DOM (pour que son
-   attribut `disabled` désactive ses boutons/select en mode code source, voir
-   EditorToolbar.tsx) sans devenir lui-même un item flex de .dte-toolbar — ses
-   enfants directs le redeviennent, comme avant son ajout. */
+/* fieldset juste pour disabled, pas un item flex */
 .dte ::deep .dte-toolbar-fieldset {
   display: contents;
   border: none;
@@ -42,9 +37,7 @@
   padding: 0;
 }
 
-/* `opacity` sur le fieldset lui-même n'aurait aucun effet visuel (`display:
-   contents` le retire de l'arbre des boîtes) — appliqué directement à ses
-   boutons/select désactivés. */
+/* opacity sans effet sur un display: contents */
 .dte ::deep .dte-toolbar button:disabled,
 .dte ::deep .dte-toolbar select:disabled {
   opacity: 0.4;
@@ -86,16 +79,7 @@
   max-width: 11rem;
 }
 
-/* ---------- Mise en page palette / canvas ---------- */
-
-/* `align-items: start` : sans ça, une grille étire ses colonnes à la même
-   hauteur — la palette (courte) serait artificiellement étirée à la hauteur
-   du canvas (parfois plusieurs pages de contrat), ce qui casserait son
-   positionnement `sticky` ci-dessous. Plus de hauteur fixée (l'ancien
-   `height: 70vh` forçait un mini-scroll interne en plus du défilement normal
-   de la page — cadre exigu qui coupait visuellement le pied de page dès que
-   le modèle dépassait une page A4) : le canvas prend sa hauteur naturelle, et
-   c'est le défilement normal de la page qui s'en charge. */
+/* sinon palette étirée à la hauteur du canvas, et plus de sticky */
 .dte ::deep .dte-body {
   display: grid;
   grid-template-columns: minmax(220px, 280px) 1fr;
@@ -110,14 +94,7 @@
   }
 }
 
-/* ---------- Palette de champs ---------- */
-
-/* Ancrée en haut de l'écran pendant le défilement (voir .dte-body) plutôt
-   qu'un simple `overflow-y: auto` d'ancienne hauteur fixe : reste accessible
-   même quand le canvas fait plusieurs pages de haut, sans créer son propre
-   cadre de défilement séparé. `max-height`/`overflow-y` bornent sa propre
-   liste, potentiellement plus haute que l'écran une fois tous les groupes
-   dépliés. */
+/* reste visible quand le canvas fait plusieurs pages */
 .dte ::deep .dte-palette {
   display: flex;
   flex-direction: column;
@@ -267,8 +244,6 @@
   color: var(--on-brand);
 }
 
-/* ---------- Canvas (page A4) ---------- */
-
 .dte ::deep .dte-canvas-scroll {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -293,8 +268,6 @@
   flex-direction: column;
   gap: 0.6rem;
 }
-
-/* ---------- Zones (en-tête / contenu / pied) ---------- */
 
 .dte ::deep .dte-zone-header,
 .dte ::deep .dte-zone-footer {
@@ -341,15 +314,10 @@
   min-height: 60mm;
 }
 
-/* ---------- Zone en mode code source ---------- */
-
 .dte ::deep .dte-zone-code {
   display: block;
   width: 100%;
-  /* Bien plus grand que la zone visuelle qu'il remplace (voir
-     .dte-zone-canvas, 2.4rem) : en-tête/pied tiennent en quelques lignes en
-     rendu visuel, mais leur HTML brut (classes, attributs data-*) est
-     nettement plus long à lire — voir domInsert.ts. */
+  /* HTML brut bien plus long que le rendu */
   min-height: 18rem;
   border: none;
   resize: vertical;
@@ -410,8 +378,6 @@
   font-size: 0.85rem;
 }
 
-/* ---------- Jetons de fusion ---------- */
-
 .dte ::deep .dte-chip {
   display: inline-flex;
   align-items: center;
@@ -458,8 +424,7 @@
   color: var(--on-brand);
 }
 
-/* Vignette d'un champ image (ex. Entite.Logo) : rectangle façon logo plutôt
-   que pastille de texte — voir domInsert.ts, createChipElement. */
+/* champ image (logo) */
 .dte ::deep .dte-chip-image {
   position: relative;
   display: inline-flex;
@@ -494,8 +459,6 @@
   top: 0.2rem;
   right: 0.2rem;
 }
-
-/* ---------- Blocs répétables ---------- */
 
 .dte ::deep .dte-repeat {
   margin: 0.5rem 0;
@@ -545,8 +508,6 @@
   background: var(--brand-bg);
 }
 
-/* ---------- Tableaux ---------- */
-
 .dte ::deep .dte-table {
   width: 100%;
   border-collapse: collapse;
@@ -575,9 +536,7 @@
   min-height: 1.6em;
 }
 
-/* Ligne/sous-tableau des prestations supplémentaires, imbriqués dans la
-   ligne de leur prestation (voir starterTemplate.ts) : mis en retrait pour
-   bien montrer qu'ils s'y rattachent. */
+/* prestations supplémentaires, en retrait sous leur prestation */
 .dte ::deep .dte-repeat-subcell {
   border-left: none;
   border-right: none;
@@ -597,8 +556,6 @@
   font-size: 0.9em;
 }
 
-/* ---------- Saut de page ---------- */
-
 .dte ::deep .dte-page-break {
   margin: 1rem 0;
   border-top: 1px dashed var(--text);
@@ -617,8 +574,6 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-
-/* ---------- Barre d'actions ---------- */
 
 .dte ::deep .dte-actions {
   display: flex;

@@ -1,9 +1,6 @@
 @inject Browser Browser
 
-@* Barre d'outils de mise en forme : s'appuie sur document.execCommand, une
-   API dépréciée mais toujours largement supportée, plutôt que d'ajouter une
-   dépendance d'édition riche (tiptap, slate...) pour ce prototype interne —
-   à réévaluer si l'éditeur doit gagner en richesse plus tard. *@
+@* execCommand déprécié mais suffisant ici *@
 <div class="dte-toolbar" role="toolbar" aria-label="Mise en forme du modèle">
     <fieldset class="dte-toolbar-fieldset" disabled="@CodeViewActive">
         <select @ref="_formatBlockSelect" class="dte-toolbar-select" @onchange="ChangeFormatBlock">
@@ -66,9 +63,7 @@
     [Parameter, EditorRequired] public Func<Task> OnInsertPageBreak { get; set; } = default!;
     [Parameter, EditorRequired] public Func<string, Task> OnInsertRepeatGroup { get; set; } = default!;
 
-    // Numéro de page : uniquement pertinent en en-tête/pied (répétés sur
-    // chaque page) — absent tant que la zone active est le contenu, pour ne
-    // pas laisser insérer un jeton qui n'y sera jamais rempli.
+    // null sur la zone contenu, numéro de page jamais rempli là
     [Parameter] public Func<Task>? OnInsertPageNumber { get; set; }
 
     [Parameter, EditorRequired] public Func<Task> OnToggleCodeView { get; set; } = default!;
@@ -84,13 +79,7 @@
     private Task Undo() => OnCommand("undo", null);
     private Task Redo() => OnCommand("redo", null);
 
-    // Les deux sélecteurs ci-dessous sont des menus d'actions, pas des
-    // réglages : une fois la commande lancée, ils reviennent à leur
-    // placeholder (comme le `e.target.value = ''` du front d'origine), plutôt
-    // que de rester sur la dernière option choisie. Un <select> non lié par
-    // `value` ne revient pas spontanément en arrière au prochain rendu (Blazor
-    // ne force sa valeur que si l'expression liée change réellement) : on
-    // réinitialise donc l'élément directement.
+    // menus d'actions : retour au placeholder, Blazor ne le fait pas seul
     private async Task ChangeFormatBlock(ChangeEventArgs e)
     {
         var value = (string)e.Value!;

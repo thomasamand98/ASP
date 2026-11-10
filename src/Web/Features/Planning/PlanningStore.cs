@@ -5,18 +5,10 @@ using Horizon.Web.Services;
 
 namespace Horizon.Web.Features.Planning;
 
-// Changements d'une exécution : dates, et ressource seulement si la carte a
-// changé de ligne / colonne (null = « Non affecté »).
+// ressource seulement si la carte a changé de ligne/colonne (null = Non affecté)
 public sealed record MoveChanges(double Start, double End, (string? Value, bool Set) ChauffeurId = default, (string? Value, bool Set) RemorqueId = default);
 
-// Charge le planning de la période [from, to] (jours inclus) et expose les
-// actions de l'écran, chacune enregistrée immédiatement en base :
-//   - MoveExecution : glisser ou redimensionner une carte. Appliqué tout de
-//     suite à l'écran, puis annulé si l'enregistrement échoue.
-//   - CreateFromCommande / PlaceDechargement / RemoveExecution : appliqués
-//     une fois la réponse du serveur reçue (il fournit l'id et les données
-//     calculées de l'exécution).
-// Chaque action lève l'erreur du serveur, à afficher par l'appelant.
+// MoveExecution est appliqué tout de suite puis annulé en cas d'échec, les autres attendent la réponse
 public sealed class PlanningStore(ApiClient api)
 {
     private string _key = "";
@@ -32,7 +24,7 @@ public sealed class PlanningStore(ApiClient api)
 
     private void Notify() => Changed?.Invoke();
 
-    // Une réponse arrivée après un changement de période est ignorée.
+    // réponse ignorée si la période a changé
     public async Task LoadAsync(DateTime from, DateTime to)
     {
         var key = _key = $"{Clock.ToMs(from)}|{Clock.ToMs(to)}";
@@ -58,7 +50,6 @@ public sealed class PlanningStore(ApiClient api)
         Notify();
     }
 
-    // « Réessayer ».
     public Task ReloadAsync(DateTime from, DateTime to)
     {
         _loadedKey = "";
@@ -140,8 +131,7 @@ public sealed class PlanningStore(ApiClient api)
         return saved.Id;
     }
 
-    // Un déchargement en attente est déjà une exécution (sans date) : le
-    // placer revient à lui donner des dates et une ressource.
+    // un déchargement en attente est déjà une exécution sans date
     public async Task PlaceDechargementAsync(string id, MoveChanges changes)
     {
         var saved = PlanningExecution.From(await TrackAsync(async () =>
